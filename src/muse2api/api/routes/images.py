@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import time
+from dataclasses import replace
 
 from fastapi import APIRouter, Depends, Request
 
@@ -25,13 +26,24 @@ def _image_item(r: MediaResult, fmt: str, svc: Services, base: str) -> dict:
     return item
 
 
+# Asking muse.ai for a "transparent background" makes it reply with text only, so
+# ask for an easy-to-cut plain background and remove it locally instead.
+_CUTOUT_HINT = "Isolated subject on a plain, uncluttered studio background."
+
+
 @router.post("/v1/images/generations")
 async def generate_images(body: ImageGenerationRequest, request: Request,
                           svc: Services = Depends(get_services)) -> dict:
     spec = resolve_model(body.model, "image")
-    req = ImageRequest(prompt=body.prompt, model=spec.id, size=body.size, n=body.n,
+    transparent = body.background == "transparent"
+    prompt = f"{body.prompt.rstrip('. ')}. {_CUTOUT_HINT}" if transparent else body.prompt
+    req = ImageRequest(prompt=prompt, model=spec.id, size=body.size, n=body.n,
                        timeout=svc.settings.image_timeout)
     results = await svc.gateway.generate_image(req)
+    if transparent:
+        # After the gateway call, so the account is not held during matting.
+        results = [replace(r, data=await svc.matting.remove(r.data), mime="image/png")
+                   for r in results]
     base = public_base(request)
     return {"created": int(time.time()),
             "data": [_image_item(r, body.response_format, svc, base) for r in results]}

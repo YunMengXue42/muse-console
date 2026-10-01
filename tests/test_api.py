@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import time
 
@@ -66,6 +67,53 @@ def test_image_b64(client, auth):
     r = client.post("/v1/images/generations", headers=auth,
                     json={"prompt": "a dog", "response_format": "b64_json"})
     assert r.json()["data"][0]["b64_json"]
+
+
+def _fake_matting(client, monkeypatch) -> list[bytes]:
+    seen: list[bytes] = []
+
+    async def fake_remove(data: bytes) -> bytes:
+        seen.append(data)
+        return b"cutout-png"
+
+    monkeypatch.setattr(client.app.state.services.matting, "remove", fake_remove)
+    return seen
+
+
+def test_image_transparent_background(client, auth, monkeypatch):
+    seen = _fake_matting(client, monkeypatch)
+    r = client.post("/v1/images/generations", headers=auth,
+                    json={"prompt": "a fox", "n": 2, "background": "transparent",
+                          "response_format": "b64_json"})
+    assert r.status_code == 200
+    data = r.json()["data"]
+    assert len(seen) == 2
+    assert all(base64.b64decode(d["b64_json"]) == b"cutout-png" for d in data)
+    # The upstream prompt asks for an easy-to-cut background, never "transparent".
+    assert "plain" in data[0]["revised_prompt"]
+    assert "transparent" not in data[0]["revised_prompt"]
+
+
+def test_image_transparent_saved_as_png(client, auth, monkeypatch):
+    _fake_matting(client, monkeypatch)
+    r = client.post("/v1/images/generations", headers=auth,
+                    json={"prompt": "a fox", "background": "transparent"})
+    assert r.json()["data"][0]["url"].endswith(".png")
+
+
+def test_image_opaque_background_skips_matting(client, auth, monkeypatch):
+    seen = _fake_matting(client, monkeypatch)
+    r = client.post("/v1/images/generations", headers=auth,
+                    json={"prompt": "a fox", "background": "opaque"})
+    assert r.status_code == 200
+    assert seen == []
+    assert r.json()["data"][0]["revised_prompt"] == "a fox"
+
+
+def test_image_invalid_background(client, auth):
+    r = client.post("/v1/images/generations", headers=auth,
+                    json={"prompt": "a fox", "background": "glass"})
+    assert r.status_code == 400
 
 
 def test_video_task(client, auth):

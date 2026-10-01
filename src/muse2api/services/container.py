@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from ..accounts.pool import AccountPool
 from ..accounts.store import JsonAccountStore
 from ..config import Settings
+from ..core.matting import Matting
 from ..core.media import MediaStore
 from ..drivers.base import MuseDriver
 from ..drivers.registry import create_driver
@@ -22,6 +23,7 @@ class Services:
     gateway: Gateway
     tasks: TaskManager
     media: MediaStore
+    matting: Matting
 
     @classmethod
     def build(cls, settings: Settings, driver: MuseDriver | None = None) -> Services:
@@ -41,4 +43,5 @@ class Services:
             gateway=Gateway(pool, driver, max_failover=settings.max_failover),
             tasks=TaskManager(settings.tasks_file),
             media=MediaStore(settings.media_dir),
+            matting=Matting(settings.matting_model),
         )

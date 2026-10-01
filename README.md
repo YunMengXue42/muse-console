@@ -181,6 +181,16 @@ curl http://localhost:18610/v1/images/generations \
   -d '{"prompt":"A cyberpunk street on a rainy night","size":"16:9","response_format":"url"}'
 ```
 
+**Transparent background**
+
+muse.ai only returns flat RGB images, so `"background":"transparent"` cuts the subject out locally (BiRefNet + edge colour estimation) and returns an RGBA PNG. Requires `pip install -e '.[matting]'`; the model (~930MB) is downloaded to `~/.u2net` on first use. Expect ~30s extra per image on CPU.
+
+```bash
+curl http://localhost:18610/v1/images/generations \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"prompt":"A red fox sitting","background":"transparent"}'
+```
+
 **Text to video (async task)**
 
 ```bash
@@ -231,6 +241,7 @@ All settings come from environment variables (prefix `MUSE2API_`) or a `.env` fi
 | `MUSE2API_MAX_FAILOVER` | `2` | Maximum number of retries on another account |
 | `MUSE2API_CHROMIUM_PATH` | auto-detected | Path to the browser executable |
 | `MUSE2API_KEEPALIVE_ENABLED` | `false` | Periodically renew sessions in the background |
+| `MUSE2API_MATTING_MODEL` | `birefnet-general` | Model for `background: "transparent"` (`birefnet-general-lite` is faster) |
 
 ## Roadmap
 

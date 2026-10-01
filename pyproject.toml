@@ -20,6 +20,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# background="transparent" for /v1/images/generations (BiRefNet + edge colour estimation)
+matting = [
+    "rembg[cpu]>=2.0.60",
+    "pymatting>=1.1",
+    "pillow>=10",
+]
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",

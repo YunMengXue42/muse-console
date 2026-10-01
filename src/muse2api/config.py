@@ -68,6 +68,13 @@ class Settings(BaseSettings):
     account_cooldown: float = 120.0
     max_failover: int = 2
 
+    # --- background removal (images with background="transparent") ---
+    matting_model: str = Field(
+        default="birefnet-general",
+        description="rembg model used to cut out the subject, e.g. birefnet-general "
+        "(best) or birefnet-general-lite (faster).",
+    )
+
     # --- keepalive (session renewal) ---
     keepalive_enabled: bool = False
     keepalive_interval: float = 6 * 3600
