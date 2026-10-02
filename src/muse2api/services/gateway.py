@@ -32,8 +32,11 @@ class Gateway:
         async with self.pool.lease(exclude=exclude, hint=hint) as lease:
             yield lease
 
-    def _should_retry(self, exc: UpstreamError, attempt: int) -> bool:
-        return exc.retryable and attempt < self.max_failover
+    def _should_retry(self, exc: UpstreamError, attempt: int, tried: list[str]) -> bool:
+        # With no other account to switch to, a retry would only replace the real
+        # error with "no usable account in pool".
+        return (exc.retryable and attempt < self.max_failover
+                and self.pool.has_alternative(tried))
 
     async def chat_stream(self, req: ChatRequest) -> AsyncIterator[str]:
         tried: list[str] = []
@@ -47,11 +50,11 @@ class Gateway:
                     return
                 except UpstreamError as exc:
                     lease.fail(exc)
+                    tried.append(lease.account.id)
                     # Once text reached the client we cannot transparently switch accounts.
-                    if emitted or not self._should_retry(exc, attempt):
+                    if emitted or not self._should_retry(exc, attempt, tried):
                         raise
                     log.warning("chat failed on %s (%s), failing over", lease.account.id, exc)
-                    tried.append(lease.account.id)
 
     async def _run(self, fn: Callable[[Account], Awaitable[T]], hint: str | None = None) -> T:
         tried: list[str] = []
@@ -61,10 +64,10 @@ class Gateway:
                     return await fn(lease.account)
                 except UpstreamError as exc:
                     lease.fail(exc)
-                    if not self._should_retry(exc, attempt):
+                    tried.append(lease.account.id)
+                    if not self._should_retry(exc, attempt, tried):
                         raise
                     log.warning("call failed on %s (%s), failing over", lease.account.id, exc)
-                    tried.append(lease.account.id)
         raise AssertionError("unreachable")
 
     async def generate_image(self, req: ImageRequest) -> list[MediaResult]:
