@@ -604,12 +604,17 @@ class BrowserDriver(MuseDriver):
                 if text_done_at is None:
                     text_done_at = time.monotonic()
                 elif time.monotonic() - text_done_at >= grace:
-                    if denied and not asked_to_attach:
-                        # After a denied upload the agent may keep the file to itself
-                        # and offer to attach it instead; take it up on that once.
-                        log.info("%s withheld after a denied approval; asking for it in chat", kind)
-                        await self._send(tab, f"Please attach the {kind} here in the chat "
-                                              "instead of uploading it.")
+                    if not asked_to_attach:
+                        # The agent often finishes with the file only in its workspace:
+                        # after a denied upload, after post-processing that it shows as
+                        # an image gallery (raw, QC crops and final mixed together), or
+                        # when it recognises a repeat request and points at the earlier
+                        # file. Asking once gets the final file attached in chat.
+                        log.info("%s not attached (%s); asking for it in chat: %.120s", kind,
+                                 "denied approval" if denied else "text-only reply", text)
+                        await self._send(tab, f"Please attach the final {kind} file here in "
+                                              "the chat" + (" instead of uploading it." if denied
+                                                            else ", as a single attachment."))
                         asked_to_attach, text_done_at = True, None
                         base_count = st.get("agentCount", 0)
                         continue
