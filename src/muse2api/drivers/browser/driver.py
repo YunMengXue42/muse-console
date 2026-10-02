@@ -73,6 +73,8 @@ class _Tab:
     turns: list[tuple[str, str]] = field(default_factory=list)
     image_count: int = 0
     thread_url: str = ""
+    quota_note: str = ""
+    """Last ignored quota-hint snippet, so a page polled every 0.6s logs it once."""
     busy: bool = False
     stale: bool = False
     """Cookies were renewed; close this tab once it is idle."""
@@ -380,12 +382,20 @@ class BrowserDriver(MuseDriver):
         tail = state.get("tail", "")
         low = tail.lower()
         if hit := next((h for h in dom.QUOTA_HINTS if h in low), None):
-            # The hints are matched on raw page text, so keep the evidence: a prompt
-            # or reply that merely mentions a limit would otherwise read as a quota hit.
             i = low.find(hit)
             snippet = " ".join(tail[max(0, i - 120):i + 120].split())
-            log.warning("quota hint %r on %s: %s", hit, tab.thread_url or "new thread", snippet)
-            raise UpstreamQuotaError(f"muse.ai reports the account is out of quota: …{snippet}…")
+            # The page tail also holds the prompt and the thread-history sidebar, and
+            # matching it cooled down accounts whose images muse.ai went on to deliver.
+            # Only a finished agent reply that says so counts; anything else is logged.
+            reply = state.get("lastText", "")
+            if not state.get("generating") and hit in reply.lower():
+                log.warning("quota hint %r in reply on %s: %s", hit,
+                            tab.thread_url or "new thread", snippet)
+                raise UpstreamQuotaError(f"muse.ai reports the account is out of quota: …{snippet}…")
+            if snippet != tab.quota_note:
+                tab.quota_note = snippet
+                log.info("ignoring quota hint %r outside the reply on %s: %s", hit,
+                         tab.thread_url or "new thread", snippet)
         return state
 
     async def _prepare(self, tab: _Tab, prompt: str, images: list[InputImage]) -> dict:
