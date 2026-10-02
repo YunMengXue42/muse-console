@@ -192,17 +192,15 @@ curl http://localhost:18610/v1/images/generations \
   -d '{"prompt":"A red fox sitting","background":"transparent"}'
 ```
 
-**With reference images**
+**Image from reference images**
 
-Up to 4 reference images per request. muse.ai uses them as references, so prompts like "the same fox, now wearing a scarf" keep the subject and scene. `mask` (inpainting a region) is not supported.
+`"image"` takes one reference image or a list of up to 4 (data URL, http(s) URL or bare base64). They are attached to the muse.ai message like a chat upload, and the prompt says how to use them, e.g. put a product on a model, or "the same fox, now wearing a red scarf" to keep the subject and scene. `/v1/images/edits` does the same with OpenAI-style multipart uploads, so `client.images.edit()` works; `mask` (inpainting a region) is not supported.
 
 ```bash
-# JSON: data URL, http(s) URL or base64 string (or a list of them)
 curl http://localhost:18610/v1/images/generations \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
-  -d '{"prompt":"The same fox, now wearing a red scarf","image":"https://example.com/fox.png"}'
+  -d '{"prompt":"A model wearing exactly this hoodie, studio photo","image":"data:image/jpeg;base64,..."}'
 
-# Multipart, OpenAI-compatible (client.images.edit)
 curl http://localhost:18610/v1/images/edits \
   -H "Authorization: Bearer $KEY" \
   -F "image[]=@fox.png" -F "prompt=The same fox, now wearing a red scarf"

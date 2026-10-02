@@ -110,6 +110,46 @@ def test_image_opaque_background_skips_matting(client, auth, monkeypatch):
     assert r.json()["data"][0]["revised_prompt"] == "a fox"
 
 
+def _capture_image_requests(client, monkeypatch):
+    seen = []
+    gateway = client.app.state.services.gateway
+    original = gateway.generate_image
+
+    async def spy(req):
+        seen.append(req)
+        return await original(req)
+
+    monkeypatch.setattr(gateway, "generate_image", spy)
+    return seen
+
+
+def test_image_reference_images(client, auth, monkeypatch):
+    seen = _capture_image_requests(client, monkeypatch)
+    png = base64.b64encode(b"\x89PNG fake").decode()
+    r = client.post("/v1/images/generations", headers=auth,
+                    json={"prompt": "a model wearing this hoodie",
+                          "image": [f"data:image/png;base64,{png}", f"data:image/jpeg;base64,{png}"]})
+    assert r.status_code == 200
+    refs = seen[0].reference_images
+    assert [i.mime for i in refs] == ["image/png", "image/jpeg"]
+    assert refs[0].data == b"\x89PNG fake"
+
+
+def test_image_single_reference_string(client, auth, monkeypatch):
+    seen = _capture_image_requests(client, monkeypatch)
+    png = base64.b64encode(b"x").decode()
+    r = client.post("/v1/images/generations", headers=auth,
+                    json={"prompt": "p", "image": f"data:image/png;base64,{png}"})
+    assert r.status_code == 200
+    assert len(seen[0].reference_images) == 1
+
+
+def test_image_too_many_references(client, auth):
+    png = "data:image/png;base64," + base64.b64encode(b"x").decode()
+    r = client.post("/v1/images/generations", headers=auth, json={"prompt": "p", "image": [png] * 5})
+    assert r.status_code == 400
+
+
 def test_image_invalid_background(client, auth):
     r = client.post("/v1/images/generations", headers=auth,
                     json={"prompt": "a fox", "background": "glass"})
