@@ -244,8 +244,9 @@ class BrowserDriver(MuseDriver):
         state: dict = {}
         while time.monotonic() < deadline:
             await asyncio.sleep(0.25)
-            with contextlib.suppress(CDPError):
-                state = await tab.session.evaluate(dom.PAGE_STATE) or {}
+            # A busy page can leave Runtime.evaluate unanswered while it loads; poll again.
+            with contextlib.suppress(CDPError, TimeoutError):
+                state = await tab.session.evaluate(dom.PAGE_STATE, timeout=5.0) or {}
                 if state.get("ready"):
                     return
         head = (state.get("head") or "").lower()

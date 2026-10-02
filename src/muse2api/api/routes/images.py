@@ -6,9 +6,10 @@ from dataclasses import replace
 
 from fastapi import APIRouter, Depends, Request
 
+from ...core.media import load_image_ref
 from ...core.models import resolve_model
-from ...drivers.base import ImageRequest, MediaResult
-from ...errors import FeatureNotImplemented
+from ...drivers.base import ImageRequest, InputImage, MediaResult
+from ...errors import FeatureNotImplemented, InvalidRequest
 from ...services.container import Services
 from ..deps import get_services, public_base, require_api_key
 from ..schemas import ImageGenerationRequest
@@ -29,6 +30,7 @@ def _image_item(r: MediaResult, fmt: str, svc: Services, base: str) -> dict:
 # Asking muse.ai for a "transparent background" makes it reply with text only, so
 # ask for an easy-to-cut plain background and remove it locally instead.
 _CUTOUT_HINT = "Isolated subject on a plain, uncluttered studio background."
+_MAX_REFS = 4
 
 
 @router.post("/v1/images/generations")
@@ -37,8 +39,13 @@ async def generate_images(body: ImageGenerationRequest, request: Request,
     spec = resolve_model(body.model, "image")
     transparent = body.background == "transparent"
     prompt = f"{body.prompt.rstrip('. ')}. {_CUTOUT_HINT}" if transparent else body.prompt
+    refs = [body.image] if isinstance(body.image, str) else (body.image or [])
+    if len(refs) > _MAX_REFS:
+        raise InvalidRequest(f"at most {_MAX_REFS} reference images")
+    # Attached to the muse.ai message like a chat upload; the prompt says how to use them.
+    reference_images = [InputImage(*(await load_image_ref(r))) for r in refs]
     req = ImageRequest(prompt=prompt, model=spec.id, size=body.size, n=body.n,
-                       timeout=svc.settings.image_timeout)
+                       reference_images=reference_images, timeout=svc.settings.image_timeout)
     results = await svc.gateway.generate_image(req)
     if transparent:
         # After the gateway call, so the account is not held during matting.

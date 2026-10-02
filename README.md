@@ -191,6 +191,16 @@ curl http://localhost:18610/v1/images/generations \
   -d '{"prompt":"A red fox sitting","background":"transparent"}'
 ```
 
+**Image from reference images**
+
+`"image"` takes one reference image or a list of up to 4 (data URL, http(s) URL or bare base64). They are attached to the muse.ai message like a chat upload, and the prompt says how to use them, e.g. put a product on a model.
+
+```bash
+curl http://localhost:18610/v1/images/generations \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"prompt":"A model wearing exactly this hoodie, studio photo","image":"data:image/jpeg;base64,..."}'
+```
+
 **Text to video (async task)**
 
 ```bash
@@ -218,7 +228,7 @@ curl http://localhost:18610/admin/accounts \
 | GET | `/healthz` · `/readyz` | Liveness · readiness (driver state and available accounts) |
 | GET | `/v1/models` | Model list, including aliases such as `gpt-4o` and `dall-e-3` |
 | POST | `/v1/chat/completions` | Chat, streaming and non-streaming |
-| POST | `/v1/images/generations` | Text to image, returns `url` or `b64_json` |
+| POST | `/v1/images/generations` | Text to image (optional reference `image`s), returns `url` or `b64_json` |
 | POST | `/v1/videos` · GET `/v1/videos/{id}` | Create a video task · query a task |
 | GET | `/v1/media/{name}` | Download generated media |
 | GET/POST/PATCH/DELETE | `/admin/accounts[/{id}]` | Account CRUD |
