@@ -543,6 +543,10 @@ class BrowserDriver(MuseDriver):
     # only" right now may still be finalising. Keep waiting this long for the
     # attachment to appear/load before treating the reply as a refusal.
     _MEDIA_GRACE = {"video": 90.0, "image": 8.0}
+    # The timeout is soft while muse.ai is visibly still working (stop button
+    # shown or attachment loading): giving up then threw away images that landed
+    # a minute later, and the failover started the whole generation over.
+    _OVERRUN_FACTOR = 2.5
 
     async def _wait_media(self, tab: _Tab, base: dict, kind: str, timeout: float,
                           on_progress, cancel: asyncio.Event | None) -> dict:
@@ -551,8 +555,11 @@ class BrowserDriver(MuseDriver):
         grace = self._MEDIA_GRACE.get(kind, 8.0)
         started = time.monotonic()
         text_done_at: float | None = None
-        denied = asked_to_attach = False
-        while time.monotonic() - started < timeout:
+        denied = asked_to_attach = busy = False
+        while True:
+            elapsed = time.monotonic() - started
+            if elapsed >= timeout and not (busy and elapsed < timeout * self._OVERRUN_FACTOR):
+                break
             if cancel and cancel.is_set():
                 raise asyncio.CancelledError
             await asyncio.sleep(0.6)
@@ -565,6 +572,7 @@ class BrowserDriver(MuseDriver):
             fresh = [a for a in new_atts if a.get("src") and a.get("kind") == kind]
             if fresh:
                 return fresh[-1]
+            busy = bool(st.get("generating")) or any(kind in (a.get("tid") or "") for a in new_atts)
             elapsed = time.monotonic() - started
             if on_progress:
                 on_progress(min(95, int(elapsed / timeout * 100)))
@@ -600,6 +608,8 @@ class BrowserDriver(MuseDriver):
                     raise UpstreamRefused(f"upstream replied with text only: {text[:200]}")
             else:
                 text_done_at = None
+        if busy:
+            log.warning("%s still generating after %.0fs; giving up", kind, elapsed)
         raise UpstreamTimeout(f"{kind} generation timed out")
 
     _VIDEO_EXT = (".mp4", ".webm", ".mov", ".m4v")
