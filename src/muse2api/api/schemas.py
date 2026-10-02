@@ -71,3 +71,14 @@ class AccountUpdate(BaseModel):
     enabled: bool | None = None
     cookies: dict[str, str] | None = None
     cookie_expires: dict[str, int] | None = None
+
+
+class KeyCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    note: str = Field(default="", max_length=500)
+
+
+class KeyUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    note: str | None = Field(default=None, max_length=500)
+    revoked: bool | None = None

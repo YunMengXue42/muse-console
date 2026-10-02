@@ -6,12 +6,14 @@ from dataclasses import dataclass
 
 from ..accounts.pool import AccountPool
 from ..accounts.store import JsonAccountStore
+from ..auth.keys import KeyStore
 from ..config import Settings
 from ..core.matting import Matting
 from ..core.media import MediaStore
 from ..drivers.base import MuseDriver
 from ..drivers.registry import create_driver
 from .gateway import Gateway
+from .request_log import RequestLog
 from .tasks import TaskManager
 
 
@@ -24,6 +26,8 @@ class Services:
     tasks: TaskManager
     media: MediaStore
     matting: Matting
+    keys: KeyStore
+    requests: RequestLog
 
     @classmethod
     def build(cls, settings: Settings, driver: MuseDriver | None = None) -> Services:
@@ -44,4 +48,6 @@ class Services:
             tasks=TaskManager(settings.tasks_file),
             media=MediaStore(settings.media_dir),
             matting=Matting(settings.matting_model),
+            keys=KeyStore(settings.keys_file),
+            requests=RequestLog(settings.requests_db),
         )

@@ -53,6 +53,7 @@ def _task_view(task: Task) -> dict:
 
 async def _generate(body: ImageGenerationRequest, refs: list[InputImage],
                     request: Request, svc: Services) -> dict:
+    request.state.model = body.model or resolve_model(body.model, "image").id
     if len(refs) > MAX_REFERENCE_IMAGES:
         raise InvalidRequest(f"at most {MAX_REFERENCE_IMAGES} reference images are supported")
     if body.async_:
@@ -72,7 +73,9 @@ def _submit(body: ImageGenerationRequest, refs: list[InputImage], request: Reque
 
     meta = {"model": spec.id, "prompt": body.prompt, "size": body.size, "n": body.n,
             "references": len(refs)}
-    return _task_view(svc.tasks.submit("image", meta, runner))
+    task = svc.tasks.submit("image", meta, runner)
+    request.state.task_id = task.id
+    return _task_view(task)
 
 
 async def _run(body: ImageGenerationRequest, refs: list[InputImage], base: str,
@@ -128,8 +131,10 @@ async def edit_images(request: Request, svc: Services = Depends(get_services)) -
 
 
 @router.get("/v1/images/generations/{task_id}")
-async def get_image_task(task_id: str, svc: Services = Depends(get_services)) -> dict:
+async def get_image_task(task_id: str, request: Request,
+                         svc: Services = Depends(get_services)) -> dict:
     task = svc.tasks.get(task_id)
     if task is None or task.kind != "image":
         raise NotFound(f"image task '{task_id}' not found")
+    request.state.model = task.request.get("model")
     return _task_view(task)

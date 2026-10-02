@@ -11,6 +11,7 @@ from ..accounts.model import Account
 from ..accounts.pool import AccountPool, Lease
 from ..drivers.base import ChatRequest, ImageRequest, MediaResult, MuseDriver, VideoRequest
 from ..errors import UpstreamError
+from .request_log import note_account
 
 log = logging.getLogger(__name__)
 T = TypeVar("T")
@@ -27,9 +28,11 @@ class Gateway:
     @asynccontextmanager
     async def _lease(self, exclude: list[str], hint: str | None) -> AsyncIterator[Lease]:
         if not self.driver.requires_account and not self.pool.all():
+            note_account(_ANONYMOUS.id)
             yield Lease(_ANONYMOUS)
             return
         async with self.pool.lease(exclude=exclude, hint=hint) as lease:
+            note_account(lease.account.id)
             yield lease
 
     def _should_retry(self, exc: UpstreamError, attempt: int, tried: list[str]) -> bool:

@@ -38,6 +38,9 @@ class Settings(BaseSettings):
 
     # --- storage ---
     data_dir: Path = Path("data")
+    request_log_retention_days: float = Field(
+        default=14, description="Days of /v1/* request history kept in data/requests.db."
+    )
 
     # --- upstream driver ---
     driver: DriverName = "mock"
@@ -94,6 +97,14 @@ class Settings(BaseSettings):
     @property
     def key_file(self) -> Path:
         return self.data_dir / "api_key"
+
+    @property
+    def keys_file(self) -> Path:
+        return self.data_dir / "keys.json"
+
+    @property
+    def requests_db(self) -> Path:
+        return self.data_dir / "requests.db"
 
     @property
     def profile_dir(self) -> Path:

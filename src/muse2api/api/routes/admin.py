@@ -1,21 +1,25 @@
-"""Admin API: account pool management, status and tasks.
+"""Admin API: account pool management, status, tasks, client keys and the request log.
 
-A web console (and a browser extension for one-click cookie import) are planned
-on top of these endpoints; see docs/ARCHITECTURE.md.
+The ``/dashboard`` page is built on these endpoints; a browser extension for
+one-click cookie import is planned on top of them too (see docs/ARCHITECTURE.md).
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+import time
+from typing import Literal
+
+from fastapi import APIRouter, Depends, Query
 
 from ... import __version__
 from ...accounts.keepalive import renew_account
 from ...accounts.model import Account, AccountStatus
+from ...auth.keys import ApiKey
 from ...errors import InvalidRequest, NotFound
 from ...services.container import Services
 from ...upstream.muse import missing_session_cookies
 from ..deps import get_services, require_admin_key
-from ..schemas import AccountCreate, AccountUpdate
+from ..schemas import AccountCreate, AccountUpdate, KeyCreate, KeyUpdate
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin_key)])
 
@@ -101,3 +105,67 @@ async def list_tasks(limit: int = 100, svc: Services = Depends(get_services)) ->
 @router.post("/tasks/{task_id}/cancel")
 async def cancel_task(task_id: str, svc: Services = Depends(get_services)) -> dict:
     return {"cancelled": await svc.tasks.cancel(task_id)}
+
+
+# ---- client API keys ----
+def _get_key(svc: Services, key_id: str) -> ApiKey:
+    key = svc.keys.get(key_id)
+    if key is None:
+        raise NotFound(f"key '{key_id}' not found")
+    return key
+
+
+@router.get("/keys")
+async def list_keys(svc: Services = Depends(get_services)) -> dict:
+    return {"data": [k.public() for k in svc.keys.all()]}
+
+
+@router.post("/keys")
+async def create_key(body: KeyCreate, svc: Services = Depends(get_services)) -> dict:
+    key, plaintext = await svc.keys.create(body.name.strip(), body.note)
+    # The only time the plaintext key is ever returned.
+    return {"key": key.public(), "api_key": plaintext}
+
+
+@router.patch("/keys/{key_id}")
+async def update_key(key_id: str, body: KeyUpdate, svc: Services = Depends(get_services)) -> dict:
+    key = _get_key(svc, key_id)
+    if body.name is not None:
+        key.name = body.name.strip()
+    if body.note is not None:
+        key.note = body.note
+    if body.revoked is not None:
+        key.revoked = body.revoked
+    await svc.keys.save()
+    return {"key": key.public()}
+
+
+@router.delete("/keys/{key_id}")
+async def delete_key(key_id: str, svc: Services = Depends(get_services)) -> dict:
+    if not await svc.keys.remove(key_id):
+        raise NotFound(f"key '{key_id}' not found")
+    return {"deleted": key_id}
+
+
+# ---- request log ----
+@router.get("/requests")
+async def list_requests(
+    key_id: str | None = None,
+    account_id: str | None = None,
+    status: Literal["2xx", "3xx", "4xx", "5xx"] | None = None,
+    path: str | None = None,
+    since: float | None = Query(default=None, description="Unix seconds"),
+    hide_polls: bool = False,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    svc: Services = Depends(get_services),
+) -> dict:
+    return await svc.requests.query(key_id=key_id, account_id=account_id, status=status,
+                                    path=path, since=since, hide_polls=hide_polls,
+                                    limit=limit, offset=offset)
+
+
+@router.get("/stats")
+async def stats(window: Literal["1h", "24h", "7d"] = "24h",
+                svc: Services = Depends(get_services)) -> dict:
+    return {"now": time.time(), **await svc.requests.stats(window)}

@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>muse2api dashboard</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #f6f7f9; --panel: #ffffff; --panel-2: #f0f2f5; --border: #dfe3e8;
+  --text: #1b1f24; --muted: #667080; --accent: #2f6fde; --accent-text: #ffffff;
+  --ok: #1f8a4c; --warn: #b7791f; --err: #c93a3a; --ok-bg: #e5f5ec; --warn-bg: #fdf3e1; --err-bg: #fbe8e8;
+  --bar: #2f6fde; --bar-err: #d9534f; --grid: #e7eaee;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1216; --panel: #171b21; --panel-2: #1e232a; --border: #2a3039;
+    --text: #e3e7ec; --muted: #8b95a3; --accent: #5b8ef0; --accent-text: #0b0e12;
+    --ok: #4cc488; --warn: #e0a84a; --err: #ef6b6b; --ok-bg: #12291d; --warn-bg: #2d2412; --err-bg: #301717;
+    --bar: #5b8ef0; --bar-err: #ef6b6b; --grid: #232932;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+button, input, select, textarea { font: inherit; color: inherit; }
+header { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--border); }
+.bar { max-width: 1280px; margin: 0 auto; padding: 8px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand { font-weight: 650; letter-spacing: .2px; }
+.brand small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+nav { display: flex; gap: 2px; }
+nav button { background: none; border: 0; padding: 6px 10px; border-radius: 6px; cursor: pointer; color: var(--muted); }
+nav button[aria-selected="true"] { background: var(--panel-2); color: var(--text); font-weight: 600; }
+.spacer { flex: 1; }
+main { max-width: 1280px; margin: 0 auto; padding: 16px; }
+section[hidden] { display: none !important; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 20px 0 8px; font-weight: 600; }
+h2:first-child { margin-top: 0; }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
+.pad { padding: 12px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.tile { padding: 10px 12px; }
+.tile .k { color: var(--muted); font-size: 12px; }
+.tile .v { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.tile .s { color: var(--muted); font-size: 12px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 10px; }
+.btn { background: var(--panel-2); border: 1px solid var(--border); padding: 5px 10px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.btn.danger { color: var(--err); }
+.btn.danger.solid { background: var(--err); border-color: var(--err); color: #fff; }
+.btn.sm { padding: 2px 8px; font-size: 12px; }
+.btn:disabled { opacity: .5; cursor: default; }
+input[type=text], input[type=password], select, textarea {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; min-width: 0; }
+input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
+label.chk { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); cursor: pointer; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.seg button { background: var(--panel); border: 0; padding: 4px 10px; cursor: pointer; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button[aria-pressed="true"] { background: var(--panel-2); color: var(--text); font-weight: 600; }
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; background: var(--panel); position: sticky; top: 0; }
+tbody tr:last-child td { border-bottom: 0; }
+tr.click { cursor: pointer; }
+tr.click:hover td { background: var(--panel-2); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.trunc { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.mono { font-family: var(--mono); font-size: 12px; }
+.muted { color: var(--muted); }
+.badge { display: inline-block; padding: 0 7px; border-radius: 10px; font-size: 12px; font-weight: 600; line-height: 19px; }
+.b-ok { background: var(--ok-bg); color: var(--ok); }
+.b-warn { background: var(--warn-bg); color: var(--warn); }
+.b-err { background: var(--err-bg); color: var(--err); }
+.b-mute { background: var(--panel-2); color: var(--muted); }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.card { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.card .top { display: flex; align-items: center; gap: 8px; }
+.card .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.card .meta { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12px; }
+.card .meta dt { color: var(--muted); }
+.card .meta dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.card .lasterr { font-size: 12px; color: var(--err); background: var(--err-bg); border-radius: 6px; padding: 4px 8px; overflow-wrap: anywhere; }
+.switch { position: relative; width: 34px; height: 20px; flex: none; }
+.switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+.switch span { position: absolute; inset: 0; background: var(--border); border-radius: 10px; cursor: pointer; transition: .15s; }
+.switch span::after { content: ""; position: absolute; width: 16px; height: 16px; left: 2px; top: 2px; background: #fff; border-radius: 50%; transition: .15s; }
+.switch input:checked + span { background: var(--ok); }
+.switch input:checked + span::after { transform: translateX(14px); }
+.switch input:focus-visible + span { outline: 2px solid var(--accent); }
+.chart { width: 100%; height: 180px; display: block; overflow: visible; }
+.chart text { fill: var(--muted); font-size: 10px; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.list { font-size: 13px; }
+.list .li { display: flex; gap: 8px; padding: 4px 0; align-items: center; }
+.list .li .lbl { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list .li .meter { width: 56px; height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; flex: none; }
+.list .li .meter b { display: block; height: 100%; background: var(--bar); }
+.list .li .n { width: 52px; text-align: right; font-variant-numeric: tabular-nums; flex: none; }
+.empty { color: var(--muted); padding: 16px; text-align: center; }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.filters > * { flex: 0 1 auto; }
+.pager { display: flex; gap: 8px; align-items: center; justify-content: flex-end; padding: 8px 10px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--muted); }
+.dot.live { background: var(--ok); }
+/* modal */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 20; }
+.overlay[hidden] { display: none; }
+.modal { width: 100%; max-width: 520px; max-height: calc(100vh - 32px); overflow: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+.modal.wide { max-width: 760px; }
+.modal h3 { margin: 0; padding: 14px 16px; font-size: 15px; border-bottom: 1px solid var(--border); }
+.modal .body { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.modal .actions { padding: 10px 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+.modal label.f { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.modal label.f input, .modal label.f textarea { color: var(--text); font-size: 14px; }
+.secret { display: flex; gap: 8px; }
+.secret input { flex: 1; font-family: var(--mono); }
+.warnbox { background: var(--warn-bg); color: var(--warn); border-radius: 6px; padding: 8px 10px; font-size: 13px; }
+.errbox { background: var(--err-bg); color: var(--err); border-radius: 6px; padding: 8px 10px; font-size: 13px; overflow-wrap: anywhere; }
+dl.kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; font-size: 13px; }
+dl.kv dt { color: var(--muted); }
+dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-size: 12px; }
+#toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 6px; font-size: 13px; z-index: 30; max-width: calc(100vw - 32px); }
+#toast[hidden] { display: none; }
+@media (max-width: 640px) {
+  .bar { gap: 8px; }
+  .brand small { display: none; }
+  main { padding: 12px; }
+  .tile .v { font-size: 19px; }
+  .hide-sm { display: none; }
+  .filters > select, .filters > input[type=text] { flex: 1 1 140px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand">muse2api<small id="version"></small></div>
+    <nav role="tablist">
+      <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
+      <button role="tab" data-tab="requests" aria-selected="false">Requests</button>
+      <button role="tab" data-tab="keys" aria-selected="false">Keys</button>
+    </nav>
+    <div class="spacer"></div>
+    <button class="btn sm" id="signout" type="button">Sign out</button>
+  </div>
+</header>
+
+<main>
+  <section id="tab-overview">
+    <div class="row" style="justify-content: space-between; margin-bottom: 10px;">
+      <div class="seg" id="window">
+        <button type="button" data-w="1h" aria-pressed="false">1h</button>
+        <button type="button" data-w="24h" aria-pressed="true">24h</button>
+        <button type="button" data-w="7d" aria-pressed="false">7d</button>
+      </div>
+      <button class="btn sm" id="ov-refresh" type="button">Refresh</button>
+    </div>
+    <div class="tiles" id="tiles"></div>
+
+    <h2>Requests over time</h2>
+    <div class="panel pad">
+      <div id="chart"></div>
+      <div class="legend"><span><i style="background: var(--bar)"></i>OK</span><span><i style="background: var(--bar-err)"></i>Errors (4xx/5xx)</span><span id="bucket-note"></span></div>
+    </div>
+
+    <h2>Breakdown</h2>
+    <div class="grid2" id="breakdown"></div>
+
+    <h2>Accounts</h2>
+    <div class="cards" id="accounts"></div>
+  </section>
+
+  <section id="tab-requests" hidden>
+    <div class="filters">
+      <select id="f-key" aria-label="Key"></select>
+      <select id="f-account" aria-label="Account"></select>
+      <select id="f-status" aria-label="Status">
+        <option value="">All statuses</option>
+        <option value="2xx">2xx</option>
+        <option value="4xx">4xx</option>
+        <option value="5xx">5xx</option>
+      </select>
+      <input type="text" id="f-path" placeholder="Path prefix, e.g. /v1/chat" aria-label="Path prefix">
+      <label class="chk"><input type="checkbox" id="f-polls" checked> Hide polls</label>
+      <label class="chk"><input type="checkbox" id="f-live" checked> <span class="dot live" id="live-dot"></span> Auto-refresh</label>
+    </div>
+    <div class="panel">
+      <div class="tablewrap">
+        <table>
+          <thead><tr>
+            <th>Time</th><th>Method</th><th>Path</th><th>Model</th><th>Key</th>
+            <th class="hide-sm">Account</th><th class="num">Status</th><th class="num">Latency</th><th class="hide-sm">Client</th>
+          </tr></thead>
+          <tbody id="req-body"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <span id="req-range"></span>
+        <button class="btn sm" id="req-prev" type="button">Newer</button>
+        <button class="btn sm" id="req-next" type="button">Older</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-keys" hidden>
+    <div class="row" style="justify-content: space-between; margin-bottom: 10px;">
+      <div class="muted" style="font-size: 13px;">Keys for <span class="mono">/v1/*</span>. Only a hash is stored; a key is shown once, when created.</div>
+      <button class="btn primary" id="key-new" type="button">New key</button>
+    </div>
+    <div class="panel">
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Name</th><th>Key</th><th>Status</th><th class="hide-sm">Created</th><th>Last used</th><th class="hide-sm">Note</th><th></th></tr></thead>
+          <tbody id="keys-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <h3 id="modal-title"></h3>
+    <div class="body" id="modal-body"></div>
+    <div class="actions" id="modal-actions"></div>
+  </div>
+</div>
+<div id="toast" role="status" hidden></div>
+
+<script>
+"use strict";
+(() => {
+  const STORE = "muse2api.adminKey";
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const state = {
+    tab: "overview", window: "24h", offset: 0, limit: 50,
+    accounts: [], keys: [], capabilities: {}, timer: null, modalOpen: false,
+  };
+
+  // ---- helpers ----
+  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+  const getKey = () => { try { return localStorage.getItem(STORE) || ""; } catch { return ""; } };
+  const setKey = (k) => { try { k ? localStorage.setItem(STORE, k) : localStorage.removeItem(STORE); } catch {} };
+  const fmtNum = (n) => n == null ? "–" : Number(n).toLocaleString();
+  const fmtMs = (ms) => ms == null ? "–" : ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(ms < 10000 ? 2 : 1)} s`;
+  const fmtPct = (r) => `${(r * 100).toFixed(r && r < 0.1 ? 2 : 1)}%`;
+  function ago(ts) {
+    if (!ts) return "never";
+    const s = Math.max(0, Date.now() / 1000 - ts);
+    if (s < 60) return `${Math.floor(s)}s ago`;
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    return `${Math.floor(s / 86400)}d ago`;
+  }
+  function clock(ts) {
+    const d = new Date(ts * 1000);
+    const today = new Date().toDateString() === d.toDateString();
+    return today ? d.toLocaleTimeString([], {hour12: false})
+      : d.toLocaleString([], {month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false});
+  }
+  const fullTime = (ts) => ts ? new Date(ts * 1000).toLocaleString() : "–";
+  function statusBadge(code) {
+    const cls = code >= 500 ? "b-err" : code >= 400 ? "b-warn" : "b-ok";
+    return `<span class="badge ${cls}">${esc(code)}</span>`;
+  }
+  function accountLabel(id) {
+    if (!id) return "";
+    const a = state.accounts.find((x) => x.id === id);
+    return a && a.label ? a.label : id;
+  }
+  let toastTimer;
+  function toast(msg) {
+    const t = $("#toast");
+    t.textContent = msg;
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.hidden = true; }, 2600);
+  }
+
+  class AuthError extends Error {}
+  async function api(path, opts = {}) {
+    const headers = {Authorization: `Bearer ${getKey()}`};
+    if (opts.body !== undefined) headers["Content-Type"] = "application/json";
+    const res = await fetch(path, {method: opts.method || "GET", headers,
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined});
+    if (res.status === 401) { throw new AuthError("unauthorized"); }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((data.error && data.error.message) || `HTTP ${res.status}`);
+    return data;
+  }
+  async function guarded(fn) {
+    try { return await fn(); }
+    catch (e) {
+      if (e instanceof AuthError) { setKey(""); stop(); login("That admin key was rejected."); }
+      else toast(e.message || String(e));
+    }
+  }
+
+  // ---- modal (in-page; never window.confirm/alert) ----
+  function modal({title, body, actions, wide}) {
+    return new Promise((resolve) => {
+      $("#modal-title").textContent = title;
+      $("#modal-body").innerHTML = body;
+      $("#modal").classList.toggle("wide", !!wide);
+      const box = $("#modal-actions");
+      box.innerHTML = "";
+      const close = (v) => {
+        $("#overlay").hidden = true;
+        state.modalOpen = false;
+        document.removeEventListener("keydown", onKey);
+        resolve(v);
+      };
+      const onKey = (e) => {
+        if (e.key === "Escape" && actions.some((a) => a.value === null)) close(null);
+        if (e.key === "Enter" && e.target.tagName === "INPUT") {
+          const primary = actions.find((a) => a.primary);
+          if (primary) { e.preventDefault(); close(primary.collect ? primary.collect() : primary.value); }
+        }
+      };
+      for (const a of actions) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = `btn ${a.cls || ""}`;
+        b.textContent = a.label;
+        b.addEventListener("click", () => close(a.collect ? a.collect() : a.value));
+        box.appendChild(b);
+      }
+      document.addEventListener("keydown", onKey);
+      $("#overlay").hidden = false;
+      state.modalOpen = true;
+      const focus = $("#modal-body input") || box.lastElementChild;
+      if (focus) focus.focus();
+    });
+  }
+  const confirmBox = (title, html, label = "Confirm", danger = true) => modal({
+    title, body: html,
+    actions: [{label: "Cancel", value: null}, {label, value: true, primary: true, cls: danger ? "danger solid" : "primary"}],
+  });
+
+  // ---- login ----
+  let loggingIn = false;
+  async function login(message) {
+    if (loggingIn) return;
+    loggingIn = true;
+    const key = await modal({
+      title: "Admin key",
+      body: `${message ? `<div class="errbox">${esc(message)}</div>` : ""}
+        <label class="f">Enter the admin key (MUSE2API_ADMIN_KEY). It is kept in this browser's local storage.
+        <input type="password" id="login-key" autocomplete="current-password"></label>`,
+      actions: [{label: "Sign in", primary: true, cls: "primary", collect: () => $("#login-key").value.trim()}],
+    });
+    loggingIn = false;
+    if (!key) return login("A key is required.");
+    setKey(key);
+    try { await api("/admin/status"); }
+    catch (e) { setKey(""); return login(e instanceof AuthError ? "That admin key was rejected." : e.message); }
+    start();
+  }
+
+  // ---- overview ----
+  function tile(k, v, s = "") {
+    return `<div class="panel tile"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="s">${esc(s)}</div></div>`;
+  }
+
+  function chart(series, bucket) {
+    // Drawn at the container's real width so text is never stretched.
+    const W = Math.max(240, $("#chart").clientWidth), H = 180, L = 34, B = 18, T = 6;
+    const max = Math.max(1, ...series.map((p) => p.count));
+    const nice = (() => { const p = Math.pow(10, Math.floor(Math.log10(max))); for (const m of [1, 2, 5, 10]) if (m * p >= max) return m * p; return max; })();
+    const bw = (W - L) / series.length;
+    const y = (v) => H - B - (v / nice) * (H - B - T);
+    let out = "";
+    for (const f of [0, 0.5, 1]) {
+      const yy = y(nice * f);
+      out += `<line x1="${L}" x2="${W}" y1="${yy}" y2="${yy}" stroke="var(--grid)"/>`;
+      out += `<text x="${L - 4}" y="${yy + 3}" text-anchor="end">${fmtNum(nice * f)}</text>`;
+    }
+    series.forEach((p, i) => {
+      const x = L + i * bw + bw * 0.12, w = Math.max(1, bw * 0.76);
+      const ok = p.count - p.errors;
+      const label = `${clock(p.t)}: ${p.count} requests, ${p.errors} errors`;
+      if (p.count) {
+        out += `<g><title>${esc(label)}</title>`;
+        if (ok) out += `<rect x="${x}" y="${y(p.count)}" width="${w}" height="${y(p.errors) - y(p.count)}" fill="var(--bar)" rx="1"/>`;
+        if (p.errors) out += `<rect x="${x}" y="${y(p.errors)}" width="${w}" height="${y(0) - y(p.errors)}" fill="var(--bar-err)" rx="1"/>`;
+        out += `</g>`;
+      }
+    });
+    const ticks = Math.max(2, Math.floor(W / 110)), step = Math.max(1, Math.round(series.length / ticks));
+    for (let i = 0; i < series.length; i += step) {
+      const d = new Date(series[i].t * 1000);
+      const txt = bucket >= 3 * 3600 ? d.toLocaleDateString([], {month: "short", day: "numeric"})
+        : d.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", hour12: false});
+      out += `<text x="${L + i * bw + bw / 2}" y="${H - 4}" text-anchor="middle">${esc(txt)}</text>`;
+    }
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Requests over time">${out}</svg>`;
+  }
+
+  function breakdown(title, rows, label) {
+    const max = Math.max(1, ...rows.map((r) => r.count));
+    const items = rows.slice(0, 8).map((r) => `<div class="li">
+        <span class="lbl" title="${esc(label(r))}">${esc(label(r))}</span>
+        <span class="meter"><b style="width:${(r.count / max) * 100}%"></b></span>
+        <span class="n">${fmtNum(r.count)}</span>
+        <span class="n ${r.errors ? "" : "muted"}" title="errors">${r.errors ? `${fmtNum(r.errors)} err` : "–"}</span>
+      </div>`).join("");
+    return `<div class="panel pad"><div class="muted" style="font-size:12px;margin-bottom:4px">${esc(title)}</div>
+      <div class="list">${items || `<div class="empty">No requests</div>`}</div></div>`;
+  }
+
+  function accountCard(a) {
+    const now = Date.now() / 1000;
+    const cooling = a.status === "cooling" && a.cooldown_until > now;
+    const badge = !a.enabled ? `<span class="badge b-mute">disabled</span>`
+      : a.status === "invalid" ? `<span class="badge b-err">invalid</span>`
+      : cooling ? `<span class="badge b-warn">cooling</span>`
+      : `<span class="badge b-ok">active</span>`;
+    return `<div class="panel card" data-id="${esc(a.id)}">
+      <div class="top">
+        <span class="name" title="${esc(a.label || a.id)}">${esc(a.label || a.id)}</span>${badge}
+        <label class="switch" title="Enabled"><input type="checkbox" data-act="toggle" ${a.enabled ? "checked" : ""} aria-label="Enabled"><span></span></label>
+      </div>
+      <dl class="meta">
+        <dt>ID</dt><dd class="mono">${esc(a.id)}</dd>
+        <dt>Success / fail</dt><dd>${fmtNum(a.success_count)} / ${fmtNum(a.fail_count)}</dd>
+        <dt>Last used</dt><dd>${esc(ago(a.last_used_at))}</dd>
+        ${cooling ? `<dt>Cooldown</dt><dd>${Math.ceil(a.cooldown_until - now)}s left</dd>` : ""}
+      </dl>
+      ${a.last_error ? `<div class="lasterr">${esc(a.last_error)}</div>` : ""}
+      <div class="row">
+        ${state.capabilities.renew_session ? `<button class="btn sm" type="button" data-act="renew">Renew</button>` : ""}
+        <button class="btn sm" type="button" data-act="reset">Reset</button>
+        <button class="btn sm" type="button" data-act="requests">Requests</button>
+      </div>
+    </div>`;
+  }
+
+  async function loadAccounts() {
+    const [st, acc] = await Promise.all([api("/admin/status"), api("/admin/accounts")]);
+    state.capabilities = st.capabilities || {};
+    state.accounts = acc.data || [];
+    $("#version").textContent = `v${st.version}`;
+    return st;
+  }
+
+  let lastStats = null, resizeTimer;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (lastStats) $("#chart").innerHTML = chart(lastStats.series, lastStats.bucket_seconds);
+    }, 150);
+  });
+
+  async function loadOverview() {
+    const [stats, st] = await Promise.all([api(`/admin/stats?window=${state.window}`), loadAccounts()]);
+    const pool = st.accounts || {};
+    $("#tiles").innerHTML = [
+      tile("Requests", fmtNum(stats.total), `last ${stats.window}, polls excluded`),
+      tile("Error rate", fmtPct(stats.error_rate), `${fmtNum(stats.errors)} errors · ${fmtNum(stats.server_errors)} 5xx`),
+      tile("p95 latency", fmtMs(stats.latency_ms.p95), `p50 ${fmtMs(stats.latency_ms.p50)}`),
+      tile("Accounts", `${fmtNum(pool.available)} / ${fmtNum(pool.total)}`, `available · ${fmtNum(pool.inflight)} in flight`),
+    ].join("");
+    lastStats = stats;
+    $("#chart").innerHTML = chart(stats.series, stats.bucket_seconds);
+    const b = stats.bucket_seconds;
+    $("#bucket-note").textContent = `bucket ${b >= 3600 ? `${b / 3600}h` : `${b / 60}m`}`;
+    $("#breakdown").innerHTML = [
+      breakdown("By key", stats.by_key, (r) => r.key_name || r.key_id || "(unauthenticated)"),
+      breakdown("By model", stats.by_model, (r) => r.model || "(none)"),
+      breakdown("By account", stats.by_account, (r) => accountLabel(r.account_id) || "(none)"),
+      breakdown("By status", stats.by_status, (r) => String(r.status_code)),
+    ].join("");
+    $("#accounts").innerHTML = state.accounts.map(accountCard).join("")
+      || `<div class="panel empty">No accounts configured.</div>`;
+  }
+
+  $("#accounts").addEventListener("change", (e) => {
+    const input = e.target.closest("input[data-act=toggle]");
+    if (!input) return;
+    const id = input.closest("[data-id]").dataset.id;
+    guarded(async () => {
+      await api(`/admin/accounts/${encodeURIComponent(id)}`, {method: "PATCH", body: {enabled: input.checked}});
+      toast(input.checked ? "Account enabled" : "Account disabled");
+      await loadOverview();
+    });
+  });
+  $("#accounts").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    const id = btn.closest("[data-id]").dataset.id;
+    const act = btn.dataset.act;
+    if (act === "requests") {
+      $("#f-account").value = id;
+      state.offset = 0;
+      return switchTab("requests");
+    }
+    btn.disabled = true;
+    guarded(async () => {
+      const res = await api(`/admin/accounts/${encodeURIComponent(id)}/${act}`, {method: "POST"});
+      if (act === "renew") toast(res.ok ? "Session renewed" : `Renew failed: ${res.error || "unknown error"}`);
+      else toast("Account reset");
+      await loadOverview();
+    }).finally(() => { btn.disabled = false; });
+  });
+  $("#window").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-w]");
+    if (!b) return;
+    state.window = b.dataset.w;
+    for (const x of $("#window").children) x.setAttribute("aria-pressed", String(x === b));
+    guarded(loadOverview);
+  });
+  $("#ov-refresh").addEventListener("click", () => guarded(loadOverview));
+
+  // ---- requests ----
+  function fillFilterOptions() {
+    const keySel = $("#f-key"), accSel = $("#f-account");
+    const keyVal = keySel.value, accVal = accSel.value;
+    keySel.innerHTML = `<option value="">All keys</option><option value="legacy">legacy</option><option value="admin">admin</option>`
+      + state.keys.map((k) => `<option value="${esc(k.id)}">${esc(k.name)}${k.revoked ? " (revoked)" : ""}</option>`).join("");
+    accSel.innerHTML = `<option value="">All accounts</option>`
+      + state.accounts.map((a) => `<option value="${esc(a.id)}">${esc(a.label || a.id)}</option>`).join("");
+    keySel.value = keyVal;
+    accSel.value = accVal;
+    if (accVal && accSel.value !== accVal) {
+      // Account picked from a card before the list loaded; keep it selectable.
+      accSel.insertAdjacentHTML("beforeend", `<option value="${esc(accVal)}">${esc(accVal)}</option>`);
+      accSel.value = accVal;
+    }
+  }
+
+  let lastRows = [];
+  async function loadRequests() {
+    const p = new URLSearchParams({limit: state.limit, offset: state.offset});
+    if ($("#f-key").value) p.set("key_id", $("#f-key").value);
+    if ($("#f-account").value) p.set("account_id", $("#f-account").value);
+    if ($("#f-status").value) p.set("status", $("#f-status").value);
+    if ($("#f-path").value.trim()) p.set("path", $("#f-path").value.trim());
+    if ($("#f-polls").checked) p.set("hide_polls", "true");
+    const res = await api(`/admin/requests?${p}`);
+    lastRows = res.data;
+    $("#req-body").innerHTML = res.data.map((r, i) => `<tr class="click" data-i="${i}" tabindex="0">
+        <td title="${esc(fullTime(r.ts))}">${esc(clock(r.ts))}</td>
+        <td class="mono">${esc(r.method)}</td>
+        <td class="mono trunc" title="${esc(r.path)}">${esc(r.path)}${r.stream ? ` <span class="badge b-mute">stream</span>` : ""}${r.poll ? ` <span class="badge b-mute">poll</span>` : ""}</td>
+        <td>${esc(r.model || "")}</td>
+        <td>${esc(r.key_name || "")}</td>
+        <td class="hide-sm trunc">${esc(accountLabel(r.account_id))}</td>
+        <td class="num" title="${esc(r.error || "")}">${statusBadge(r.status_code)}</td>
+        <td class="num">${esc(fmtMs(r.latency_ms))}</td>
+        <td class="hide-sm mono">${esc(r.client_ip || "")}</td>
+      </tr>`).join("") || `<tr><td colspan="9" class="empty">No requests match.</td></tr>`;
+    const end = state.offset + res.data.length;
+    $("#req-range").textContent = res.total ? `${state.offset + 1}–${end} of ${fmtNum(res.total)}` : "";
+    $("#req-prev").disabled = state.offset === 0;
+    $("#req-next").disabled = end >= res.total;
+  }
+
+  function showRequest(r) {
+    const fields = [
+      ["ID", r.id], ["Time", fullTime(r.ts)], ["Method", r.method], ["Path", r.path],
+      ["Status", r.status_code], ["Latency", fmtMs(r.latency_ms)], ["Stream", r.stream ? "yes" : "no"],
+      ["Poll", r.poll ? "yes" : "no"], ["Model", r.model], ["Key", r.key_name ? `${r.key_name} (${r.key_id})` : ""],
+      ["Account", r.account_id ? `${accountLabel(r.account_id)} (${r.account_id})` : ""],
+      ["Task", r.task_id], ["Client IP", r.client_ip], ["User agent", r.user_agent],
+    ];
+    modal({
+      title: `${r.method} ${r.path}`, wide: true,
+      body: `${r.error ? `<div class="errbox">${esc(r.error)}</div>` : ""}
+        <dl class="kv">${fields.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v == null || v === "" ? "–" : v)}</dd>`).join("")}</dl>`,
+      actions: [{label: "Close", value: null, primary: true, cls: "primary"}],
+    });
+  }
+  $("#req-body").addEventListener("click", (e) => {
+    const tr = e.target.closest("tr[data-i]");
+    if (tr) showRequest(lastRows[Number(tr.dataset.i)]);
+  });
+  $("#req-body").addEventListener("keydown", (e) => {
+    const tr = e.target.closest("tr[data-i]");
+    if (tr && e.key === "Enter") showRequest(lastRows[Number(tr.dataset.i)]);
+  });
+  for (const id of ["#f-key", "#f-account", "#f-status", "#f-polls"]) {
+    $(id).addEventListener("change", () => { state.offset = 0; guarded(loadRequests); });
+  }
+  let pathTimer;
+  $("#f-path").addEventListener("input", () => {
+    clearTimeout(pathTimer);
+    pathTimer = setTimeout(() => { state.offset = 0; guarded(loadRequests); }, 300);
+  });
+  $("#f-live").addEventListener("change", () => { $("#live-dot").classList.toggle("live", $("#f-live").checked); });
+  $("#req-prev").addEventListener("click", () => { state.offset = Math.max(0, state.offset - state.limit); guarded(loadRequests); });
+  $("#req-next").addEventListener("click", () => { state.offset += state.limit; guarded(loadRequests); });
+
+  // ---- keys ----
+  async function loadKeys() {
+    state.keys = (await api("/admin/keys")).data || [];
+    $("#keys-body").innerHTML = state.keys.map((k) => `<tr data-id="${esc(k.id)}">
+        <td><b>${esc(k.name)}</b></td>
+        <td class="mono">${esc(k.prefix)}…</td>
+        <td>${k.revoked ? `<span class="badge b-err">revoked</span>` : `<span class="badge b-ok">active</span>`}</td>
+        <td class="hide-sm" title="${esc(fullTime(k.created_at))}">${esc(ago(k.created_at))}</td>
+        <td title="${esc(fullTime(k.last_used_at))}">${esc(ago(k.last_used_at))}</td>
+        <td class="hide-sm trunc" title="${esc(k.note)}">${esc(k.note)}</td>
+        <td class="row" style="flex-wrap: nowrap; justify-content: flex-end;">
+          <button class="btn sm" type="button" data-act="edit">Edit</button>
+          <button class="btn sm" type="button" data-act="${k.revoked ? "unrevoke" : "revoke"}">${k.revoked ? "Restore" : "Revoke"}</button>
+          <button class="btn sm danger" type="button" data-act="delete">Delete</button>
+        </td>
+      </tr>`).join("") || `<tr><td colspan="7" class="empty">No keys yet. The legacy key (MUSE2API_API_KEY) keeps working.</td></tr>`;
+    fillFilterOptions();
+  }
+
+  async function keyForm(title, k = {}) {
+    return modal({
+      title,
+      body: `<label class="f">Name<input type="text" id="kf-name" maxlength="100" value="${esc(k.name || "")}" placeholder="e.g. alice-laptop"></label>
+        <label class="f">Note (optional)<input type="text" id="kf-note" maxlength="500" value="${esc(k.note || "")}"></label>`,
+      actions: [{label: "Cancel", value: null},
+        {label: k.id ? "Save" : "Create", primary: true, cls: "primary",
+         collect: () => ({name: $("#kf-name").value.trim(), note: $("#kf-note").value.trim()})}],
+    });
+  }
+
+  $("#key-new").addEventListener("click", () => guarded(async () => {
+    const form = await keyForm("New API key");
+    if (!form) return;
+    if (!form.name) return toast("Name is required");
+    const res = await api("/admin/keys", {method: "POST", body: form});
+    await loadKeys();
+    await modal({
+      title: `Key created: ${res.key.name}`,
+      body: `<div class="warnbox">Copy this key now. It is not stored and cannot be shown again.</div>
+        <div class="secret"><input type="text" id="new-key" readonly value="${esc(res.api_key)}" aria-label="New API key">
+        <button class="btn" type="button" id="copy-key">Copy</button></div>`,
+      actions: [{label: "Done", value: null, primary: true, cls: "primary"}],
+    });
+  }));
+  // Copy button lives inside the modal body, which is re-rendered per modal.
+  $("#modal-body").addEventListener("click", async (e) => {
+    if (e.target.id !== "copy-key") return;
+    const input = $("#new-key");
+    input.select();
+    try { await navigator.clipboard.writeText(input.value); }
+    catch { document.execCommand && document.execCommand("copy"); }
+    e.target.textContent = "Copied";
+  });
+
+  $("#keys-body").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    const k = state.keys.find((x) => x.id === btn.closest("tr").dataset.id);
+    if (!k) return;
+    guarded(async () => {
+      const path = `/admin/keys/${encodeURIComponent(k.id)}`;
+      switch (btn.dataset.act) {
+        case "edit": {
+          const form = await keyForm("Edit key", k);
+          if (!form) return;
+          if (!form.name) return toast("Name is required");
+          await api(path, {method: "PATCH", body: form});
+          toast("Key updated");
+          break;
+        }
+        case "revoke":
+          if (!await confirmBox("Revoke key?", `<p style="margin:0">Requests using <b>${esc(k.name)}</b> (<span class="mono">${esc(k.prefix)}…</span>) will get 401 until it is restored.</p>`, "Revoke")) return;
+          await api(path, {method: "PATCH", body: {revoked: true}});
+          toast("Key revoked");
+          break;
+        case "unrevoke":
+          await api(path, {method: "PATCH", body: {revoked: false}});
+          toast("Key restored");
+          break;
+        case "delete":
+          if (!await confirmBox("Delete key?", `<p style="margin:0">Permanently delete <b>${esc(k.name)}</b> (<span class="mono">${esc(k.prefix)}…</span>)? Clients using it will get 401. Its past requests stay in the log.</p>`, "Delete")) return;
+          await api(path, {method: "DELETE"});
+          toast("Key deleted");
+          break;
+      }
+      await loadKeys();
+    });
+  });
+
+  // ---- tabs & refresh loop ----
+  const loaders = {overview: loadOverview, requests: loadRequests, keys: loadKeys};
+  function switchTab(tab) {
+    state.tab = tab;
+    for (const b of document.querySelectorAll("nav button")) b.setAttribute("aria-selected", String(b.dataset.tab === tab));
+    for (const t of Object.keys(loaders)) $(`#tab-${t}`).hidden = t !== tab;
+    try { localStorage.setItem("muse2api.tab", tab); } catch {}
+    guarded(loaders[tab]);
+  }
+  for (const b of document.querySelectorAll("nav button")) b.addEventListener("click", () => switchTab(b.dataset.tab));
+  $("#signout").addEventListener("click", () => { setKey(""); stop(); login(); });
+
+  function tick() {
+    if (document.hidden || state.modalOpen) return;
+    if (state.tab === "requests" && $("#f-live").checked) guarded(loadRequests);
+    else if (state.tab === "overview") guarded(loadOverview);
+  }
+  function stop() { clearInterval(state.timer); state.timer = null; }
+  async function start() {
+    stop();
+    // Labels for filters and account names come from these two lists.
+    await guarded(async () => { await loadAccounts(); await loadKeys(); });
+    let tab = "overview";
+    try { tab = localStorage.getItem("muse2api.tab") || tab; } catch {}
+    switchTab(loaders[tab] ? tab : "overview");
+    // Requests refresh every 5s; the overview is heavier, so every 6th tick.
+    let n = 0;
+    state.timer = setInterval(() => {
+      n += 1;
+      if (state.tab !== "overview" || n % 6 === 0) tick();
+    }, 5000);
+  }
+
+  if (getKey()) start(); else login();
+})();
+</script>
+</body>
+</html>

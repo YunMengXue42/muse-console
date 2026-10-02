@@ -251,7 +251,16 @@ curl http://localhost:18610/admin/accounts \
 | GET/POST/PATCH/DELETE | `/admin/accounts[/{id}]` | Account CRUD |
 | POST | `/admin/accounts/{id}/renew` · `/reset` | Renew session · reset account state |
 | GET | `/admin/status` · `/admin/tasks` | Service status · task list |
+| GET/POST/PATCH/DELETE | `/admin/keys[/{id}]` | Client API keys (create returns the key once; PATCH renames / revokes) |
+| GET | `/admin/requests` · `/admin/stats?window=1h\|24h\|7d` | Request log (filters: `key_id`, `account_id`, `status=2xx\|4xx\|5xx`, `path`, `since`, `hide_polls`) · aggregates |
+| GET | `/dashboard` | Web dashboard (asks for the admin key in the browser) |
 | POST | `/v1/responses` | Reserved, currently returns 501 |
+
+### Dashboard, API keys and request log
+
+Open `http://localhost:18610/dashboard` and enter the admin key; it is kept in the browser's local storage and sent as a Bearer token to `/admin/*`. The page shows request volume, error rate and latency, the account pool (enable/disable, renew, reset), a live request log, and API key management.
+
+Besides the admin key and `MUSE2API_API_KEY` (still accepted, logged as `legacy`), `/v1/*` accepts any non-revoked key created on the dashboard or with `POST /admin/keys {"name": "..."}`. Keys look like `m2a-...` and are shown once; `data/keys.json` stores only their SHA-256 hash and an 8-character prefix. Every `/v1/*` request (except `/v1/media/*` downloads) is recorded in `data/requests.db` (SQLite) with its key, model, account, status, latency and client IP (`CF-Connecting-IP` / `X-Forwarded-For` aware). Task status polls are flagged so the dashboard and stats can leave them out.
 
 ## Configuration
 
@@ -263,6 +272,7 @@ All settings come from environment variables (prefix `MUSE2API_`) or a `.env` fi
 | `MUSE2API_HOST` · `MUSE2API_PORT` | `127.0.0.1` · `18610` | Listen address and port |
 | `MUSE2API_API_KEY` | auto-generated | Key for `/v1/*` endpoints |
 | `MUSE2API_ADMIN_KEY` | same as API key | Key for `/admin/*` endpoints |
+| `MUSE2API_REQUEST_LOG_RETENTION_DAYS` | `14` | Days of request history kept in `data/requests.db` |
 | `MUSE2API_PUBLIC_BASE` | empty | Public base URL used in media links; derived from the request when empty |
 | `MUSE2API_POOL_STRATEGY` | `lru` | Account scheduling: `lru` / `round_robin` / `affinity` |
 | `MUSE2API_MAX_FAILOVER` | `2` | Maximum number of retries on another account |
@@ -278,7 +288,7 @@ All reserved modules and outstanding work are tracked in **[TODO.md](TODO.md)**,
 - **Verification and live testing (do first)**: get the tests passing, test the browser driver against real accounts, and verify image/video generation and session renewal.
 - **Drivers**: direct HTTP protocol driver, conversation thread reuse, quota lookup.
 - **Protocol**: `/v1/responses`, mask-based inpainting, emulated tool calling, streaming heartbeats.
-- **Accounts, admin and operations**: more cookie import formats, browser extension, web console, storage backends, media cleanup, multiple keys with rate limits, metrics.
+- **Accounts, admin and operations**: more cookie import formats, browser extension, storage backends, media cleanup, per-key rate limits, Prometheus metrics.
 
 Each task lists its location, approach and definition of done. Places marked `TODO(contributors)` in the code are the reserved extension points.
 
