@@ -41,6 +41,8 @@ class ImageGenerationRequest(_Lenient):
     # Same values as OpenAI gpt-image-1. "transparent" cuts the subject out locally
     # and returns an RGBA PNG; "auto"/"opaque" leave the image as generated.
     background: Literal["auto", "opaque", "transparent"] | None = None
+    # Reference image(s) for the new image: data URL, http(s) URL or base64.
+    image: str | list[str] | None = None
     user: str | None = None
 
 

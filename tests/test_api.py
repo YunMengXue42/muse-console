@@ -130,7 +130,63 @@ def test_video_task(client, auth):
 
 def test_reserved_endpoints(client, auth):
     assert client.post("/v1/responses", headers=auth, json={}).status_code == 501
-    assert client.post("/v1/images/edits", headers=auth).status_code == 501
+
+
+def _capture_image_requests(client, monkeypatch) -> list:
+    gateway = client.app.state.services.gateway
+    original, seen = gateway.generate_image, []
+
+    async def spy(req):
+        seen.append(req)
+        return await original(req)
+
+    monkeypatch.setattr(gateway, "generate_image", spy)
+    return seen
+
+
+_PNG_DATA_URL = "data:image/png;base64," + base64.b64encode(b"\x89PNG-ref").decode()
+
+
+def test_image_generation_with_reference(client, auth, monkeypatch):
+    seen = _capture_image_requests(client, monkeypatch)
+    r = client.post("/v1/images/generations", headers=auth,
+                    json={"prompt": "same fox, wearing a scarf", "image": _PNG_DATA_URL})
+    assert r.status_code == 200
+    refs = seen[0].reference_images
+    assert [(i.data, i.mime) for i in refs] == [(b"\x89PNG-ref", "image/png")]
+
+
+def test_image_generation_reference_list_limit(client, auth):
+    r = client.post("/v1/images/generations", headers=auth,
+                    json={"prompt": "x", "image": [_PNG_DATA_URL] * 5})
+    assert r.status_code == 400
+
+
+def test_image_edits_multipart(client, auth, monkeypatch):
+    seen = _capture_image_requests(client, monkeypatch)
+    r = client.post("/v1/images/edits", headers=auth,
+                    data={"prompt": "put them in a cafe", "n": "1", "response_format": "b64_json"},
+                    files=[("image[]", ("a.png", b"img-a", "image/png")),
+                           ("image[]", ("b.jpg", b"img-b", "application/octet-stream"))])
+    assert r.status_code == 200
+    assert r.json()["data"][0]["b64_json"]
+    req = seen[0]
+    assert req.prompt == "put them in a cafe"
+    # A generic upload type falls back to the filename's type.
+    assert [(i.data, i.mime) for i in req.reference_images] == [
+        (b"img-a", "image/png"), (b"img-b", "image/jpeg")]
+
+
+def test_image_edits_rejects_bad_input(client, auth):
+    png = ("image", ("a.png", b"img", "image/png"))
+    no_image = client.post("/v1/images/edits", headers=auth, data={"prompt": "x"})
+    assert no_image.status_code == 400
+    mask = client.post("/v1/images/edits", headers=auth, data={"prompt": "x"},
+                       files=[png, ("mask", ("m.png", b"mask", "image/png"))])
+    assert mask.status_code == 400
+    bad_n = client.post("/v1/images/edits", headers=auth, data={"prompt": "x", "n": "9"},
+                        files=[png])
+    assert bad_n.status_code == 400
 
 
 def test_admin_accounts_crud(client, auth, admin):

@@ -53,7 +53,8 @@ The project focuses on **clean engineering and easy collaboration**:
 | Browser driver (Chromium + CDP) | 🧪 Needs live testing | Full chat, image and video flows are written |
 | Session renewal / keepalive | 🧪 Needs live testing | Plain HTTP, disabled by default |
 | Direct HTTP protocol driver | 🚧 Reserved | Returns 501 |
-| `/v1/responses`, `/v1/images/edits` | 🚧 Reserved | Returns 501 |
+| `/v1/images/edits` (reference images) | ✅ Implemented | Images are references for a new image; `mask` is rejected |
+| `/v1/responses` | 🚧 Reserved | Returns 501 |
 | Web console, cookie import extension, quota lookup | 🚧 Reserved | |
 
 ## Architecture
@@ -191,6 +192,22 @@ curl http://localhost:18610/v1/images/generations \
   -d '{"prompt":"A red fox sitting","background":"transparent"}'
 ```
 
+**With reference images**
+
+Up to 4 reference images per request. muse.ai uses them as references, so prompts like "the same fox, now wearing a scarf" keep the subject and scene. `mask` (inpainting a region) is not supported.
+
+```bash
+# JSON: data URL, http(s) URL or base64 string (or a list of them)
+curl http://localhost:18610/v1/images/generations \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"prompt":"The same fox, now wearing a red scarf","image":"https://example.com/fox.png"}'
+
+# Multipart, OpenAI-compatible (client.images.edit)
+curl http://localhost:18610/v1/images/edits \
+  -H "Authorization: Bearer $KEY" \
+  -F "image[]=@fox.png" -F "prompt=The same fox, now wearing a red scarf"
+```
+
 **Text to video (async task)**
 
 ```bash
@@ -218,13 +235,14 @@ curl http://localhost:18610/admin/accounts \
 | GET | `/healthz` · `/readyz` | Liveness · readiness (driver state and available accounts) |
 | GET | `/v1/models` | Model list, including aliases such as `gpt-4o` and `dall-e-3` |
 | POST | `/v1/chat/completions` | Chat, streaming and non-streaming |
-| POST | `/v1/images/generations` | Text to image, returns `url` or `b64_json` |
+| POST | `/v1/images/generations` | Text to image (optional `image` references), returns `url` or `b64_json` |
+| POST | `/v1/images/edits` | Multipart `image`/`image[]` files + `prompt`, OpenAI-compatible |
 | POST | `/v1/videos` · GET `/v1/videos/{id}` | Create a video task · query a task |
 | GET | `/v1/media/{name}` | Download generated media |
 | GET/POST/PATCH/DELETE | `/admin/accounts[/{id}]` | Account CRUD |
 | POST | `/admin/accounts/{id}/renew` · `/reset` | Renew session · reset account state |
 | GET | `/admin/status` · `/admin/tasks` | Service status · task list |
-| POST | `/v1/responses` · `/v1/images/edits` | Reserved, currently return 501 |
+| POST | `/v1/responses` | Reserved, currently returns 501 |
 
 ## Configuration
 
@@ -249,7 +267,7 @@ All reserved modules and outstanding work are tracked in **[TODO.md](TODO.md)**,
 
 - **Verification and live testing (do first)**: get the tests passing, test the browser driver against real accounts, and verify image/video generation and session renewal.
 - **Drivers**: direct HTTP protocol driver, conversation thread reuse, quota lookup.
-- **Protocol**: `/v1/responses`, `/v1/images/edits`, emulated tool calling, streaming heartbeats.
+- **Protocol**: `/v1/responses`, mask-based inpainting, emulated tool calling, streaming heartbeats.
 - **Accounts, admin and operations**: more cookie import formats, browser extension, web console, storage backends, media cleanup, multiple keys with rate limits, metrics.
 
 Each task lists its location, approach and definition of done. Places marked `TODO(contributors)` in the code are the reserved extension points.
