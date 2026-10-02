@@ -207,3 +207,80 @@ def test_dashboard_html(client):
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("text/html")
     assert "<title>muse2api dashboard</title>" in r.text
+
+
+def _wait_task(client, auth, task_id: str) -> dict:
+    import time
+
+    for _ in range(200):
+        body = client.get(f"/v1/videos/{task_id}", headers=auth).json()
+        if body["status"] in ("completed", "failed", "succeeded", "cancelled"):
+            return body
+        time.sleep(0.01)
+    raise AssertionError(f"task {task_id} did not finish")
+
+
+def test_failed_task_counts_as_error(client, auth, admin, monkeypatch):
+    from muse2api.drivers.mock import MockDriver
+    from muse2api.errors import UpstreamTimeout
+
+    ok = client.post("/v1/videos", headers=auth, json={"prompt": "a wave"}).json()
+    _wait_task(client, auth, ok["id"])
+
+    async def boom(self, account, req):
+        raise UpstreamTimeout("video generation timed out")
+
+    monkeypatch.setattr(MockDriver, "generate_video", boom)
+    bad = client.post("/v1/videos", headers=auth, json={"prompt": "a wave"}).json()
+    _wait_task(client, auth, bad["id"])
+
+    import time
+
+    # The outcome is written just after the task flips to failed, so allow a beat.
+    for _ in range(100):
+        rows = {r["task_id"]: r for r in _requests(client, admin, hide_polls="true")}
+        if all(r["task_status"] for r in rows.values()):
+            break
+        time.sleep(0.01)
+    # Both submits answered 200; only the task outcome tells them apart.
+    assert rows[ok["id"]]["status_code"] == rows[bad["id"]]["status_code"] == 200
+    assert rows[ok["id"]]["task_status"] == "succeeded"
+    assert rows[bad["id"]]["task_status"] == "failed"
+    assert rows[bad["id"]]["error"] == "video generation timed out"
+    assert rows[bad["id"]]["task_ms"] >= 0
+    assert [r["task_id"] for r in _requests(client, admin, status="failed")] == [bad["id"]]
+
+    s = client.get("/admin/stats", headers=admin, params={"window": "1h"}).json()
+    assert s["total"] == 2 and s["errors"] == 1 and s["server_errors"] == 0
+    assert sum(p["count"] for p in s["series"]) == 2
+    assert sum(p["errors"] for p in s["series"]) == 1
+    usage = client.get("/admin/keys", headers=admin).json()["builtin"][0]["usage"]
+    assert usage["requests_24h"] == 2 and usage["errors_24h"] == 1
+
+
+async def test_task_outcome_before_row_and_backfill(settings):
+    import time
+    from types import SimpleNamespace
+
+    from muse2api.services.request_log import RequestLog
+    from muse2api.services.tasks import TaskStatus
+
+    log = RequestLog(settings.requests_db)
+    now = time.time()
+    base = {"method": "POST", "path": "/v1/images/generations", "status_code": 200,
+            "latency_ms": 5, "ts": now}
+    # The task fails before the middleware has written its submit row.
+    await log.finish_task("task_early", "failed", now + 1, "no usable account", None)
+    await log.add({**base, "task_id": "task_early"})
+    # A row from before outcomes were recorded, filled in at startup.
+    await log.add({**base, "task_id": "task_old"})
+    old = SimpleNamespace(id="task_old", status=TaskStatus.FAILED, finished=True,
+                          updated_at=now + 2, error={"message": "interrupted"})
+    await log.backfill_tasks([old])
+
+    rows = {r["task_id"]: r for r in (await log.query())["data"]}
+    assert rows["task_early"]["task_status"] == "failed"
+    assert rows["task_early"]["error"] == "no usable account"
+    assert rows["task_old"]["task_status"] == "failed"
+    assert (await log.stats("1h"))["errors"] == 2
+    await log.close()

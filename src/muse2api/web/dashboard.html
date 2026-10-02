@@ -396,7 +396,7 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
         <h2>Requests theo thời gian</h2>
         <div class="panel pad">
           <div id="chart"></div>
-          <div class="legend"><span><i style="background: var(--bar)"></i>Thành công</span><span><i style="background: var(--bar-err)"></i>Lỗi (4xx/5xx)</span><span id="bucket-note"></span></div>
+          <div class="legend"><span><i style="background: var(--bar)"></i>Thành công</span><span><i style="background: var(--bar-err)"></i>Lỗi (4xx/5xx hoặc task failed)</span><span id="bucket-note"></span></div>
         </div>
         <div class="grid2" style="margin-top: 10px;">
           <div class="panel"><div class="cardhead">Top API keys<a class="link" href="#keys">Quản lý keys</a></div><div class="list" id="ov-keys"></div></div>
@@ -450,6 +450,7 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
             <option value="2xx">2xx</option>
             <option value="4xx">4xx</option>
             <option value="5xx">5xx</option>
+            <option value="failed">Lỗi (gồm task failed)</option>
           </select>
           <input type="text" id="f-path" placeholder="Path, ví dụ /v1/chat" aria-label="Path prefix">
           <label class="chk"><input type="checkbox" id="f-polls" checked> Ẩn poll</label>
@@ -536,6 +537,14 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
   function statusBadge(code) {
     const cls = code >= 500 ? "b-err" : code >= 400 ? "b-warn" : "b-ok";
     return `<span class="badge plain ${cls} mono">${esc(code)}</span>`;
+  }
+  // Async submits answer 200 at once; the task's own outcome is what the client got.
+  const TASK_BADGE = { succeeded: ["b-ok", "ok"], failed: ["b-err", "failed"],
+                       cancelled: ["b-mute", "cancelled"] };
+  function taskBadge(r) {
+    if (r.poll || !r.task_id) return "";
+    const [cls, txt] = TASK_BADGE[r.task_status] || ["b-info", "running"];
+    return ` <span class="badge plain ${cls}">${esc(txt)}</span>`;
   }
   function accountLabel(id) {
     if (!id) return "";
@@ -854,7 +863,7 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
         <span class="lbl" title="${esc(label(r))}">${esc(label(r))}</span>
         <span class="meter" aria-hidden="true"><b style="width:${okW}%"></b><b class="e" style="width:${errW}%"></b></span>
         <span class="n">${fmtNum(r.count)}</span>
-        <span class="n ${r.errors ? "e" : "muted"}" title="lỗi 4xx/5xx">${r.errors ? `${fmtNum(r.errors)} lỗi` : "–"}</span>
+        <span class="n ${r.errors ? "e" : "muted"}" title="lỗi 4xx/5xx hoặc task failed">${r.errors ? `${fmtNum(r.errors)} lỗi` : "–"}</span>
       </div>`;
     }).join("") || `<div class="empty">Chưa có request</div>`;
   }
@@ -1116,7 +1125,7 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
         <td class="hide-sm">${esc(r.model || "")}</td>
         <td>${esc(r.key_name || "")}</td>
         <td class="hide-sm trunc">${esc(accountLabel(r.account_id))}</td>
-        <td class="num" title="${esc(r.error || "")}">${statusBadge(r.status_code)}</td>
+        <td class="num" title="${esc(r.error || "")}">${statusBadge(r.status_code)}${taskBadge(r)}</td>
         <td class="num">${esc(fmtMs(r.latency_ms))}</td>
         <td class="hide-sm mono">${esc(r.client_ip || "")}</td>
       </tr>`).join("") || `<tr><td colspan="9" class="empty">Không có request nào khớp bộ lọc.</td></tr>`;
@@ -1132,7 +1141,7 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
       ["Status", r.status_code], ["Latency", fmtMs(r.latency_ms)], ["Stream", r.stream ? "yes" : "no"],
       ["Poll", r.poll ? "yes" : "no"], ["Model", r.model], ["Key", r.key_name ? `${r.key_name} (${r.key_id})` : ""],
       ["Account", r.account_id ? `${accountLabel(r.account_id)} (${r.account_id})` : ""],
-      ["Task", r.task_id], ["Client IP", r.client_ip], ["User agent", r.user_agent],
+      ["Task", r.task_id ? `${r.task_id} · ${r.task_status || "running"}${r.task_ms != null ? ` · ${fmtMs(r.task_ms)}` : ""}` : ""], ["Client IP", r.client_ip], ["User agent", r.user_agent],
     ];
     modal({
       title: `${r.method} ${r.path}`, wide: true,

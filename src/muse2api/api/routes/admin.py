@@ -174,7 +174,7 @@ async def delete_key(key_id: str, svc: Services = Depends(get_services)) -> dict
 async def list_requests(
     key_id: str | None = None,
     account_id: str | None = None,
-    status: Literal["2xx", "3xx", "4xx", "5xx"] | None = None,
+    status: Literal["2xx", "3xx", "4xx", "5xx", "failed"] | None = None,
     path: str | None = None,
     since: float | None = Query(default=None, description="Unix seconds"),
     hide_polls: bool = False,

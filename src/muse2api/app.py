@@ -51,6 +51,7 @@ def create_app(settings: Settings | None = None, driver: MuseDriver | None = Non
         await services.keys.load()
         await services.requests.open()
         await services.requests.prune(settings.request_log_retention_days)
+        await services.requests.backfill_tasks(services.tasks.list(limit=services.tasks.max_kept))
         await services.driver.startup()
         housekeeping = asyncio.create_task(_housekeeping(services))
         keepalive = None
