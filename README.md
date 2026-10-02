@@ -206,6 +206,17 @@ curl http://localhost:18610/v1/images/edits \
   -F "image[]=@fox.png" -F "prompt=The same fox, now wearing a red scarf"
 ```
 
+**Image as an async task**
+
+A sync image call (page load plus generation) can take longer than a reverse proxy allows; Cloudflare cuts it after about 100 s with HTTP 524. Add `"async": true` to get a task back, then poll it. Results are always stored as media URLs.
+
+```bash
+curl http://localhost:18610/v1/images/generations \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"prompt":"A red fox sitting","async":true}'          # -> {"id":"task_xxx","object":"image.task",...}
+curl http://localhost:18610/v1/images/generations/task_xxx -H "Authorization: Bearer $KEY"
+```
+
 **Text to video (async task)**
 
 ```bash
@@ -233,7 +244,7 @@ curl http://localhost:18610/admin/accounts \
 | GET | `/healthz` · `/readyz` | Liveness · readiness (driver state and available accounts) |
 | GET | `/v1/models` | Model list, including aliases such as `gpt-4o` and `dall-e-3` |
 | POST | `/v1/chat/completions` | Chat, streaming and non-streaming |
-| POST | `/v1/images/generations` | Text to image (optional `image` references), returns `url` or `b64_json` |
+| POST | `/v1/images/generations` · GET `/v1/images/generations/{id}` | Text to image (optional `image` references), returns `url` or `b64_json`; `"async": true` returns a task to poll |
 | POST | `/v1/images/edits` | Multipart `image`/`image[]` files + `prompt`, OpenAI-compatible |
 | POST | `/v1/videos` · GET `/v1/videos/{id}` | Create a video task · query a task |
 | GET | `/v1/media/{name}` | Download generated media |

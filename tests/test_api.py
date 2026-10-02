@@ -156,6 +156,29 @@ def test_image_invalid_background(client, auth):
     assert r.status_code == 400
 
 
+def test_image_async_task(client, auth):
+    import time
+    png = "data:image/png;base64," + base64.b64encode(b"x").decode()
+    r = client.post("/v1/images/generations", headers=auth,
+                    json={"prompt": "a fox", "image": png, "async": True, "response_format": "b64_json"})
+    assert r.status_code == 200
+    task = r.json()
+    assert task["object"] == "image.task" and task["id"].startswith("task_")
+    for _ in range(50):
+        view = client.get(f"/v1/images/generations/{task['id']}", headers=auth).json()
+        if view["status"] == "succeeded":
+            break
+        time.sleep(0.02)
+    assert view["status"] == "succeeded"
+    url = view["result"]["data"][0]["url"]  # async results are always stored as media URLs
+    media = client.get(url.split("http://testserver", 1)[-1], headers=auth)
+    assert media.status_code == 200 and media.headers["content-type"] == "image/png"
+
+
+def test_image_task_not_found(client, auth):
+    assert client.get("/v1/images/generations/task_nope", headers=auth).status_code == 404
+
+
 def test_video_task(client, auth):
     r = client.post("/v1/videos", headers=auth, json={"prompt": "waves", "duration": 5})
     task_id = r.json()["id"]

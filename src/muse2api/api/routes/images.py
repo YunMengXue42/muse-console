@@ -12,8 +12,9 @@ from starlette.datastructures import UploadFile
 from ...core.media import load_image_ref
 from ...core.models import resolve_model
 from ...drivers.base import ImageRequest, InputImage, MediaResult
-from ...errors import InvalidRequest
+from ...errors import InvalidRequest, NotFound
 from ...services.container import Services
+from ...services.tasks import Task
 from ..deps import get_services, public_base, require_api_key
 from ..schemas import ImageGenerationRequest
 
@@ -37,10 +38,45 @@ def _image_item(r: MediaResult, fmt: str, svc: Services, base: str) -> dict:
     return item
 
 
+def _task_view(task: Task) -> dict:
+    return {
+        "id": task.id,
+        "object": "image.task",
+        "status": task.status.value,
+        "progress": task.progress,
+        "created_at": int(task.created_at),
+        "model": task.request.get("model"),
+        "result": task.result,
+        "error": task.error,
+    }
+
+
 async def _generate(body: ImageGenerationRequest, refs: list[InputImage],
                     request: Request, svc: Services) -> dict:
     if len(refs) > MAX_REFERENCE_IMAGES:
         raise InvalidRequest(f"at most {MAX_REFERENCE_IMAGES} reference images are supported")
+    if body.async_:
+        return _submit(body, refs, request, svc)
+    return await _run(body, refs, public_base(request), svc)
+
+
+def _submit(body: ImageGenerationRequest, refs: list[InputImage], request: Request,
+            svc: Services) -> dict:
+    """Run the generation as a background task; results are stored as media URLs."""
+    spec = resolve_model(body.model, "image")
+    body = body.model_copy(update={"response_format": "url"})  # keep base64 out of tasks.json
+    base = public_base(request)
+
+    async def runner(progress) -> dict:
+        return await _run(body, refs, base, svc)
+
+    meta = {"model": spec.id, "prompt": body.prompt, "size": body.size, "n": body.n,
+            "references": len(refs)}
+    return _task_view(svc.tasks.submit("image", meta, runner))
+
+
+async def _run(body: ImageGenerationRequest, refs: list[InputImage], base: str,
+               svc: Services) -> dict:
     spec = resolve_model(body.model, "image")
     transparent = body.background == "transparent"
     prompt = f"{body.prompt.rstrip('. ')}. {_CUTOUT_HINT}" if transparent else body.prompt
@@ -51,7 +87,6 @@ async def _generate(body: ImageGenerationRequest, refs: list[InputImage],
         # After the gateway call, so the account is not held during matting.
         results = [replace(r, data=await svc.matting.remove(r.data), mime="image/png")
                    for r in results]
-    base = public_base(request)
     return {"created": int(time.time()),
             "data": [_image_item(r, body.response_format, svc, base) for r in results]}
 
@@ -90,3 +125,11 @@ async def edit_images(request: Request, svc: Services = Depends(get_services)) -
             mime = mimetypes.guess_type(f.filename or "")[0] or "image/png"
         refs.append(InputImage(data=await f.read(), mime=mime))
     return await _generate(body, refs, request, svc)
+
+
+@router.get("/v1/images/generations/{task_id}")
+async def get_image_task(task_id: str, svc: Services = Depends(get_services)) -> dict:
+    task = svc.tasks.get(task_id)
+    if task is None or task.kind != "image":
+        raise NotFound(f"image task '{task_id}' not found")
+    return _task_view(task)

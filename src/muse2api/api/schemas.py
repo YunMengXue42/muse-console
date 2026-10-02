@@ -43,6 +43,9 @@ class ImageGenerationRequest(_Lenient):
     background: Literal["auto", "opaque", "transparent"] | None = None
     image: str | list[str] | None = Field(
         default=None, description="Reference image(s) as data URL, http(s) URL or base64 (max 4)")
+    # A sync call can outlive a proxy's timeout (Cloudflare cuts at ~100 s with 524), so
+    # "async": true returns a task to poll at GET /v1/images/generations/{task_id}.
+    async_: bool = Field(default=False, alias="async")
     user: str | None = None
 
 
