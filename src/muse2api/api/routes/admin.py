@@ -115,9 +115,31 @@ def _get_key(svc: Services, key_id: str) -> ApiKey:
     return key
 
 
+# Identities that authenticate without a stored key (see deps.require_api_key).
+BUILTIN_KEYS = ("legacy", "admin")
+_NO_USAGE = {"total": 0, "requests_24h": 0, "errors_24h": 0, "last_request_at": None}
+
+
+def _usage(row: dict | None) -> dict:
+    if row is None:
+        return dict(_NO_USAGE)
+    return {k: row[k] for k in _NO_USAGE}
+
+
 @router.get("/keys")
 async def list_keys(svc: Services = Depends(get_services)) -> dict:
-    return {"data": [k.public() for k in svc.keys.all()]}
+    """Stored keys plus the built-in identities, each with request counts from the log."""
+    usage = {r["key_id"]: r for r in (await svc.requests.key_usage())["data"]}
+    return {
+        "data": [{**k.public(), "usage": _usage(usage.get(k.id))} for k in svc.keys.all()],
+        "builtin": [{"id": b, "name": b, "usage": _usage(usage.get(b))} for b in BUILTIN_KEYS],
+    }
+
+
+@router.get("/keys/usage")
+async def key_usage(svc: Services = Depends(get_services)) -> dict:
+    """Raw per-``key_id`` counts, including deleted keys still present in the log."""
+    return await svc.requests.key_usage()
 
 
 @router.post("/keys")

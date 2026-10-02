@@ -134,6 +134,62 @@ def test_stats_shape(client, auth, admin):
     assert client.get("/admin/stats", headers=admin, params={"window": "2y"}).status_code == 400
 
 
+def test_key_usage(client, auth, admin):
+    alice = client.post("/admin/keys", headers=admin, json={"name": "alice"}).json()
+    client.post("/admin/keys", headers=admin, json={"name": "idle"})
+    a = _bearer(alice["api_key"])
+    assert client.get("/v1/models", headers=a).status_code == 200
+    assert client.post("/v1/chat/completions", headers=a, json={
+        "model": "muse-video", "messages": [{"role": "user", "content": "x"}]}).status_code == 400
+    task = client.post("/v1/videos", headers=a, json={"prompt": "a wave"}).json()
+    client.get(f"/v1/videos/{task['id']}", headers=a)  # poll: not counted
+    client.get("/v1/models", headers=auth)
+
+    r = client.get("/admin/keys", headers=admin)
+    assert r.status_code == 200
+    body = r.json()
+    by_name = {k["name"]: k for k in body["data"]}
+    assert by_name["alice"]["usage"]["total"] == 3
+    assert by_name["alice"]["usage"]["requests_24h"] == 3
+    assert by_name["alice"]["usage"]["errors_24h"] == 1
+    assert by_name["alice"]["usage"]["last_request_at"] > 0
+    assert by_name["idle"]["usage"] == {"total": 0, "requests_24h": 0, "errors_24h": 0,
+                                        "last_request_at": None}
+    builtin = {b["id"]: b["usage"] for b in body["builtin"]}
+    assert set(builtin) == {"legacy", "admin"}
+    assert builtin["legacy"]["total"] == 1 and builtin["legacy"]["errors_24h"] == 0
+    assert builtin["admin"]["total"] == 0  # /admin/* calls are not logged
+
+    raw = client.get("/admin/keys/usage", headers=admin).json()
+    assert raw["since"] > 0
+    rows = {row["key_id"]: row for row in raw["data"]}
+    assert rows[alice["key"]["id"]]["key_name"] == "alice"
+    assert rows[alice["key"]["id"]]["total"] == 3
+    assert None not in rows  # unauthenticated requests have no key
+    assert client.get("/admin/keys/usage", headers=auth).status_code == 401
+
+
+async def test_key_usage_windows(settings):
+    import time
+
+    from muse2api.services.request_log import RequestLog
+
+    log = RequestLog(settings.requests_db)
+    base = {"method": "GET", "path": "/v1/models", "latency_ms": 1, "key_id": "k1"}
+    now = time.time()
+    await log.add({**base, "ts": now - 3 * 86400, "status_code": 500, "key_name": "old"})
+    await log.add({**base, "ts": now - 60, "status_code": 200, "key_name": "new"})
+    await log.add({**base, "ts": now - 30, "status_code": 503, "key_name": "new"})
+    await log.add({**base, "ts": now - 10, "status_code": 200, "poll": 1})
+    (row,) = (await log.key_usage())["data"]
+    assert row["total"] == 3
+    assert row["requests_24h"] == 2
+    assert row["errors_24h"] == 1
+    assert row["key_name"] == "new"
+    assert abs(row["last_request_at"] - (now - 30)) < 1e-3
+    await log.close()
+
+
 async def test_prune(settings):
     from muse2api.services.request_log import RequestLog
 

@@ -217,6 +217,25 @@ class RequestLog:
 
         return await asyncio.to_thread(self._call, run)
 
+    async def key_usage(self) -> dict[str, Any]:
+        """Per-key request counts in one GROUP BY: everything kept (see retention), the
+        last 24h, and the 4xx/5xx among those. Task polls are excluded, as in ``stats``."""
+        since = time.time() - 86400
+
+        def run(db: sqlite3.Connection) -> list[dict[str, Any]]:
+            # A bare column next to MAX() takes its value from the max row in SQLite,
+            # so key_name is the name used by the key's latest request.
+            rows = db.execute(
+                "SELECT key_id, key_name, MAX(ts) AS last_request_at, COUNT(*) AS total, "
+                "COALESCE(SUM(ts >= ?), 0) AS requests_24h, "
+                "COALESCE(SUM(ts >= ? AND status_code >= 400), 0) AS errors_24h "
+                "FROM requests WHERE poll = 0 AND key_id IS NOT NULL "
+                "GROUP BY key_id ORDER BY total DESC",
+                (since, since)).fetchall()
+            return [dict(r) for r in rows]
+
+        return {"since": since, "data": await asyncio.to_thread(self._call, run)}
+
 
 def _row(r: sqlite3.Row) -> dict[str, Any]:
     d = dict(r)
