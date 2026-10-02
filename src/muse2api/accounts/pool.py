@@ -18,7 +18,7 @@ from collections.abc import AsyncIterator, Iterable
 from contextlib import asynccontextmanager
 from typing import Protocol
 
-from ..errors import NoAccountAvailable, UpstreamAuthError, UpstreamQuotaError
+from ..errors import NoAccountAvailable, UpstreamAuthError, UpstreamQuotaError, UpstreamTimeout
 from .model import Account, AccountStatus
 from .store import AccountStore
 
@@ -214,6 +214,10 @@ class AccountPool:
             acc.status = AccountStatus.COOLING
             acc.cooldown_until = time.time() + max(self.cooldown, 3600)
             log.warning("account %s out of quota, cooling down", acc.id)
+        elif isinstance(error, UpstreamTimeout):
+            # muse.ai being slow says nothing about the account; cooling it down
+            # would only fail the other requests running on it in parallel.
+            pass
         elif getattr(error, "retryable", False):
             acc.status = AccountStatus.COOLING
             acc.cooldown_until = time.time() + self.cooldown

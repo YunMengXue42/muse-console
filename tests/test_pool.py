@@ -110,3 +110,23 @@ async def test_acquire_fails_fast_when_cooldown_outlasts_timeout(tmp_path):
     with pytest.raises(NoAccountAvailable, match="cooling"):
         await pool.acquire()
     assert time.monotonic() - started < 0.1
+
+
+async def test_timeout_does_not_cool_the_account(tmp_path):
+    from muse2api.errors import UpstreamTimeout
+
+    pool = await _pool(tmp_path, n=1)
+    with pytest.raises(UpstreamTimeout):
+        async with pool.lease():
+            raise UpstreamTimeout("video generation timed out")
+    acc = pool.get("a0")
+    assert acc.status == AccountStatus.ACTIVE and acc.fail_count == 1
+    assert (await pool.acquire()).id == "a0"
+
+
+async def test_other_upstream_errors_still_cool_down(tmp_path):
+    pool = await _pool(tmp_path, n=1, cooldown=30)
+    with pytest.raises(UpstreamError):
+        async with pool.lease():
+            raise UpstreamError("browser error")
+    assert pool.get("a0").status == AccountStatus.COOLING
