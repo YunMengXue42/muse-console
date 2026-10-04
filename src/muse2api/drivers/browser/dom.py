@@ -13,6 +13,9 @@ INPUT = "textarea"
 AGENT_BUBBLE = 'div[class*="hatch-agent-bubble-bg"]'
 ATTACHMENT = '[data-testid^="hatch-chat-attachment-presentation-"]'
 STOP_BUTTON = 'button[aria-label*="Stop" i]'
+# The agent asks before acting on the user's behalf (e.g. uploading the result to
+# muse.ai/files as a public link). Nobody answers it here, so it would block for minutes.
+APPROVAL_CARD = '[data-testid="hatch-inline-approval-card"]'
 FILE_INPUT = 'input[type="file"]'
 
 LOGIN_HINTS = ("log in", "sign in", "create an account", "use another account")
@@ -61,7 +64,24 @@ CHAT_STATE = f"""(() => {{
   const tail = document.body ? document.body.innerText.slice(-600) : '';
   return {{ agentCount: bubbles.length, lastText: last,
             generating: !!document.querySelector({q(STOP_BUTTON)}),
+            approval: !!document.querySelector({q(APPROVAL_CARD)}),
             attachments: atts, tail }};
+}})()"""
+
+
+# Click "Deny" on every pending approval card; the agent then carries on without
+# the action (and the result stays private instead of becoming a public link).
+DENY_APPROVALS = f"""(() => {{
+  const denied = [];
+  for (const card of document.querySelectorAll({q(APPROVAL_CARD)})) {{
+    const btn = [...card.querySelectorAll('button,[role=button]')]
+      .find(b => /^(deny|decline|reject|don.t allow)$/i.test((b.innerText || '').trim()));
+    if (btn && !btn.disabled) {{
+      btn.click();
+      denied.push(card.getAttribute('aria-label') || 'approval request');
+    }}
+  }}
+  return denied;
 }})()"""
 
 
