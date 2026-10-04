@@ -24,35 +24,13 @@ def _check(provided: str, expected: str) -> None:
         raise Unauthorized("invalid or missing API key")
 
 
-def _matches(provided: str, expected: str) -> bool:
-    return bool(expected) and hmac.compare_digest(provided.encode(), expected.encode())
-
-
-def _identify(request: Request, key_id: str, key_name: str) -> None:
-    # Read by the request-log middleware.
-    request.state.key_id = key_id
-    request.state.key_name = key_name
-
-
 def require_api_key(request: Request) -> None:
-    """Accept the admin key, the legacy single ``api_key``, or any active stored key."""
-    svc = get_services(request)
-    s = svc.settings
+    s = get_services(request).settings
     provided = _bearer(request)
-    if not provided:
-        raise Unauthorized("invalid or missing API key")
     # The admin key is a superset of the API key.
-    if _matches(provided, s.admin_key):
-        _identify(request, "admin", "admin")
+    if s.admin_key and provided and hmac.compare_digest(provided.encode(), s.admin_key.encode()):
         return
-    if _matches(provided, s.api_key):
-        _identify(request, "legacy", "legacy")
-        return
-    key = svc.keys.verify(provided)
-    if key is None:
-        raise Unauthorized("invalid or missing API key")
-    svc.keys.touch(key)
-    _identify(request, key.id, key.name)
+    _check(provided, s.api_key)
 
 
 def require_admin_key(request: Request) -> None:

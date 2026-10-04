@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -15,7 +14,6 @@ from fastapi.responses import JSONResponse
 
 from . import __version__
 from .accounts.keepalive import keepalive_loop
-from .api.middleware import RequestLogMiddleware
 from .api.routes import build_router
 from .config import Settings, get_settings
 from .drivers.base import MuseDriver
@@ -23,20 +21,6 @@ from .errors import Muse2APIError
 from .services.container import Services
 
 log = logging.getLogger("muse2api")
-
-# How often pending key "last used" times are written and old request rows pruned.
-_FLUSH_INTERVAL = 60.0
-_PRUNE_INTERVAL = 3600.0
-
-
-async def _housekeeping(services: Services) -> None:
-    last_prune = time.monotonic()
-    while True:
-        await asyncio.sleep(_FLUSH_INTERVAL)
-        await services.keys.flush()
-        if time.monotonic() - last_prune >= _PRUNE_INTERVAL:
-            last_prune = time.monotonic()
-            await services.requests.prune(services.settings.request_log_retention_days)
 
 
 def create_app(settings: Settings | None = None, driver: MuseDriver | None = None) -> FastAPI:
@@ -48,12 +32,7 @@ def create_app(settings: Settings | None = None, driver: MuseDriver | None = Non
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await services.pool.load()
         await services.tasks.load()
-        await services.keys.load()
-        await services.requests.open()
-        await services.requests.prune(settings.request_log_retention_days)
-        await services.requests.backfill_tasks(services.tasks.list(limit=services.tasks.max_kept))
         await services.driver.startup()
-        housekeeping = asyncio.create_task(_housekeeping(services))
         keepalive = None
         if settings.keepalive_enabled and services.driver.capabilities.renew_session:
             keepalive = asyncio.create_task(
@@ -63,15 +42,12 @@ def create_app(settings: Settings | None = None, driver: MuseDriver | None = Non
         try:
             yield
         finally:
-            for bg in (keepalive, housekeeping):
-                if bg:
-                    bg.cancel()
-                    with contextlib.suppress(asyncio.CancelledError):
-                        await bg
+            if keepalive:
+                keepalive.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await keepalive
             await services.tasks.shutdown()
             await services.driver.shutdown()
-            await services.keys.flush()
-            await services.requests.close()
 
     app = FastAPI(title="muse2api", version=__version__, lifespan=lifespan)
     app.state.services = services
@@ -89,5 +65,4 @@ def create_app(settings: Settings | None = None, driver: MuseDriver | None = Non
         )
 
     app.include_router(build_router())
-    app.add_middleware(RequestLogMiddleware, request_log=services.requests)
     return app
