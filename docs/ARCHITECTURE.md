@@ -2,34 +2,57 @@
 
 ## Layers
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│ api/            OpenAI protocol layer (routes, schemas, auth)│
-│   routes/chat.py  images.py  videos.py  media.py  admin.py   │
-├─────────────────────────────────────────────────────────────┤
-│ services/       Service layer                                │
-│   gateway.py    Runs driver calls on pooled accounts,        │
-│                 with failover                                │
-│   tasks.py      Background long-running tasks (video, ...)   │
-│   container.py  Dependency wiring (app.state.services)       │
-├──────────────────────────────┬──────────────────────────────┤
-│ accounts/  Account pool       │ core/  Upstream-agnostic     │
-│   model / store / pool        │   models   registry, aliases │
-│   keepalive  session renewal  │   prompt   messages → prompt │
-│                               │   media    storage, inputs   │
-├──────────────────────────────┴──────────────────────────────┤
-│ drivers/        The only layer that talks to muse.ai         │
-│   base.py   MuseDriver interface + request/result types      │
-│   mock.py   Offline driver                                   │
-│   browser/  Chromium + CDP (cdp.py / chromium.py / dom.py)   │
-│   http/     Direct protocol (reserved)                       │
-├─────────────────────────────────────────────────────────────┤
-│ upstream/muse.py  Upstream constants (URLs, cookie names)    │
-│                   and HTTP session renewal                   │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph api["api/ — OpenAI protocol layer"]
+        direction LR
+        api_routes["routes/<br/>chat · images · videos · media<br/>models · responses · health · admin · dashboard"]
+        api_support["schemas.py · deps.py · middleware.py"]
+    end
+
+    subgraph services["services/ — service layer"]
+        direction LR
+        svc_gateway["gateway.py<br/>pooled accounts + failover"]
+        svc_tasks["tasks.py<br/>background long-running tasks"]
+        svc_container["container.py<br/>dependency wiring"]
+        svc_reqlog["request_log.py<br/>request log (SQLite)"]
+    end
+
+    subgraph accounts["accounts/ — account pool"]
+        direction TB
+        acc_pool["model.py · store.py · pool.py"]
+        acc_keepalive["keepalive.py<br/>session renewal"]
+    end
+
+    subgraph auth["auth/"]
+        auth_keys["keys.py<br/>per-client API keys"]
+    end
+
+    subgraph core["core/ — upstream-agnostic"]
+        direction TB
+        core_models["models.py<br/>registry · aliases"]
+        core_prompt["prompt.py<br/>messages → prompt"]
+        core_media["media.py · matting.py<br/>storage · inputs"]
+    end
+
+    subgraph drivers["drivers/ — the only layer that talks to muse.ai"]
+        direction LR
+        drv_base["base.py<br/>MuseDriver interface"]
+        drv_mock["mock.py<br/>offline driver"]
+        drv_browser["browser/<br/>Chromium + CDP"]
+        drv_http["http/<br/>direct protocol (reserved)"]
+        drv_registry["registry.py"]
+    end
+
+    upstream["upstream/muse.py<br/>upstream constants · session renewal"]
+
+    api --> services
+    services --> accounts & auth & core
+    accounts & auth & core --> drivers
+    drivers --> upstream
 ```
 
-Dependencies flow strictly downward: `api → services → accounts/core → drivers → upstream`. Routes never call a driver directly, and drivers know nothing about the HTTP wire format.
+Dependencies flow strictly downward: `api → services → accounts/auth/core → drivers → upstream`. Routes never call a driver directly, and drivers know nothing about the HTTP wire format.
 
 ## Lifecycle of a chat request
 
@@ -66,7 +89,7 @@ class MuseDriver(ABC):
 
 ## Browser driver notes
 
-- One Chromium process. Each account gets its own isolated context via `Target.createBrowserContext` plus one reused tab, so switching accounts never requires clearing cookies.
+- One Chromium process. Each account gets its own isolated browser context via `Target.createBrowserContext` (up to `MUSE2API_ACCOUNT_MAX_CONCURRENCY` tabs, one window per tab — Chromium throttles background tabs of a shared window), so switching accounts never requires clearing cookies.
 - Follow-up chat from the same owner stays on that conversation and only the new user text is sent. The thread URL is stored on the account, so a later request reopens that muse chat instead of `/thread/new`. A different history or a different `user` opens a fresh page. The default pool strategy is `affinity`.
 - All DOM selectors and in-page scripts live in `drivers/browser/dom.py`. When muse.ai changes its UI, this is usually the only file that needs updating.
 - Text is written into the textarea through the native value setter plus an `input` event, so React picks it up and long prompts stay fast. If the send button cannot be found, it falls back to pressing Enter.

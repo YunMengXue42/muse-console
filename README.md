@@ -26,6 +26,7 @@
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [Disclaimer](#disclaimer)
+- [Star History](#star-history)
 
 ## Overview
 
@@ -304,6 +305,10 @@ ruff check .     # lint
 ## Disclaimer
 
 This project is for learning and technical research only. Please comply with muse.ai's terms of service and local laws. Never commit or publish account cookies.
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=www222fff/muse2api&type=Date)](https://star-history.com/#www222fff/muse2api&Date)
 
 ## License
 
