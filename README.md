@@ -60,29 +60,43 @@ The project focuses on **clean engineering and easy collaboration**:
 
 ## Architecture
 
-```
-          OpenAI SDK / chat clients
-                    │  HTTP (Bearer key)
-┌───────────────────▼────────────────────────────────────┐
-│ api/        Protocol: routes · validation · auth · SSE │
-├────────────────────────────────────────────────────────┤
-│ services/   Gateway (failover) · TaskManager           │
-├──────────────────────────┬─────────────────────────────┤
-│ accounts/  Account pool   │ core/  Model aliases        │
-│ strategies · cooldown ·   │        prompt conversion    │
-│ renewal                   │        media storage        │
-├──────────────────────────┴─────────────────────────────┤
-│ drivers/    MuseDriver interface (only layer that      │
-│             talks to upstream)                         │
-│   ├─ mock      offline fake data                       │
-│   ├─ browser   Chromium + CDP, one BrowserContext per  │
-│   │            account                                 │
-│   └─ http      direct protocol (reserved)              │
-├────────────────────────────────────────────────────────┤
-│ upstream/   muse.ai URLs, cookie names, session API    │
-└────────────────────────────────────────────────────────┘
-                    │
-                 muse.ai
+```mermaid
+flowchart TB
+    clients["OpenAI SDK / chat clients<br/>HTTP · Bearer key"]
+
+    subgraph api["api/ — protocol"]
+        api_routes["routes · validation · auth · SSE"]
+    end
+
+    subgraph services["services/"]
+        svc["Gateway (failover) · TaskManager"]
+    end
+
+    subgraph accounts["accounts/"]
+        acc["Account pool<br/>strategies · cooldown · renewal"]
+    end
+
+    subgraph core["core/"]
+        core_inner["Model aliases<br/>prompt conversion · media storage"]
+    end
+
+    subgraph drivers["drivers/ — MuseDriver interface (only layer that talks to upstream)"]
+        direction LR
+        d_mock["mock<br/>offline fake data"]
+        d_browser["browser<br/>Chromium + CDP"]
+        d_http["http<br/>direct protocol (reserved)"]
+    end
+
+    subgraph upstream["upstream/"]
+        u["muse.ai URLs · cookie names · session API"]
+    end
+
+    musedotai["muse.ai"]
+
+    clients --> api --> services
+    services --> accounts & core
+    accounts & core --> drivers
+    drivers --> upstream --> musedotai
 ```
 
 **How a chat request is handled**: the route resolves the model alias and merges the multi-turn `messages` into a single prompt, then hands it to the Gateway. The Gateway leases an account from the pool and asks the driver for a text stream. On failure, the account's state is updated according to the error type: accounts with an expired session are taken offline, accounts out of quota cool down, and other errors cause a short cooldown. As long as nothing has been sent to the client yet, the request is retried on another account.
