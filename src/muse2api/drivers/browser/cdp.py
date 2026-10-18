@@ -71,14 +71,19 @@ class CDPSession:
         msg_id = next(self._ids)
         fut: asyncio.Future = asyncio.get_running_loop().create_future()
         self._pending[msg_id] = fut
-        await self._ws.send(json.dumps({"id": msg_id, "method": method, "params": params or {}}))
         try:
+            await self._ws.send(
+                json.dumps({"id": msg_id, "method": method, "params": params or {}})
+            )
             return await asyncio.wait_for(fut, timeout)
         finally:
             self._pending.pop(msg_id, None)
+            if not fut.done():
+                fut.cancel()
 
-    async def evaluate(self, expression: str, *, await_promise: bool = False,
-                       timeout: float = 30.0) -> Any:
+    async def evaluate(
+        self, expression: str, *, await_promise: bool = False, timeout: float = 30.0
+    ) -> Any:
         res = await self.send(
             "Runtime.evaluate",
             {"expression": expression, "returnByValue": True, "awaitPromise": await_promise},

@@ -24,6 +24,7 @@ class Account(BaseModel):
     id: str = Field(default_factory=lambda: "acc_" + uuid.uuid4().hex[:10])
     label: str = ""
     enabled: bool = True
+    max_concurrency: int | None = Field(default=None, ge=1, le=16)
     status: AccountStatus = AccountStatus.ACTIVE
 
     cookies: dict[str, str] = Field(default_factory=dict)
@@ -46,17 +47,38 @@ class Account(BaseModel):
         if not self.enabled or self.status == AccountStatus.INVALID:
             return False
         if self.status == AccountStatus.COOLING:
-            return (now or _now()) >= self.cooldown_until
+            return (_now() if now is None else now) >= self.cooldown_until
         return True
 
     def public(self) -> dict[str, Any]:
-        """Serialisable view with cookie values masked."""
-        data = self.model_dump(mode="json")
-        data["cookies"] = {k: _mask(v) for k, v in self.cookies.items()}
+        """Public allowlist: upstream metadata and error text may contain credentials."""
+        data = self.model_dump(
+            mode="json",
+            include={
+                "id",
+                "label",
+                "enabled",
+                "status",
+                "created_at",
+                "last_used_at",
+                "cooldown_until",
+                "success_count",
+                "fail_count",
+                "max_concurrency",
+            },
+        )
+        from ..upstream.muse import SESSION_COOKIES
+
+        data["cookies"] = {name: "***" for name in SESSION_COOKIES if name in self.cookies}
+        quota = self.meta.get("quota")
+        safe_quota = {}
+        if isinstance(quota, dict):
+            for key in ("checked_at", "remaining", "total", "used", "limit", "credits", "reset_at"):
+                value = quota.get(key)
+                if isinstance(value, (int, float)) and not isinstance(value, bool):
+                    safe_quota[key] = value
+            if quota.get("plan") in ("free", "pro", "team", "enterprise", "business", "premium"):
+                safe_quota["plan"] = quota["plan"]
+        data["meta"] = {"quota": safe_quota} if safe_quota else {}
+        data["last_error"] = "upstream request failed" if self.last_error else None
         return data
-
-
-def _mask(value: str) -> str:
-    if len(value) <= 8:
-        return "***"
-    return f"{value[:4]}...{value[-4:]}"

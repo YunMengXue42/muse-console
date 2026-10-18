@@ -130,3 +130,145 @@ async def test_other_upstream_errors_still_cool_down(tmp_path):
         async with pool.lease():
             raise UpstreamError("browser error")
     assert pool.get("a0").status == AccountStatus.COOLING
+
+
+async def test_round_robin_dynamic_candidates_do_not_starve(tmp_path):
+    pool = await _pool(tmp_path, n=3, strategy="round_robin")
+    first = await pool.acquire()
+    assert first.id == "a0"
+    seen = []
+    for _ in range(8):
+        account = await pool.acquire()
+        seen.append(account.id)
+        await pool.release(account)
+    assert seen == ["a1", "a2"] * 4
+    await pool.release(first)
+    assert (await pool.acquire()).id == "a0"
+
+
+async def test_cancelled_lease_not_success_and_waiter_removed(tmp_path):
+    pool = await _pool(tmp_path, n=1)
+    entered = asyncio.Event()
+
+    async def hold():
+        async with pool.lease():
+            entered.set()
+            await asyncio.Event().wait()
+
+    task = asyncio.create_task(hold())
+    await entered.wait()
+    waiter = asyncio.create_task(pool.acquire())
+    await asyncio.sleep(0.01)
+    assert pool.stats()["waiting"] == 1
+    waiter.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await waiter
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert pool.stats()["inflight"] == pool.stats()["waiting"] == 0
+    assert pool.get("a0").success_count == pool.get("a0").fail_count == 0
+
+
+async def test_per_account_limits_and_parallel_leases(tmp_path):
+    pool = await _pool(tmp_path, n=1)
+    account = pool.get("a0")
+    account.max_concurrency = 2
+    await pool.upsert(account)
+    one, two = await asyncio.gather(pool.acquire(), pool.acquire())
+    assert pool.stats()["busy"] == 1
+    await asyncio.gather(pool.release(one), pool.release(two))
+    assert pool.stats()["available"] == 1
+    assert pool.stats()["inflight"] == 0
+    assert pool.get(account.id).success_count == 2
+
+
+async def test_parallel_success_cannot_clear_auth_failure(tmp_path):
+    pool = await _pool(tmp_path, n=1, max_concurrency=2)
+    one, two = await asyncio.gather(pool.acquire(), pool.acquire())
+    await pool.release(one, UpstreamAuthError("secret"))
+    await pool.release(two)
+    assert pool.get("a0").status == AccountStatus.INVALID
+
+
+async def test_duplicate_session_and_strategy_update(tmp_path):
+    pool = await _pool(tmp_path, n=1)
+    await pool.upsert(Account(cookies={"hatch_sess": "x"}))
+    assert pool.stats()["total"] == 2
+    await pool.set_strategy("round_robin")
+    assert pool.strategy_name == "round_robin"
+    with pytest.raises(KeyError):
+        await pool.set_strategy("bogus")
+    assert pool.strategy_name == "round_robin"
+
+
+async def test_cancelled_mutation_finishes_disk_memory_commit(tmp_path):
+    class SlowStore(JsonAccountStore):
+        def __init__(self, path):
+            super().__init__(path)
+            self.started = asyncio.Event()
+            self.resume = asyncio.Event()
+
+        async def save(self, accounts):
+            self.started.set()
+            await self.resume.wait()
+            await super().save(accounts)
+
+    store = SlowStore(tmp_path / "accounts.json")
+    pool = AccountPool(store)
+    account = Account(cookies={"hatch_sess": "synthetic"})
+    task = asyncio.create_task(pool.upsert(account))
+    await store.started.wait()
+    task.cancel()
+    store.resume.set()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert pool.get(account.id) == account
+    assert (await store.load())[0] == account
+
+
+async def test_driver_hot_page_merge_preserves_current_config_and_meta(tmp_path):
+    pool = await _pool(tmp_path, n=1, max_concurrency=2)
+    first, second = await asyncio.gather(pool.acquire(), pool.acquire())
+    updated = pool.get("a0").model_copy(deep=True)
+    updated.label = "new label"
+    updated.max_concurrency = 3
+    updated.meta.update(quota={"remaining": 9}, renewed_at=123)
+    await pool.upsert(updated)
+    first.meta.update(hot_page={"url": "first"}, quota={"remaining": 0}, renewed_at=0)
+    second.meta["hot_page"] = {"url": "second"}
+    await pool.release(first)
+    await pool.release(second)
+    current = pool.get("a0")
+    assert current.meta == {
+        "hot_page": {"url": "second"},
+        "quota": {"remaining": 9},
+        "renewed_at": 123,
+    }
+    assert current.label == "new label" and current.max_concurrency == 3
+    assert current.success_count == 2
+    reloaded = AccountPool(pool.store)
+    await reloaded.load()
+    assert reloaded.get("a0").meta == current.meta
+
+
+async def test_old_snapshot_hot_page_not_merged_after_credentials_change(tmp_path):
+    pool = await _pool(tmp_path, n=1)
+    snapshot = await pool.acquire()
+    updated = pool.get("a0").model_copy(deep=True)
+    updated.cookies = {"hatch_sess": "replacement"}
+    updated.meta["hot_page"] = {"url": "fresh"}
+    await pool.upsert(updated)
+    snapshot.meta["hot_page"] = {"url": "obsolete"}
+    await pool.release(snapshot)
+    assert pool.get("a0").meta["hot_page"] == {"url": "fresh"}
+    assert pool.get("a0").success_count == 0
+
+
+async def test_unmodified_hot_snapshot_does_not_erase_concurrent_hot_update(tmp_path):
+    pool = await _pool(tmp_path, n=1, max_concurrency=2)
+    first, second = await asyncio.gather(pool.acquire(), pool.acquire())
+    first.meta["hot_page"] = {"url": "first"}
+    await pool.release(first)
+    await pool.release(second)
+    assert pool.get("a0").meta["hot_page"] == {"url": "first"}

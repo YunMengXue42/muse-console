@@ -26,8 +26,23 @@ log = logging.getLogger(__name__)
 # values so that writes from copied contexts (streaming body tasks) are still seen.
 current_record: ContextVar[dict[str, Any] | None] = ContextVar("current_record", default=None)
 
-COLUMNS = ("ts", "method", "path", "model", "key_id", "key_name", "account_id", "status_code",
-           "latency_ms", "stream", "poll", "error", "client_ip", "user_agent", "task_id")
+COLUMNS = (
+    "ts",
+    "method",
+    "path",
+    "model",
+    "key_id",
+    "key_name",
+    "account_id",
+    "status_code",
+    "latency_ms",
+    "stream",
+    "poll",
+    "error",
+    "client_ip",
+    "user_agent",
+    "task_id",
+)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS requests (
@@ -130,7 +145,9 @@ class RequestLog:
     async def add(self, record: dict[str, Any]) -> None:
         record = {"stream": 0, "poll": 0, **record}
         row = tuple(record.get(c) for c in COLUMNS)
-        sql = f"INSERT INTO requests ({', '.join(COLUMNS)}) VALUES ({', '.join('?' * len(COLUMNS))})"
+        sql = (
+            f"INSERT INTO requests ({', '.join(COLUMNS)}) VALUES ({', '.join('?' * len(COLUMNS))})"
+        )
         task_id = None if record["poll"] else record.get("task_id")
 
         def run(db: sqlite3.Connection) -> None:
@@ -145,8 +162,14 @@ class RequestLog:
         except Exception:  # noqa: BLE001
             log.exception("failed to write request log row")
 
-    async def finish_task(self, task_id: str, status: str, finished_at: float,
-                          error: str | None = None, account_id: str | None = None) -> None:
+    async def finish_task(
+        self,
+        task_id: str,
+        status: str,
+        finished_at: float,
+        error: str | None = None,
+        account_id: str | None = None,
+    ) -> None:
         """Write an async task's outcome onto the request that submitted it."""
         args = (status, finished_at, error, account_id, task_id)
 
@@ -165,8 +188,11 @@ class RequestLog:
 
     async def backfill_tasks(self, tasks: list[Any]) -> None:
         """Fill in outcomes for submit rows logged before outcomes were recorded."""
-        rows = [(t.status.value, t.updated_at, (t.error or {}).get("message"), None, t.id)
-                for t in tasks if t.finished]
+        rows = [
+            (t.status.value, t.updated_at, (t.error or {}).get("message"), None, t.id)
+            for t in tasks
+            if t.finished
+        ]
         if not rows:
             return
         sql = _FINISH_SQL + " AND task_status IS NULL"
@@ -179,7 +205,8 @@ class RequestLog:
         cutoff = time.time() - retention_days * 86400
         try:
             cur = await asyncio.to_thread(
-                self._call, lambda db: db.execute("DELETE FROM requests WHERE ts < ?", (cutoff,)))
+                self._call, lambda db: db.execute("DELETE FROM requests WHERE ts < ?", (cutoff,))
+            )
         except Exception:  # noqa: BLE001
             log.exception("failed to prune request log")
             return 0
@@ -188,10 +215,18 @@ class RequestLog:
         return cur.rowcount
 
     # ---- reads ----
-    async def query(self, *, key_id: str | None = None, account_id: str | None = None,
-                    status: str | None = None, path: str | None = None,
-                    since: float | None = None, hide_polls: bool = False,
-                    limit: int = 100, offset: int = 0) -> dict[str, Any]:
+    async def query(
+        self,
+        *,
+        key_id: str | None = None,
+        account_id: str | None = None,
+        status: str | None = None,
+        path: str | None = None,
+        since: float | None = None,
+        hide_polls: bool = False,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> dict[str, Any]:
         where, args = ["1=1"], []
         if key_id:
             where.append("key_id = ?")
@@ -220,7 +255,8 @@ class RequestLog:
             total = db.execute(f"SELECT COUNT(*) FROM requests WHERE {cond}", args).fetchone()[0]
             rows = db.execute(
                 f"SELECT * FROM requests WHERE {cond} ORDER BY id DESC LIMIT ? OFFSET ?",
-                [*args, limit, offset]).fetchall()
+                [*args, limit, offset],
+            ).fetchall()
             return {"data": [_row(r) for r in rows], "total": total}
 
         return await asyncio.to_thread(self._call, run)
@@ -238,21 +274,28 @@ class RequestLog:
             rows = db.execute(
                 f"SELECT {cols}, COUNT(*) AS count, SUM({FAILED}) AS errors "
                 f"FROM requests WHERE {cond} GROUP BY {cols} ORDER BY count DESC LIMIT 50",
-                args).fetchall()
+                args,
+            ).fetchall()
             return [dict(r) for r in rows]
 
         def run(db: sqlite3.Connection) -> dict[str, Any]:
             total, errors, server_errors = db.execute(
                 f"SELECT COUNT(*), COALESCE(SUM({FAILED}), 0), "
                 f"COALESCE(SUM(status_code >= 500), 0) FROM requests WHERE {cond}",
-                args).fetchone()
-            latencies = [r[0] for r in db.execute(
-                f"SELECT latency_ms FROM requests WHERE {cond} ORDER BY latency_ms", args)]
+                args,
+            ).fetchone()
+            latencies = [
+                r[0]
+                for r in db.execute(
+                    f"SELECT latency_ms FROM requests WHERE {cond} ORDER BY latency_ms", args
+                )
+            ]
             series = [{"t": start + i * bucket, "count": 0, "errors": 0} for i in range(n_buckets)]
             for idx, count, errs in db.execute(
-                    f"SELECT CAST((ts - ?) / ? AS INTEGER) AS b, COUNT(*), "
-                    f"SUM({FAILED}) FROM requests WHERE {cond} GROUP BY b",
-                    (start, bucket, *args)):
+                f"SELECT CAST((ts - ?) / ? AS INTEGER) AS b, COUNT(*), "
+                f"SUM({FAILED}) FROM requests WHERE {cond} GROUP BY b",
+                (start, bucket, *args),
+            ):
                 if 0 <= idx < n_buckets:
                     series[idx]["count"], series[idx]["errors"] = count, errs
             return {
@@ -263,8 +306,10 @@ class RequestLog:
                 "errors": errors,
                 "server_errors": server_errors,
                 "error_rate": errors / total if total else 0.0,
-                "latency_ms": {"p50": _percentile(latencies, 0.50),
-                               "p95": _percentile(latencies, 0.95)},
+                "latency_ms": {
+                    "p50": _percentile(latencies, 0.50),
+                    "p95": _percentile(latencies, 0.95),
+                },
                 "by_key": grouped(db, "key_id, key_name"),
                 "by_account": grouped(db, "account_id"),
                 "by_model": grouped(db, "model"),
@@ -288,7 +333,8 @@ class RequestLog:
                 f"COALESCE(SUM(ts >= ? AND {FAILED}), 0) AS errors_24h "
                 "FROM requests WHERE poll = 0 AND key_id IS NOT NULL "
                 "GROUP BY key_id ORDER BY total DESC",
-                (since, since)).fetchall()
+                (since, since),
+            ).fetchall()
             return [dict(r) for r in rows]
 
         return {"since": since, "data": await asyncio.to_thread(self._call, run)}

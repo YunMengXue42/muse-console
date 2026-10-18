@@ -51,8 +51,9 @@ def _task_view(task: Task) -> dict:
     }
 
 
-async def _generate(body: ImageGenerationRequest, refs: list[InputImage],
-                    request: Request, svc: Services) -> dict:
+async def _generate(
+    body: ImageGenerationRequest, refs: list[InputImage], request: Request, svc: Services
+) -> dict:
     request.state.model = body.model or resolve_model(body.model, "image").id
     if len(refs) > MAX_REFERENCE_IMAGES:
         raise InvalidRequest(f"at most {MAX_REFERENCE_IMAGES} reference images are supported")
@@ -61,8 +62,9 @@ async def _generate(body: ImageGenerationRequest, refs: list[InputImage],
     return await _run(body, refs, public_base(request), svc)
 
 
-def _submit(body: ImageGenerationRequest, refs: list[InputImage], request: Request,
-            svc: Services) -> dict:
+def _submit(
+    body: ImageGenerationRequest, refs: list[InputImage], request: Request, svc: Services
+) -> dict:
     """Run the generation as a background task; results are stored as media URLs."""
     spec = resolve_model(body.model, "image")
     body = body.model_copy(update={"response_format": "url"})  # keep base64 out of tasks.json
@@ -71,32 +73,48 @@ def _submit(body: ImageGenerationRequest, refs: list[InputImage], request: Reque
     async def runner(progress) -> dict:
         return await _run(body, refs, base, svc)
 
-    meta = {"model": spec.id, "prompt": body.prompt, "size": body.size, "n": body.n,
-            "references": len(refs)}
+    meta = {
+        "model": spec.id,
+        "prompt": body.prompt,
+        "size": body.size,
+        "n": body.n,
+        "references": len(refs),
+    }
     task = svc.tasks.submit("image", meta, runner)
     request.state.task_id = task.id
     return _task_view(task)
 
 
-async def _run(body: ImageGenerationRequest, refs: list[InputImage], base: str,
-               svc: Services) -> dict:
+async def _run(
+    body: ImageGenerationRequest, refs: list[InputImage], base: str, svc: Services
+) -> dict:
     spec = resolve_model(body.model, "image")
     transparent = body.background == "transparent"
     prompt = f"{body.prompt.rstrip('. ')}. {_CUTOUT_HINT}" if transparent else body.prompt
-    req = ImageRequest(prompt=prompt, model=spec.id, size=body.size, n=body.n,
-                       reference_images=refs, timeout=svc.settings.image_timeout)
+    req = ImageRequest(
+        prompt=prompt,
+        model=spec.id,
+        size=body.size,
+        n=body.n,
+        reference_images=refs,
+        timeout=svc.settings.image_timeout,
+    )
     results = await svc.gateway.generate_image(req)
     if transparent:
         # After the gateway call, so the account is not held during matting.
-        results = [replace(r, data=await svc.matting.remove(r.data), mime="image/png")
-                   for r in results]
-    return {"created": int(time.time()),
-            "data": [_image_item(r, body.response_format, svc, base) for r in results]}
+        results = [
+            replace(r, data=await svc.matting.remove(r.data), mime="image/png") for r in results
+        ]
+    return {
+        "created": int(time.time()),
+        "data": [_image_item(r, body.response_format, svc, base) for r in results],
+    }
 
 
 @router.post("/v1/images/generations")
-async def generate_images(body: ImageGenerationRequest, request: Request,
-                          svc: Services = Depends(get_services)) -> dict:
+async def generate_images(
+    body: ImageGenerationRequest, request: Request, svc: Services = Depends(get_services)
+) -> dict:
     refs = body.image if isinstance(body.image, list) else [body.image] if body.image else []
     loaded = [InputImage(*(await load_image_ref(ref))) for ref in refs]
     return await _generate(body, loaded, request, svc)
@@ -112,8 +130,9 @@ async def edit_images(request: Request, svc: Services = Depends(get_services)) -
     form = await request.form()
     if form.get("mask") is not None:
         raise InvalidRequest("mask is not supported; muse.ai cannot inpaint a region")
-    files = [f for key in ("image", "image[]") for f in form.getlist(key)
-             if isinstance(f, UploadFile)]
+    files = [
+        f for key in ("image", "image[]") for f in form.getlist(key) if isinstance(f, UploadFile)
+    ]
     if not files:
         raise InvalidRequest("at least one image file is required (field 'image' or 'image[]')")
     fields = {k: v for k, v in form.items() if isinstance(v, str) and k not in ("image", "image[]")}
@@ -131,8 +150,9 @@ async def edit_images(request: Request, svc: Services = Depends(get_services)) -
 
 
 @router.get("/v1/images/generations/{task_id}")
-async def get_image_task(task_id: str, request: Request,
-                         svc: Services = Depends(get_services)) -> dict:
+async def get_image_task(
+    task_id: str, request: Request, svc: Services = Depends(get_services)
+) -> dict:
     task = svc.tasks.get(task_id)
     if task is None or task.kind != "image":
         raise NotFound(f"image task '{task_id}' not found")

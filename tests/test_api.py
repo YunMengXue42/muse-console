@@ -22,8 +22,11 @@ def test_models(client, auth):
 
 
 def test_chat_non_stream(client, auth):
-    r = client.post("/v1/chat/completions", headers=auth, json={
-        "model": "gpt-4o", "messages": [{"role": "user", "content": "hello"}]})
+    r = client.post(
+        "/v1/chat/completions",
+        headers=auth,
+        json={"model": "gpt-4o", "messages": [{"role": "user", "content": "hello"}]},
+    )
     assert r.status_code == 200
     body = r.json()
     assert body["object"] == "chat.completion"
@@ -32,10 +35,16 @@ def test_chat_non_stream(client, auth):
 
 
 def test_chat_stream(client, auth):
-    with client.stream("POST", "/v1/chat/completions", headers=auth, json={
-        "messages": [{"role": "user", "content": "stream me"}], "stream": True,
-        "stream_options": {"include_usage": True},
-    }) as r:
+    with client.stream(
+        "POST",
+        "/v1/chat/completions",
+        headers=auth,
+        json={
+            "messages": [{"role": "user", "content": "stream me"}],
+            "stream": True,
+            "stream_options": {"include_usage": True},
+        },
+    ) as r:
         assert r.status_code == 200
         lines = [ln[6:] for ln in r.iter_lines() if ln.startswith("data: ")]
     assert lines[-1] == "[DONE]"
@@ -46,14 +55,18 @@ def test_chat_stream(client, auth):
 
 
 def test_chat_wrong_model_kind(client, auth):
-    r = client.post("/v1/chat/completions", headers=auth, json={
-        "model": "muse-video", "messages": [{"role": "user", "content": "x"}]})
+    r = client.post(
+        "/v1/chat/completions",
+        headers=auth,
+        json={"model": "muse-video", "messages": [{"role": "user", "content": "x"}]},
+    )
     assert r.status_code == 400
 
 
 def test_image_url_and_media(client, auth):
-    r = client.post("/v1/images/generations", headers=auth,
-                    json={"prompt": "a cat", "n": 2, "size": "1:1"})
+    r = client.post(
+        "/v1/images/generations", headers=auth, json={"prompt": "a cat", "n": 2, "size": "1:1"}
+    )
     assert r.status_code == 200
     data = r.json()["data"]
     assert len(data) == 2
@@ -64,8 +77,11 @@ def test_image_url_and_media(client, auth):
 
 
 def test_image_b64(client, auth):
-    r = client.post("/v1/images/generations", headers=auth,
-                    json={"prompt": "a dog", "response_format": "b64_json"})
+    r = client.post(
+        "/v1/images/generations",
+        headers=auth,
+        json={"prompt": "a dog", "response_format": "b64_json"},
+    )
     assert r.json()["data"][0]["b64_json"]
 
 
@@ -82,9 +98,16 @@ def _fake_matting(client, monkeypatch) -> list[bytes]:
 
 def test_image_transparent_background(client, auth, monkeypatch):
     seen = _fake_matting(client, monkeypatch)
-    r = client.post("/v1/images/generations", headers=auth,
-                    json={"prompt": "a fox", "n": 2, "background": "transparent",
-                          "response_format": "b64_json"})
+    r = client.post(
+        "/v1/images/generations",
+        headers=auth,
+        json={
+            "prompt": "a fox",
+            "n": 2,
+            "background": "transparent",
+            "response_format": "b64_json",
+        },
+    )
     assert r.status_code == 200
     data = r.json()["data"]
     assert len(seen) == 2
@@ -96,15 +119,19 @@ def test_image_transparent_background(client, auth, monkeypatch):
 
 def test_image_transparent_saved_as_png(client, auth, monkeypatch):
     _fake_matting(client, monkeypatch)
-    r = client.post("/v1/images/generations", headers=auth,
-                    json={"prompt": "a fox", "background": "transparent"})
+    r = client.post(
+        "/v1/images/generations",
+        headers=auth,
+        json={"prompt": "a fox", "background": "transparent"},
+    )
     assert r.json()["data"][0]["url"].endswith(".png")
 
 
 def test_image_opaque_background_skips_matting(client, auth, monkeypatch):
     seen = _fake_matting(client, monkeypatch)
-    r = client.post("/v1/images/generations", headers=auth,
-                    json={"prompt": "a fox", "background": "opaque"})
+    r = client.post(
+        "/v1/images/generations", headers=auth, json={"prompt": "a fox", "background": "opaque"}
+    )
     assert r.status_code == 200
     assert seen == []
     assert r.json()["data"][0]["revised_prompt"] == "a fox"
@@ -126,9 +153,14 @@ def _capture_image_requests(client, monkeypatch):
 def test_image_reference_images(client, auth, monkeypatch):
     seen = _capture_image_requests(client, monkeypatch)
     png = base64.b64encode(b"\x89PNG fake").decode()
-    r = client.post("/v1/images/generations", headers=auth,
-                    json={"prompt": "a model wearing this hoodie",
-                          "image": [f"data:image/png;base64,{png}", f"data:image/jpeg;base64,{png}"]})
+    r = client.post(
+        "/v1/images/generations",
+        headers=auth,
+        json={
+            "prompt": "a model wearing this hoodie",
+            "image": [f"data:image/png;base64,{png}", f"data:image/jpeg;base64,{png}"],
+        },
+    )
     assert r.status_code == 200
     refs = seen[0].reference_images
     assert [i.mime for i in refs] == ["image/png", "image/jpeg"]
@@ -138,29 +170,39 @@ def test_image_reference_images(client, auth, monkeypatch):
 def test_image_single_reference_string(client, auth, monkeypatch):
     seen = _capture_image_requests(client, monkeypatch)
     png = base64.b64encode(b"x").decode()
-    r = client.post("/v1/images/generations", headers=auth,
-                    json={"prompt": "p", "image": f"data:image/png;base64,{png}"})
+    r = client.post(
+        "/v1/images/generations",
+        headers=auth,
+        json={"prompt": "p", "image": f"data:image/png;base64,{png}"},
+    )
     assert r.status_code == 200
     assert len(seen[0].reference_images) == 1
 
 
 def test_image_too_many_references(client, auth):
     png = "data:image/png;base64," + base64.b64encode(b"x").decode()
-    r = client.post("/v1/images/generations", headers=auth, json={"prompt": "p", "image": [png] * 5})
+    r = client.post(
+        "/v1/images/generations", headers=auth, json={"prompt": "p", "image": [png] * 5}
+    )
     assert r.status_code == 400
 
 
 def test_image_invalid_background(client, auth):
-    r = client.post("/v1/images/generations", headers=auth,
-                    json={"prompt": "a fox", "background": "glass"})
+    r = client.post(
+        "/v1/images/generations", headers=auth, json={"prompt": "a fox", "background": "glass"}
+    )
     assert r.status_code == 400
 
 
 def test_image_async_task(client, auth):
     import time
+
     png = "data:image/png;base64," + base64.b64encode(b"x").decode()
-    r = client.post("/v1/images/generations", headers=auth,
-                    json={"prompt": "a fox", "image": png, "async": True, "response_format": "b64_json"})
+    r = client.post(
+        "/v1/images/generations",
+        headers=auth,
+        json={"prompt": "a fox", "image": png, "async": True, "response_format": "b64_json"},
+    )
     assert r.status_code == 200
     task = r.json()
     assert task["object"] == "image.task" and task["id"].startswith("task_")
@@ -191,8 +233,114 @@ def test_video_task(client, auth):
     assert task["result"]["url"].endswith(".mp4")
 
 
-def test_reserved_endpoints(client, auth):
-    assert client.post("/v1/responses", headers=auth, json={}).status_code == 501
+def _responses_events(response) -> list[dict]:
+    events = []
+    block: list[str] = []
+    for line in response.iter_lines():
+        if line:
+            block.append(line)
+            continue
+        data = next((item[6:] for item in block if item.startswith("data: ")), None)
+        if data:
+            events.append(json.loads(data))
+        block = []
+    data = next((item[6:] for item in block if item.startswith("data: ")), None)
+    if data:
+        events.append(json.loads(data))
+    return events
+
+
+def test_responses_non_stream_string_input(client, auth):
+    response = client.post(
+        "/v1/responses",
+        headers=auth,
+        json={
+            "model": "gpt-4o",
+            "instructions": "Be concise.",
+            "input": "hello responses",
+            "metadata": {"source": "test"},
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["object"] == "response"
+    assert body["status"] == "completed"
+    assert body["model"] == "gpt-4o"
+    assert body["metadata"] == {"source": "test"}
+    assert body["output"][0]["type"] == "message"
+    assert body["output"][0]["content"][0]["type"] == "output_text"
+    assert "hello responses" in body["output"][0]["content"][0]["text"]
+    assert body["usage"]["total_tokens"] == (
+        body["usage"]["input_tokens"] + body["usage"]["output_tokens"]
+    )
+
+
+def test_responses_message_array_and_instructions(client, auth):
+    response = client.post(
+        "/v1/responses",
+        headers=auth,
+        json={
+            "model": "muse-chat",
+            "instructions": "Follow this instruction.",
+            "input": [
+                {"role": "user", "content": [{"type": "input_text", "text": "look"}]},
+                {"role": "assistant", "content": "previous answer"},
+                {"role": "user", "content": "continue"},
+            ],
+        },
+    )
+    assert response.status_code == 200
+    output = response.json()["output"][0]["content"][0]["text"]
+    assert "Follow this instruction." in output
+    assert "previous answer" in output
+    assert "continue" in output
+
+
+def test_responses_stream_events(client, auth):
+    with client.stream(
+        "POST",
+        "/v1/responses",
+        headers=auth,
+        json={"model": "gpt-4o", "input": "stream responses", "stream": True},
+    ) as response:
+        assert response.status_code == 200
+        events = _responses_events(response)
+    event_types = [event["type"] for event in events]
+    assert event_types[:4] == [
+        "response.created",
+        "response.in_progress",
+        "response.output_item.added",
+        "response.content_part.added",
+    ]
+    assert event_types[-4:] == [
+        "response.output_text.done",
+        "response.content_part.done",
+        "response.output_item.done",
+        "response.completed",
+    ]
+    assert all(event["sequence_number"] == index for index, event in enumerate(events))
+    deltas = "".join(
+        event["delta"] for event in events if event["type"] == "response.output_text.delta"
+    )
+    final = events[-1]["response"]
+    assert final["status"] == "completed"
+    assert final["output"][0]["content"][0]["text"] == deltas
+    assert "stream responses" in deltas
+
+
+def test_responses_reject_unsupported_state_and_tools(client, auth):
+    state = client.post(
+        "/v1/responses",
+        headers=auth,
+        json={"model": "gpt-4o", "input": "hello", "previous_response_id": "resp_old"},
+    )
+    tools = client.post(
+        "/v1/responses",
+        headers=auth,
+        json={"model": "gpt-4o", "input": "hello", "tools": [{"type": "function"}]},
+    )
+    assert state.status_code == 400
+    assert tools.status_code == 400
 
 
 def _capture_image_requests(client, monkeypatch) -> list:
@@ -212,49 +360,68 @@ _PNG_DATA_URL = "data:image/png;base64," + base64.b64encode(b"\x89PNG-ref").deco
 
 def test_image_generation_with_reference(client, auth, monkeypatch):
     seen = _capture_image_requests(client, monkeypatch)
-    r = client.post("/v1/images/generations", headers=auth,
-                    json={"prompt": "same fox, wearing a scarf", "image": _PNG_DATA_URL})
+    r = client.post(
+        "/v1/images/generations",
+        headers=auth,
+        json={"prompt": "same fox, wearing a scarf", "image": _PNG_DATA_URL},
+    )
     assert r.status_code == 200
     refs = seen[0].reference_images
     assert [(i.data, i.mime) for i in refs] == [(b"\x89PNG-ref", "image/png")]
 
 
 def test_image_generation_reference_list_limit(client, auth):
-    r = client.post("/v1/images/generations", headers=auth,
-                    json={"prompt": "x", "image": [_PNG_DATA_URL] * 5})
+    r = client.post(
+        "/v1/images/generations", headers=auth, json={"prompt": "x", "image": [_PNG_DATA_URL] * 5}
+    )
     assert r.status_code == 400
 
 
 def test_image_edits_multipart(client, auth, monkeypatch):
     seen = _capture_image_requests(client, monkeypatch)
-    r = client.post("/v1/images/edits", headers=auth,
-                    data={"prompt": "put them in a cafe", "n": "1", "response_format": "b64_json"},
-                    files=[("image[]", ("a.png", b"img-a", "image/png")),
-                           ("image[]", ("b.jpg", b"img-b", "application/octet-stream"))])
+    r = client.post(
+        "/v1/images/edits",
+        headers=auth,
+        data={"prompt": "put them in a cafe", "n": "1", "response_format": "b64_json"},
+        files=[
+            ("image[]", ("a.png", b"img-a", "image/png")),
+            ("image[]", ("b.jpg", b"img-b", "application/octet-stream")),
+        ],
+    )
     assert r.status_code == 200
     assert r.json()["data"][0]["b64_json"]
     req = seen[0]
     assert req.prompt == "put them in a cafe"
     # A generic upload type falls back to the filename's type.
     assert [(i.data, i.mime) for i in req.reference_images] == [
-        (b"img-a", "image/png"), (b"img-b", "image/jpeg")]
+        (b"img-a", "image/png"),
+        (b"img-b", "image/jpeg"),
+    ]
 
 
 def test_image_edits_rejects_bad_input(client, auth):
     png = ("image", ("a.png", b"img", "image/png"))
     no_image = client.post("/v1/images/edits", headers=auth, data={"prompt": "x"})
     assert no_image.status_code == 400
-    mask = client.post("/v1/images/edits", headers=auth, data={"prompt": "x"},
-                       files=[png, ("mask", ("m.png", b"mask", "image/png"))])
+    mask = client.post(
+        "/v1/images/edits",
+        headers=auth,
+        data={"prompt": "x"},
+        files=[png, ("mask", ("m.png", b"mask", "image/png"))],
+    )
     assert mask.status_code == 400
-    bad_n = client.post("/v1/images/edits", headers=auth, data={"prompt": "x", "n": "9"},
-                        files=[png])
+    bad_n = client.post(
+        "/v1/images/edits", headers=auth, data={"prompt": "x", "n": "9"}, files=[png]
+    )
     assert bad_n.status_code == 400
 
 
 def test_admin_account_quota(client, admin):
-    r = client.post("/admin/accounts", headers=admin,
-                    json={"label": "q1", "cookies": {"hatch_sess": "secretvalue123"}})
+    r = client.post(
+        "/admin/accounts",
+        headers=admin,
+        json={"label": "q1", "cookies": {"hatch_sess": "secretvalue123"}},
+    )
     acc_id = r.json()["account"]["id"]
 
     q = client.get(f"/admin/accounts/{acc_id}/quota", headers=admin)
@@ -273,8 +440,11 @@ def test_admin_account_quota(client, admin):
 def test_admin_accounts_crud(client, auth, admin):
     assert client.get("/admin/accounts", headers=auth).status_code == 401
 
-    r = client.post("/admin/accounts", headers=admin,
-                    json={"label": "a1", "cookies": {"hatch_sess": "secretvalue123"}})
+    r = client.post(
+        "/admin/accounts",
+        headers=admin,
+        json={"label": "a1", "cookies": {"hatch_sess": "secretvalue123"}},
+    )
     assert r.status_code == 200
     acc = r.json()["account"]
     assert acc["cookies"]["hatch_sess"] != "secretvalue123"

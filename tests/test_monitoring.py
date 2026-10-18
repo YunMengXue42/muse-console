@@ -39,8 +39,9 @@ def test_key_lifecycle(client, admin, settings):
     assert r.json()["key"]["revoked"] is True
     assert client.get("/v1/models", headers=_bearer(plaintext)).status_code == 401
 
-    r = client.patch(f"/admin/keys/{key['id']}", headers=admin,
-                     json={"revoked": False, "name": "alice2"})
+    r = client.patch(
+        f"/admin/keys/{key['id']}", headers=admin, json={"revoked": False, "name": "alice2"}
+    )
     assert r.json()["key"]["name"] == "alice2"
     assert client.get("/v1/models", headers=_bearer(plaintext)).status_code == 200
 
@@ -65,8 +66,11 @@ def test_legacy_and_admin_keys_still_work(client, auth, admin):
 def test_request_logged(client, admin):
     key = client.post("/admin/keys", headers=admin, json={"name": "bob"}).json()
     headers = {**_bearer(key["api_key"]), "cf-connecting-ip": "203.0.113.7"}
-    r = client.post("/v1/chat/completions", headers=headers, json={
-        "model": "gpt-4o", "messages": [{"role": "user", "content": "hi"}]})
+    r = client.post(
+        "/v1/chat/completions",
+        headers=headers,
+        json={"model": "gpt-4o", "messages": [{"role": "user", "content": "hi"}]},
+    )
     assert r.status_code == 200
 
     row = _requests(client, admin)[0]
@@ -84,12 +88,19 @@ def test_request_logged(client, admin):
 
 
 def test_stream_and_error_logged(client, auth, admin):
-    with client.stream("POST", "/v1/chat/completions", headers=auth, json={
-        "messages": [{"role": "user", "content": "s"}], "stream": True}) as r:
+    with client.stream(
+        "POST",
+        "/v1/chat/completions",
+        headers=auth,
+        json={"messages": [{"role": "user", "content": "s"}], "stream": True},
+    ) as r:
         assert r.status_code == 200
         list(r.iter_lines())
-    r = client.post("/v1/chat/completions", headers=auth, json={
-        "model": "muse-video", "messages": [{"role": "user", "content": "x"}]})
+    r = client.post(
+        "/v1/chat/completions",
+        headers=auth,
+        json={"model": "muse-video", "messages": [{"role": "user", "content": "x"}]},
+    )
     assert r.status_code == 400
 
     bad, streamed = _requests(client, admin)[:2]
@@ -139,8 +150,14 @@ def test_key_usage(client, auth, admin):
     client.post("/admin/keys", headers=admin, json={"name": "idle"})
     a = _bearer(alice["api_key"])
     assert client.get("/v1/models", headers=a).status_code == 200
-    assert client.post("/v1/chat/completions", headers=a, json={
-        "model": "muse-video", "messages": [{"role": "user", "content": "x"}]}).status_code == 400
+    assert (
+        client.post(
+            "/v1/chat/completions",
+            headers=a,
+            json={"model": "muse-video", "messages": [{"role": "user", "content": "x"}]},
+        ).status_code
+        == 400
+    )
     task = client.post("/v1/videos", headers=a, json={"prompt": "a wave"}).json()
     client.get(f"/v1/videos/{task['id']}", headers=a)  # poll: not counted
     client.get("/v1/models", headers=auth)
@@ -153,8 +170,12 @@ def test_key_usage(client, auth, admin):
     assert by_name["alice"]["usage"]["requests_24h"] == 3
     assert by_name["alice"]["usage"]["errors_24h"] == 1
     assert by_name["alice"]["usage"]["last_request_at"] > 0
-    assert by_name["idle"]["usage"] == {"total": 0, "requests_24h": 0, "errors_24h": 0,
-                                        "last_request_at": None}
+    assert by_name["idle"]["usage"] == {
+        "total": 0,
+        "requests_24h": 0,
+        "errors_24h": 0,
+        "last_request_at": None,
+    }
     builtin = {b["id"]: b["usage"] for b in body["builtin"]}
     assert set(builtin) == {"legacy", "admin"}
     assert builtin["legacy"]["total"] == 1 and builtin["legacy"]["errors_24h"] == 0
@@ -206,7 +227,8 @@ def test_dashboard_html(client):
     r = client.get("/dashboard")
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("text/html")
-    assert "<title>muse2api dashboard</title>" in r.text
+    assert "Muse Console" in r.text
+    assert 'id="root"' in r.text
 
 
 def _wait_task(client, auth, task_id: str) -> dict:
@@ -267,15 +289,25 @@ async def test_task_outcome_before_row_and_backfill(settings):
 
     log = RequestLog(settings.requests_db)
     now = time.time()
-    base = {"method": "POST", "path": "/v1/images/generations", "status_code": 200,
-            "latency_ms": 5, "ts": now}
+    base = {
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "status_code": 200,
+        "latency_ms": 5,
+        "ts": now,
+    }
     # The task fails before the middleware has written its submit row.
     await log.finish_task("task_early", "failed", now + 1, "no usable account", None)
     await log.add({**base, "task_id": "task_early"})
     # A row from before outcomes were recorded, filled in at startup.
     await log.add({**base, "task_id": "task_old"})
-    old = SimpleNamespace(id="task_old", status=TaskStatus.FAILED, finished=True,
-                          updated_at=now + 2, error={"message": "interrupted"})
+    old = SimpleNamespace(
+        id="task_old",
+        status=TaskStatus.FAILED,
+        finished=True,
+        updated_at=now + 2,
+        error={"message": "interrupted"},
+    )
     await log.backfill_tasks([old])
 
     rows = {r["task_id"]: r for r in (await log.query())["data"]}

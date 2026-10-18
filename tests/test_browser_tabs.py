@@ -114,7 +114,7 @@ async def test_close_then_checkin_closes_once(driver, monkeypatch):
     monkeypatch.setattr(driver, "_dispose_tab", counting)
     tab.stale = True
     await driver._close_tab(tab)  # e.g. a CDP error path
-    await driver._checkin(tab)    # the finally block still checks it in
+    await driver._checkin(tab)  # the finally block still checks it in
     assert calls == [tab]
     assert (await driver.health())["tabs"] == 0
 
@@ -133,6 +133,7 @@ async def test_cancelled_checkin_still_frees_the_tab(driver):
 
 
 # ---- waiting for media, with page states scripted ----
+
 
 class _ScriptedSession(_FakeSession):
     """Returns the scripted CHAT_STATE snapshots in order, repeating the last one."""
@@ -162,8 +163,12 @@ def _media_tab(states):
 
 
 IMG = {"tid": "hatch-chat-attachment-presentation-1", "kind": "image", "src": "blob:x"}
-DONE = {"agentCount": 1, "lastText": "Done — the sheet passed QC.", "generating": False,
-        "attachments": []}
+DONE = {
+    "agentCount": 1,
+    "lastText": "Done — the sheet passed QC.",
+    "generating": False,
+    "attachments": [],
+}
 
 
 async def test_text_only_reply_asks_for_the_file_once(driver, fast, monkeypatch):
@@ -175,7 +180,9 @@ async def test_text_only_reply_asks_for_the_file_once(driver, fast, monkeypatch)
 
     monkeypatch.setattr(driver, "_send", send)
     tab = _media_tab([{**DONE, "agentCount": 0}, DONE, DONE])
-    att = await driver._wait_media(tab, {"agentCount": 0, "attachments": []}, "image", 30, None, None)
+    att = await driver._wait_media(
+        tab, {"agentCount": 0, "attachments": []}, "image", 30, None, None
+    )
     assert att == IMG
     assert len(sent) == 1 and "attach the final image" in sent[0]
 
@@ -200,7 +207,8 @@ async def test_timeout_is_soft_while_still_generating(driver, fast):
     busy = {"agentCount": 0, "lastText": "", "generating": True, "attachments": []}
     tab = _media_tab([busy])
     task = asyncio.create_task(
-        driver._wait_media(tab, {"agentCount": 0, "attachments": []}, "image", 0.05, None, None))
+        driver._wait_media(tab, {"agentCount": 0, "attachments": []}, "image", 0.05, None, None)
+    )
     await asyncio.sleep(0.1)  # past the timeout, but the stop button is still shown
     assert not task.done()
     tab.session.states[:] = [{**busy, "generating": False, "agentCount": 1, "attachments": [IMG]}]
@@ -210,10 +218,16 @@ async def test_timeout_is_soft_while_still_generating(driver, fast):
 async def test_quota_hint_only_counts_in_the_finished_reply(driver):
     from muse2api.errors import UpstreamQuotaError
 
-    sidebar = {"tail": "Earlier: Fixed token limit in the sheet script 2:21 pm",
-               "lastText": "Generating your image", "generating": True}
+    sidebar = {
+        "tail": "Earlier: Fixed token limit in the sheet script 2:21 pm",
+        "lastText": "Generating your image",
+        "generating": True,
+    }
     assert (await driver._state(_media_tab([sidebar])))["tail"] == sidebar["tail"]
-    quota = {"tail": "You've reached your usage limit. Try again later.",
-             "lastText": "You've reached your usage limit. Try again later.", "generating": False}
+    quota = {
+        "tail": "You've reached your usage limit. Try again later.",
+        "lastText": "You've reached your usage limit. Try again later.",
+        "generating": False,
+    }
     with pytest.raises(UpstreamQuotaError, match="usage limit"):
         await driver._state(_media_tab([quota]))

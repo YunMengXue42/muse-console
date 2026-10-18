@@ -43,7 +43,12 @@ class MockDriver(MuseDriver):
     name = "mock"
     requires_account = False
     capabilities = DriverCapabilities(
-        chat=True, chat_images=True, image=True, image_edit=True, video=True, renew_session=True,
+        chat=True,
+        chat_images=True,
+        image=True,
+        image_edit=True,
+        video=True,
+        renew_session=True,
         quota=True,
     )
 
@@ -51,7 +56,10 @@ class MockDriver(MuseDriver):
         self.delay = delay
 
     async def chat_stream(self, account: Account, req: ChatRequest) -> AsyncIterator[str]:
-        reply = f"[mock:{req.model}] You said: {req.prompt[-200:]}"
+        prompt = req.prompt
+        if len(prompt) > 200:
+            prompt = prompt[:100] + "\n...\n" + prompt[-100:]
+        reply = f"[mock:{req.model}] You said: {prompt}"
         if req.images:
             reply += f" (with {len(req.images)} image(s))"
         for i in range(0, len(reply), 8):

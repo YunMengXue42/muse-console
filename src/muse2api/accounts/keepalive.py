@@ -24,22 +24,25 @@ async def renew_account(pool: AccountPool, driver: MuseDriver, account_id: str) 
     acc = pool.get(account_id)
     if acc is None:
         return {"ok": False, "error": "not found"}
+    expected = acc
+    acc = acc.model_copy(deep=True)
     try:
         info = await driver.renew_session(acc)
     except FeatureNotImplemented as exc:
         return {"ok": False, "error": exc.message}
-    except UpstreamAuthError as exc:
+    except UpstreamAuthError:
         acc.status = AccountStatus.INVALID
-        acc.last_error = exc.message
-        await pool.upsert(acc)
-        return {"ok": False, "error": exc.message}
+        acc.last_error = "UpstreamAuthError"
+        await pool.upsert_if_current(acc, expected)
+        return {"ok": False, "error": "session rejected by upstream"}
 
     acc.cookies.update(info.cookies)
     acc.cookie_expires.update(info.cookie_expires)
     acc.meta.update(info.meta)
     acc.meta["renewed_at"] = time.time()
-    await pool.upsert(acc)
-    return {"ok": info.ok, "meta": info.meta}
+    if not await pool.upsert_if_current(acc, expected):
+        return {"ok": False, "error": "account changed during renewal"}
+    return {"ok": info.ok}
 
 
 async def keepalive_loop(pool: AccountPool, driver: MuseDriver, interval: float) -> None:

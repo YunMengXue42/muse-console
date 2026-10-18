@@ -46,14 +46,24 @@ class Task(BaseModel):
 
 
 class TaskManager:
-    def __init__(self, path: Path, *, max_kept: int = 500,
-                 on_finish: Callable[[Task], Awaitable[None]] | None = None) -> None:
+    def __init__(
+        self,
+        path: Path,
+        *,
+        max_kept: int = 500,
+        max_concurrent: int = 4,
+        on_finish: Callable[[Task], Awaitable[None]] | None = None,
+    ) -> None:
+        if max_kept < 0 or max_concurrent < 1:
+            raise ValueError("max_kept must be nonnegative and max_concurrent must be positive")
         self.path = path
         self.max_kept = max_kept
+        self._slots = asyncio.Semaphore(max_concurrent)
         # Runs in the task's own context, so it still sees the submitting request's state.
         self.on_finish = on_finish
         self._tasks: dict[str, Task] = {}
         self._running: dict[str, asyncio.Task] = {}
+        self._started: set[str] = set()
 
     async def load(self) -> None:
         if not self.path.is_file():
@@ -71,15 +81,26 @@ class TaskManager:
             self._tasks[task.id] = task
 
     def _persist(self) -> None:
-        tasks = sorted(self._tasks.values(), key=lambda t: t.created_at)[-self.max_kept :]
-        self._tasks = {t.id: t for t in tasks}
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(
-            json.dumps([t.model_dump(mode="json") for t in tasks], ensure_ascii=False),
-            encoding="utf-8",
+        history = sorted(
+            (t for t in self._tasks.values() if t.finished), key=lambda t: t.created_at
         )
-        tmp.replace(self.path)
+        kept = history[-self.max_kept :] if self.max_kept else []
+        tasks = sorted(
+            [t for t in self._tasks.values() if not t.finished] + kept,
+            key=lambda t: t.created_at,
+        )
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self.path.with_suffix(".tmp")
+            tmp.write_text(
+                json.dumps([t.model_dump(mode="json") for t in tasks], ensure_ascii=False),
+                encoding="utf-8",
+            )
+            tmp.replace(self.path)
+        except Exception:  # noqa: BLE001
+            log.exception("failed to persist tasks to %s", self.path)
+            raise
+        self._tasks = {t.id: t for t in tasks}
 
     def get(self, task_id: str) -> Task | None:
         return self._tasks.get(task_id)
@@ -90,20 +111,38 @@ class TaskManager:
     def submit(self, kind: str, request: dict[str, Any], runner: Runner) -> Task:
         task = Task(kind=kind, request=request)
         self._tasks[task.id] = task
-        self._persist()
-        self._running[task.id] = asyncio.create_task(self._run(task, runner))
+        try:
+            self._persist()
+        except Exception:
+            self._tasks.pop(task.id, None)
+            raise
+        worker = asyncio.create_task(self._run(task, runner))
+        self._running[task.id] = worker
+        worker.add_done_callback(self._worker_done)
         return task
+
+    @staticmethod
+    def _worker_done(worker: asyncio.Task) -> None:
+        if not worker.cancelled() and (exc := worker.exception()) is not None:
+            log.error("task worker failed", exc_info=(type(exc), exc, exc.__traceback__))
 
     async def _run(self, task: Task, runner: Runner) -> None:
         def progress(p: int) -> None:
             task.progress = max(task.progress, min(99, int(p)))
             task.updated_at = time.time()
 
-        task.status = TaskStatus.RUNNING
+        self._started.add(task.id)
         try:
-            task.result = await runner(progress)
-            task.status = TaskStatus.SUCCEEDED
-            task.progress = 100
+            if task.status == TaskStatus.CANCELLED:
+                return
+            async with self._slots:
+                task.status = TaskStatus.RUNNING
+                task.updated_at = time.time()
+                result = await runner(progress)
+                if task.status != TaskStatus.CANCELLED:
+                    task.result = result
+                    task.status = TaskStatus.SUCCEEDED
+                    task.progress = 100
         except asyncio.CancelledError:
             task.status = TaskStatus.CANCELLED
         except Muse2APIError as exc:
@@ -115,23 +154,35 @@ class TaskManager:
             task.error = {"message": str(exc), "code": "internal_error"}
         finally:
             task.updated_at = time.time()
-            self._running.pop(task.id, None)
-            self._persist()
-            if self.on_finish:
+            try:
                 try:
-                    await self.on_finish(task)
-                except Exception:  # noqa: BLE001
-                    log.exception("on_finish hook failed for task %s", task.id)
+                    self._persist()
+                finally:
+                    if self.on_finish:
+                        try:
+                            await self.on_finish(task)
+                        except Exception:  # noqa: BLE001
+                            log.exception("on_finish hook failed for task %s", task.id)
+            finally:
+                self._running.pop(task.id, None)
+                self._started.discard(task.id)
 
     async def cancel(self, task_id: str) -> bool:
+        """Wait for local cleanup; cancelling an upstream job is not guaranteed."""
         running = self._running.get(task_id)
         if running is None:
             return False
-        running.cancel()
+        task = self._tasks.get(task_id)
+        if task is not None and not task.finished:
+            task.status = TaskStatus.CANCELLED
+            # A coroutine cancelled before its first step cannot execute its finally.
+            # Let it start and finalize (including on_finish in the original context).
+            if task_id in self._started:
+                running.cancel()
+        await asyncio.shield(running)
         return True
 
     async def shutdown(self) -> None:
-        for t in list(self._running.values()):
-            t.cancel()
-        if self._running:
-            await asyncio.gather(*self._running.values(), return_exceptions=True)
+        await asyncio.gather(
+            *(self.cancel(task_id) for task_id in list(self._running)), return_exceptions=True
+        )

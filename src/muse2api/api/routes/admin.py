@@ -43,7 +43,7 @@ async def status(svc: Services = Depends(get_services)) -> dict:
 
 @router.get("/accounts")
 async def list_accounts(svc: Services = Depends(get_services)) -> dict:
-    return {"data": [a.public() for a in svc.pool.all()]}
+    return {"data": svc.pool.all_public()}
 
 
 @router.post("/accounts")
@@ -51,28 +51,27 @@ async def create_account(body: AccountCreate, svc: Services = Depends(get_servic
     cookies = {k: v for k, v in body.cookies.items() if v}
     if not cookies:
         raise InvalidRequest("cookies must not be empty")
-    acc = Account(label=body.label, cookies=cookies, cookie_expires=body.cookie_expires,
-                  enabled=body.enabled)
-    await svc.pool.upsert(acc)
+    try:
+        acc = await svc.account_manager.create_legacy(body)
+    except ValueError:
+        raise InvalidRequest("this session already exists in the account pool") from None
     return {"account": acc.public(), "missing_cookies": missing_session_cookies(cookies)}
 
 
 @router.patch("/accounts/{account_id}")
-async def update_account(account_id: str, body: AccountUpdate,
-                         svc: Services = Depends(get_services)) -> dict:
-    acc = _get(svc, account_id)
-    if body.label is not None:
-        acc.label = body.label
-    if body.enabled is not None:
-        acc.enabled = body.enabled
+async def update_account(
+    account_id: str, body: AccountUpdate, svc: Services = Depends(get_services)
+) -> dict:
+    _get(svc, account_id)
+    changes = body.model_dump(exclude_unset=True)
+    try:
+        acc = await svc.account_manager.update(account_id, **changes)
+    except ValueError:
+        raise InvalidRequest("invalid account update or duplicate session") from None
     if body.cookies is not None:
-        acc.cookies = {k: v for k, v in body.cookies.items() if v}
-        # Fresh cookies give an invalid account another chance.
-        acc.status = AccountStatus.ACTIVE
-        acc.last_error = None
-    if body.cookie_expires is not None:
-        acc.cookie_expires = body.cookie_expires
-    await svc.pool.upsert(acc)
+        invalidate = getattr(svc.driver, "invalidate_account", None)
+        if invalidate:
+            await invalidate(account_id)
     return {"account": acc.public()}
 
 
@@ -80,12 +79,15 @@ async def update_account(account_id: str, body: AccountUpdate,
 async def delete_account(account_id: str, svc: Services = Depends(get_services)) -> dict:
     if not await svc.pool.remove(account_id):
         raise NotFound(f"account '{account_id}' not found")
+    invalidate = getattr(svc.driver, "invalidate_account", None)
+    if invalidate:
+        await invalidate(account_id)
     return {"deleted": account_id}
 
 
 @router.post("/accounts/{account_id}/reset")
 async def reset_account(account_id: str, svc: Services = Depends(get_services)) -> dict:
-    acc = _get(svc, account_id)
+    acc = _get(svc, account_id).model_copy(deep=True)
     acc.status, acc.cooldown_until, acc.last_error = AccountStatus.ACTIVE, 0.0, None
     await svc.pool.upsert(acc)
     return {"account": acc.public()}
@@ -104,10 +106,12 @@ async def account_quota(account_id: str, svc: Services = Depends(get_services)) 
     Drivers that do not implement ``MuseDriver.quota`` raise
     ``FeatureNotImplemented``, which the app renders as HTTP 501.
     """
-    acc = _get(svc, account_id)
+    expected = _get(svc, account_id)
+    acc = expected.model_copy(deep=True)
     snapshot = await svc.driver.quota(acc)
     acc.meta["quota"] = {"checked_at": time.time(), **snapshot}
-    await svc.pool.upsert(acc)
+    if not await svc.pool.upsert_if_current(acc, expected):
+        raise InvalidRequest("account changed during quota lookup; retry the request")
     return {"account_id": acc.id, "quota": acc.meta["quota"]}
 
 
@@ -196,12 +200,20 @@ async def list_requests(
     offset: int = Query(default=0, ge=0),
     svc: Services = Depends(get_services),
 ) -> dict:
-    return await svc.requests.query(key_id=key_id, account_id=account_id, status=status,
-                                    path=path, since=since, hide_polls=hide_polls,
-                                    limit=limit, offset=offset)
+    return await svc.requests.query(
+        key_id=key_id,
+        account_id=account_id,
+        status=status,
+        path=path,
+        since=since,
+        hide_polls=hide_polls,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/stats")
-async def stats(window: Literal["1h", "24h", "7d"] = "24h",
-                svc: Services = Depends(get_services)) -> dict:
+async def stats(
+    window: Literal["1h", "24h", "7d"] = "24h", svc: Services = Depends(get_services)
+) -> dict:
     return {"now": time.time(), **await svc.requests.stats(window)}

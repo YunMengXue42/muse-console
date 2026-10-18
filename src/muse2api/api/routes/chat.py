@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import time
@@ -33,8 +34,9 @@ def _sse(payload: dict | str) -> bytes:
 
 
 @router.post("/v1/chat/completions")
-async def chat_completions(body: ChatCompletionRequest, request: Request,
-                           svc: Services = Depends(get_services)):
+async def chat_completions(
+    body: ChatCompletionRequest, request: Request, svc: Services = Depends(get_services)
+):
     request.state.model = body.model  # logged even if it does not resolve
     spec = resolve_model(body.model, "chat")
     request.state.model = body.model or spec.id
@@ -44,13 +46,15 @@ async def chat_completions(body: ChatCompletionRequest, request: Request,
 
     images = [InputImage(*(await load_image_ref(ref))) for ref in flat.images]
     cancel = asyncio.Event()
+    owner = json.dumps([request.state.key_id, body.user], ensure_ascii=False, separators=(",", ":"))
+    conversation_key = hashlib.sha256(owner.encode()).hexdigest()
     req = ChatRequest(
         prompt=flat.text,
         model=spec.id,
         images=images,
         timeout=svc.settings.chat_timeout,
         first_token_timeout=svc.settings.first_token_timeout,
-        conversation_hint=body.user,
+        conversation_hint=conversation_key,
         turns=message_turns([m.model_dump() for m in body.messages]),
         cancel=cancel,
     )
@@ -66,8 +70,13 @@ async def chat_completions(body: ChatCompletionRequest, request: Request,
             "object": "chat.completion",
             "created": created,
             "model": model_name,
-            "choices": [{"index": 0, "message": {"role": "assistant", "content": text},
-                         "finish_reason": "stop"}],
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": text},
+                    "finish_reason": "stop",
+                }
+            ],
             "usage": {
                 "prompt_tokens": _approx_tokens(flat.text),
                 "completion_tokens": _approx_tokens(text),
@@ -83,9 +92,13 @@ async def chat_completions(body: ChatCompletionRequest, request: Request,
         first = ""
 
     def chunk(delta: dict, finish: str | None = None) -> dict:
-        return {"id": completion_id, "object": "chat.completion.chunk", "created": created,
-                "model": model_name,
-                "choices": [{"index": 0, "delta": delta, "finish_reason": finish}]}
+        return {
+            "id": completion_id,
+            "object": "chat.completion.chunk",
+            "created": created,
+            "model": model_name,
+            "choices": [{"index": 0, "delta": delta, "finish_reason": finish}],
+        }
 
     async def events() -> AsyncIterator[bytes]:
         produced = first
@@ -96,12 +109,21 @@ async def chat_completions(body: ChatCompletionRequest, request: Request,
                 yield _sse(chunk({"content": delta}))
             yield _sse(chunk({}, "stop"))
             if (body.stream_options or {}).get("include_usage"):
-                usage = {"prompt_tokens": _approx_tokens(flat.text),
-                         "completion_tokens": _approx_tokens(produced)}
+                usage = {
+                    "prompt_tokens": _approx_tokens(flat.text),
+                    "completion_tokens": _approx_tokens(produced),
+                }
                 usage["total_tokens"] = usage["prompt_tokens"] + usage["completion_tokens"]
-                yield _sse({"id": completion_id, "object": "chat.completion.chunk",
-                            "created": created, "model": model_name, "choices": [],
-                            "usage": usage})
+                yield _sse(
+                    {
+                        "id": completion_id,
+                        "object": "chat.completion.chunk",
+                        "created": created,
+                        "model": model_name,
+                        "choices": [],
+                        "usage": usage,
+                    }
+                )
         except Muse2APIError as exc:
             yield _sse(exc.to_body())
         except Exception:  # noqa: BLE001
@@ -112,5 +134,8 @@ async def chat_completions(body: ChatCompletionRequest, request: Request,
             await stream.aclose()
         yield _sse("[DONE]")
 
-    return StreamingResponse(events(), media_type="text/event-stream",
-                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

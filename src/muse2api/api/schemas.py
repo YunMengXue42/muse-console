@@ -32,6 +32,21 @@ class ChatCompletionRequest(_Lenient):
     tool_choice: Any = None
 
 
+class ResponsesRequest(_Lenient):
+    """Minimum Responses API request surface supported by the chat-backed gateway."""
+
+    model: str | None = None
+    input: Any
+    instructions: str | None = None
+    stream: bool = False
+    user: str | None = None
+    metadata: dict[str, str] | None = None
+    previous_response_id: str | None = None
+    conversation: Any = None
+    tools: list[dict[str, Any]] | None = None
+    tool_choice: Any = None
+
+
 class ImageGenerationRequest(_Lenient):
     prompt: str = Field(min_length=1)
     model: str | None = None
@@ -42,7 +57,8 @@ class ImageGenerationRequest(_Lenient):
     # and returns an RGBA PNG; "auto"/"opaque" leave the image as generated.
     background: Literal["auto", "opaque", "transparent"] | None = None
     image: str | list[str] | None = Field(
-        default=None, description="Reference image(s) as data URL, http(s) URL or base64 (max 4)")
+        default=None, description="Reference image(s) as data URL, http(s) URL or base64 (max 4)"
+    )
     # A sync call can outlive a proxy's timeout (Cloudflare cuts at ~100 s with 524), so
     # "async": true returns a task to poll at GET /v1/images/generations/{task_id}.
     async_: bool = Field(default=False, alias="async")
@@ -64,6 +80,7 @@ class AccountCreate(BaseModel):
     cookies: dict[str, str]
     cookie_expires: dict[str, int] = Field(default_factory=dict)
     enabled: bool = True
+    max_concurrency: int | None = Field(default=None, ge=1, le=16)
 
 
 class AccountUpdate(BaseModel):
@@ -71,6 +88,7 @@ class AccountUpdate(BaseModel):
     enabled: bool | None = None
     cookies: dict[str, str] | None = None
     cookie_expires: dict[str, int] | None = None
+    max_concurrency: int | None = Field(default=None, ge=1, le=16)
 
 
 class KeyCreate(BaseModel):

@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import base64
+import logging
 import mimetypes
 import re
+import stat
+import time
 import uuid
 from pathlib import Path
 
@@ -22,6 +25,8 @@ _EXT_BY_MIME = {
     "video/quicktime": ".mov",
 }
 _SAFE_NAME = re.compile(r"^[A-Za-z0-9_\-]+\.[A-Za-z0-9]+$")
+_MANAGED_MEDIA_NAME = re.compile(r"^(?:img|vid)_[0-9a-f]{16}\.[a-z0-9]+$")
+log = logging.getLogger(__name__)
 
 
 class MediaStore:
@@ -34,6 +39,44 @@ class MediaStore:
         name = f"{prefix}_{uuid.uuid4().hex[:16]}{ext}"
         (self.root / name).write_bytes(data)
         return name
+
+    def prune(self, retention_days: float, *, now: float | None = None) -> int:
+        """Delete expired generated media files; a zero retention disables pruning."""
+        if retention_days <= 0:
+            return 0
+
+        cutoff = (time.time() if now is None else now) - retention_days * 86400
+        deleted = 0
+        try:
+            entries = self.root.iterdir()
+        except OSError:
+            log.exception("failed to list media directory %s", self.root)
+            return 0
+
+        for path in entries:
+            if not _MANAGED_MEDIA_NAME.fullmatch(path.name):
+                continue
+            try:
+                info = path.lstat()
+            except FileNotFoundError:
+                continue
+            except OSError:
+                log.warning("failed to inspect media file %s", path, exc_info=True)
+                continue
+            if not stat.S_ISREG(info.st_mode) or info.st_mtime >= cutoff:
+                continue
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                continue
+            except OSError:
+                log.warning("failed to remove expired media file %s", path, exc_info=True)
+                continue
+            deleted += 1
+
+        if deleted:
+            log.info("pruned %d generated media files older than %s days", deleted, retention_days)
+        return deleted
 
     def path_of(self, name: str) -> Path:
         if not _SAFE_NAME.match(name):

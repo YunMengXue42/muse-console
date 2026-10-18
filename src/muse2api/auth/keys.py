@@ -91,8 +91,9 @@ class KeyStore:
 
     async def create(self, name: str, note: str = "") -> tuple[ApiKey, str]:
         plaintext = generate_key()
-        key = ApiKey(name=name, note=note, prefix=plaintext[:_DISPLAY_LEN],
-                     hash=hash_key(plaintext))
+        key = ApiKey(
+            name=name, note=note, prefix=plaintext[:_DISPLAY_LEN], hash=hash_key(plaintext)
+        )
         self._keys[key.id] = key
         await self.save()
         return key, plaintext
@@ -105,8 +106,9 @@ class KeyStore:
 
     async def save(self) -> None:
         self._dirty = False
-        payload = json.dumps([k.model_dump(mode="json") for k in self.all()],
-                             ensure_ascii=False, indent=2)
+        payload = json.dumps(
+            [k.model_dump(mode="json") for k in self.all()], ensure_ascii=False, indent=2
+        )
         async with self._lock:
             await asyncio.to_thread(self._atomic_write, payload)
 

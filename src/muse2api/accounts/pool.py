@@ -10,17 +10,17 @@ Usage::
 from __future__ import annotations
 
 import asyncio
-import itertools
 import logging
 import time
 from collections import defaultdict
 from collections.abc import AsyncIterator, Iterable
 from contextlib import asynccontextmanager
+from copy import deepcopy
 from typing import Protocol
 
 from ..errors import NoAccountAvailable, UpstreamAuthError, UpstreamQuotaError, UpstreamTimeout
 from .model import Account, AccountStatus
-from .store import AccountStore
+from .store import AccountStore, session_digest
 
 log = logging.getLogger(__name__)
 
@@ -32,11 +32,13 @@ class Strategy(Protocol):
 
 class RoundRobinStrategy:
     def __init__(self) -> None:
-        self._counter = itertools.count()
+        self._last: str | None = None
 
     def choose(self, candidates: list[Account], hint: str | None) -> Account:
         ordered = sorted(candidates, key=lambda a: a.id)
-        return ordered[next(self._counter) % len(ordered)]
+        account = next((a for a in ordered if self._last is None or a.id > self._last), ordered[0])
+        self._last = account.id
+        return account
 
 
 class LRUStrategy:
@@ -95,6 +97,7 @@ class AccountPool:
         acquire_timeout: float = 60.0,
     ) -> None:
         self.store = store
+        self.strategy_name = strategy
         self.strategy: Strategy = STRATEGIES[strategy]()
         self.max_concurrency = max(1, max_concurrency)
         self.cooldown = cooldown
@@ -102,14 +105,37 @@ class AccountPool:
         self._accounts: dict[str, Account] = {}
         self._inflight: dict[str, int] = defaultdict(int)
         self._cond = asyncio.Condition()
+        self._waiting = 0
+        self._revisions: dict[str, int] = defaultdict(int)
+        self._leases: dict[int, tuple[str, int, dict]] = {}
 
     # ---- lifecycle / CRUD ----
     async def load(self) -> None:
-        self._accounts = {a.id: a for a in await self.store.load()}
+        accounts = await self.store.load()
+        self._accounts = {a.id: a for a in accounts}
+        loader = getattr(self.store, "load_policy", None)
+        if loader is not None:
+            policy = await loader()
+            if policy and policy.get("strategy") in STRATEGIES:
+                self.strategy_name = policy["strategy"]
+                self.strategy = STRATEGIES[self.strategy_name]()
         log.info("loaded %d account(s)", len(self._accounts))
 
     async def persist(self) -> None:
         await self.store.save(list(self._accounts.values()))
+
+    async def _commit(self, updated: dict[str, Account]) -> None:
+        async def save() -> None:
+            await self.store.save(list(updated.values()))
+            self._accounts = updated
+            self._cond.notify_all()
+
+        task = asyncio.create_task(save())
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            await task
+            raise
 
     def all(self) -> list[Account]:
         return list(self._accounts.values())
@@ -119,25 +145,95 @@ class AccountPool:
 
     async def upsert(self, account: Account) -> Account:
         async with self._cond:
-            self._accounts[account.id] = account
-            self._cond.notify_all()
-        await self.persist()
+            from ..upstream.muse import missing_session_cookies
+
+            if not missing_session_cookies(account.cookies):
+                digest = session_digest(account)
+                if any(a.id != account.id and session_digest(a) == digest for a in self.all()):
+                    raise ValueError("duplicate account session")
+            current = self._accounts.get(account.id)
+            if current is None or current.cookies != account.cookies:
+                self._revisions[account.id] += 1
+            updated = {**self._accounts, account.id: account}
+            await self._commit(updated)
         return account
+
+    async def upsert_if_current(self, account: Account, expected: Account) -> bool:
+        async with self._cond:
+            if self._accounts.get(account.id) is not expected:
+                return False
+            from ..upstream.muse import missing_session_cookies
+
+            if not missing_session_cookies(account.cookies):
+                digest = session_digest(account)
+                if any(a.id != account.id and session_digest(a) == digest for a in self.all()):
+                    raise ValueError("duplicate account session")
+            if expected.cookies != account.cookies:
+                self._revisions[account.id] += 1
+            await self._commit({**self._accounts, account.id: account})
+            return True
 
     async def remove(self, account_id: str) -> bool:
         async with self._cond:
-            removed = self._accounts.pop(account_id, None) is not None
-        if removed:
-            await self.persist()
-        return removed
+            if account_id not in self._accounts:
+                return False
+            self._revisions[account_id] += 1
+            updated = {k: v for k, v in self._accounts.items() if k != account_id}
+            await self._commit(updated)
+            return True
+
+    async def set_strategy(self, strategy: str) -> None:
+        replacement = STRATEGIES[strategy]()
+        async with self._cond:
+
+            async def commit() -> None:
+                saver = getattr(self.store, "save_policy", None)
+                if saver is not None:
+                    await saver({"strategy": strategy})
+                self.strategy, self.strategy_name = replacement, strategy
+                self._cond.notify_all()
+
+            task = asyncio.create_task(commit())
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                await task
+                raise
+
+    def _limit(self, account: Account) -> int:
+        return account.max_concurrency or self.max_concurrency
+
+    def _effective_status(self, account: Account) -> str:
+        if not account.enabled:
+            return "disabled"
+        if account.status == AccountStatus.INVALID:
+            return "invalid"
+        if not account.is_available():
+            return "cooling"
+        if self._inflight[account.id] >= self._limit(account):
+            return "busy"
+        return "available"
+
+    def all_public(self) -> list[dict]:
+        return [
+            {
+                **a.public(),
+                "inflight": self._inflight[a.id],
+                "effective_status": self._effective_status(a),
+                "effective_max_concurrency": self._limit(a),
+            }
+            for a in self.all()
+        ]
 
     def stats(self) -> dict[str, int]:
-        now = time.time()
+        counts = {key: 0 for key in ("available", "invalid", "disabled", "cooling", "busy")}
+        for account in self.all():
+            counts[self._effective_status(account)] += 1
         return {
             "total": len(self._accounts),
-            "available": sum(1 for a in self._accounts.values() if a.is_available(now)),
-            "invalid": sum(1 for a in self._accounts.values() if a.status == AccountStatus.INVALID),
+            **counts,
             "inflight": sum(self._inflight.values()),
+            "waiting": self._waiting,
         }
 
     # ---- scheduling ----
@@ -151,9 +247,11 @@ class AccountPool:
             if acc.id in excluded or not acc.enabled or acc.status == AccountStatus.INVALID:
                 continue
             if not acc.is_available(now):  # cooling down
-                back_at = acc.cooldown_until if back_at is None else min(back_at, acc.cooldown_until)
+                back_at = (
+                    acc.cooldown_until if back_at is None else min(back_at, acc.cooldown_until)
+                )
                 continue
-            if self._inflight[acc.id] >= self.max_concurrency:
+            if self._inflight[acc.id] >= self._limit(acc):
                 busy = True
                 continue
             free.append(acc)
@@ -162,8 +260,10 @@ class AccountPool:
     def has_alternative(self, exclude: Iterable[str]) -> bool:
         """Whether an enabled, valid account exists outside ``exclude`` (busy or cooling counts)."""
         excluded = set(exclude)
-        return any(a.id not in excluded and a.enabled and a.status != AccountStatus.INVALID
-                   for a in self._accounts.values())
+        return any(
+            a.id not in excluded and a.enabled and a.status != AccountStatus.INVALID
+            for a in self._accounts.values()
+        )
 
     async def acquire(self, *, exclude: Iterable[str] = (), hint: str | None = None) -> Account:
         exclude = tuple(exclude)
@@ -175,7 +275,13 @@ class AccountPool:
                     acc = self.strategy.choose(free, hint)
                     self._inflight[acc.id] += 1
                     acc.last_used_at = time.time()
-                    return acc
+                    snapshot = acc.model_copy(deep=True)
+                    self._leases[id(snapshot)] = (
+                        acc.id,
+                        self._revisions[acc.id],
+                        deepcopy(acc.meta),
+                    )
+                    return snapshot
                 remaining = deadline - time.monotonic()
                 back_in = None if back_at is None else back_at - time.time()
                 if not busy and back_in is None:
@@ -186,30 +292,54 @@ class AccountPool:
                     raise NoAccountAvailable(f"all accounts are {reason}, try again later")
                 # Wake on release, or when the soonest cooldown ends (nothing notifies that).
                 wait = remaining if back_in is None else min(remaining, max(back_in, 0.05))
+                self._waiting += 1
                 try:
                     await asyncio.wait_for(self._cond.wait(), timeout=wait)
                 except asyncio.TimeoutError:
                     continue
+                finally:
+                    self._waiting -= 1
 
     async def release(self, account: Account, error: BaseException | None = None) -> None:
         async with self._cond:
+            lease = self._leases.pop(id(account), None)
+            if lease is None:
+                return
             self._inflight[account.id] = max(0, self._inflight[account.id] - 1)
-            self._apply_result(account, error)
-            self._cond.notify_all()
-        await self.persist()
+            current = self._accounts.get(account.id)
+            if (
+                current is not None
+                and lease[1] == self._revisions[account.id]
+                and current.cookies == account.cookies
+                and not isinstance(error, (asyncio.CancelledError, GeneratorExit))
+            ):
+                updated = current.model_copy(deep=True)
+                # Drivers own hot-page state, not quota or renewal metadata.
+                for key in ("hot_page",):
+                    if account.meta.get(key) != lease[2].get(key):
+                        if key in account.meta:
+                            updated.meta[key] = deepcopy(account.meta[key])
+                        else:
+                            updated.meta.pop(key, None)
+                self._apply_result(updated, error)
+                await self._commit({**self._accounts, account.id: updated})
+            else:
+                self._cond.notify_all()
 
     def _apply_result(self, acc: Account, error: BaseException | None) -> None:
         if error is None:
             acc.success_count += 1
             acc.last_error = None
-            if acc.status == AccountStatus.COOLING:
+            if acc.status == AccountStatus.COOLING and acc.is_available():
                 acc.status = AccountStatus.ACTIVE
             return
         acc.fail_count += 1
-        acc.last_error = str(error)[:500]
+        acc.last_error = type(error).__name__
+        if acc.status == AccountStatus.INVALID:
+            return
         if isinstance(error, UpstreamAuthError):
             acc.status = AccountStatus.INVALID
-            log.warning("account %s marked invalid: %s", acc.id, error)
+            log.warning("account %s marked invalid", acc.id)
         elif isinstance(error, UpstreamQuotaError):
             acc.status = AccountStatus.COOLING
             acc.cooldown_until = time.time() + max(self.cooldown, 3600)
@@ -230,11 +360,16 @@ class AccountPool:
         lease = Lease(acc)
         try:
             yield lease
-        except (asyncio.CancelledError, GeneratorExit):
-            # Client went away; not the account's fault.
+        except (asyncio.CancelledError, GeneratorExit) as exc:
+            lease.error = exc
             raise
         except BaseException as exc:
             lease.error = lease.error or exc
             raise
         finally:
-            await self.release(acc, lease.error)
+            cleanup = asyncio.create_task(self.release(acc, lease.error))
+            try:
+                await asyncio.shield(cleanup)
+            except asyncio.CancelledError:
+                await cleanup
+                raise

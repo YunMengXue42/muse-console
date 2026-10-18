@@ -17,8 +17,14 @@ async def list_models() -> dict:
         for m in MODELS.values()
     ]
     data += [
-        {"id": alias, "object": "model", "created": _CREATED, "owned_by": "muse",
-         "kind": MODELS[target].kind, "alias_of": target}
+        {
+            "id": alias,
+            "object": "model",
+            "created": _CREATED,
+            "owned_by": "muse",
+            "kind": MODELS[target].kind,
+            "alias_of": target,
+        }
         for alias, target in ALIASES.items()
     ]
     return {"object": "list", "data": data}

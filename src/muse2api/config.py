@@ -34,12 +34,20 @@ class Settings(BaseSettings):
 
     # --- auth ---
     api_key: str = Field(default="", description="Bearer key for /v1/*. Auto-generated if empty.")
-    admin_key: str = Field(default="", description="Bearer key for /admin/*. Falls back to api_key.")
+    admin_key: str = Field(
+        default="", description="Bearer key for /admin/*. Falls back to api_key."
+    )
 
     # --- storage ---
     data_dir: Path = Path("data")
     request_log_retention_days: float = Field(
         default=14, description="Days of /v1/* request history kept in data/requests.db."
+    )
+    media_retention_days: float = Field(
+        default=0,
+        ge=0,
+        le=36500,
+        description="Days to retain generated media; 0 disables automatic cleanup.",
     )
 
     # --- upstream driver ---
@@ -65,11 +73,14 @@ class Settings(BaseSettings):
     video_timeout: float = 600.0
 
     # --- account pool ---
-    pool_strategy: PoolStrategyName = "affinity"
-    pool_acquire_timeout: float = 60.0
-    account_max_concurrency: int = 1
-    account_cooldown: float = 120.0
-    max_failover: int = 2
+    pool_strategy: PoolStrategyName = "round_robin"
+    pool_acquire_timeout: float = Field(default=60.0, gt=0, le=600)
+    account_max_concurrency: int = Field(default=1, ge=1, le=16)
+    account_cooldown: float = Field(default=120.0, ge=0, le=86400)
+    max_failover: int = Field(default=2, ge=0, le=10)
+
+    login_session_ttl: float = Field(default=600.0, ge=30, le=1800)
+    login_session_limit: int = Field(default=3, ge=1, le=10)
 
     # --- background removal (images with background="transparent") ---
     matting_model: str = Field(
