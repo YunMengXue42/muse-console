@@ -12,7 +12,7 @@ Priorities: **P0** must be done first · **P1** core feature · **P2** better ex
 
 | ID | Task | Priority | Location | Owner | Status |
 |---|---|---|---|---|---|
-| A1 | Install dependencies, get tests and lint passing | P0 | `tests/` | | Not started |
+| A1 | Install dependencies, get tests and lint passing | P0 | `tests/` | | Done locally in v0.3 |
 | A2 | Test the browser driver with real accounts | P0 | `drivers/browser/` | | Not started |
 | A3 | Verify how image/video generation is triggered | P0 | `drivers/browser/driver.py` | | Not started |
 | A4 | Verify session renewal | P0 | `upstream/muse.py` | | Not started |
@@ -21,15 +21,15 @@ Priorities: **P0** must be done first · **P1** core feature · **P2** better ex
 | B1 | Direct HTTP protocol driver | P1 | `drivers/http/` | | Not started |
 | B2 | Reuse conversation threads to cut first-token latency | P2 | `drivers/browser/` | | Done |
 | B3 | Quota lookup | P2 | `MuseDriver.quota` | | Not started |
-| C1 | `/v1/responses` endpoint | P1 | `api/routes/responses.py` | | Not started |
-| C2 | `/v1/images/edits` endpoint | P1 | `api/routes/images.py` | | Not started |
+| C1 | `/v1/responses` endpoint | P1 | `api/routes/responses.py` | | Done: streamed Responses events; official SDK run pending |
+| C2 | `/v1/images/edits` endpoint | P1 | `api/routes/images.py` | | Done: multipart references, `mask` rejected |
 | C3 | Emulated tool calling | P2 | `core/prompt.py` | | Not started |
 | C4 | Streaming heartbeats to avoid client timeouts | P2 | `api/routes/chat.py` | | Not started |
-| D1 | Support more cookie import formats | P1 | `api/routes/admin.py` | | Not started |
+| D1 | Support more cookie import formats | P1 | `services/account_manager.py` | | Done: JSON, browser export, Netscape, header lines |
 | D2 | Cookie import browser extension | P2 | `extension/` (new) | | Not started |
-| D3 | Web admin console | P2 | `web/` (new) | | Not started |
-| D4 | SQLite / Redis storage backends | P3 | `accounts/store.py` | | Not started |
-| E1 | Automatic media cleanup | P2 | `core/media.py` | | Not started |
+| D3 | Web admin console | P2 | `frontend/` / `web/` | | Done: React console, live browser acceptance pending |
+| D4 | SQLite / Redis storage backends | P3 | `accounts/store.py` | | Encrypted SQLite done; Redis out of scope |
+| E1 | Automatic media cleanup | P2 | `core/media.py` | | Done: optional retention cleanup |
 | E2 | Multiple API keys and rate limiting | P3 | `api/deps.py` | | Not started |
 | E3 | Observability (metrics, logs) | P3 | `observability/` (new) | | Not started |
 
@@ -37,7 +37,7 @@ Priorities: **P0** must be done first · **P1** core feature · **P2** better ex
 
 ## A. Verification and live testing
 
-All v0.1 code is written but has never been run. This group must be done first; otherwise later work has no reliable foundation.
+The v0.3 rebuild has passing local offline regressions, frontend checks and an HTTP mock-driver smoke test. Live Muse account acceptance and Docker runtime verification remain separate, unfinished gates.
 
 ### A1 Install dependencies, get tests and lint passing · P0
 - Run `pip install -e '.[dev]'`, `pytest` and `ruff check .`, and fix every failure.
@@ -103,16 +103,15 @@ Done. A follow-up whose `messages` continue the conversation already on the page
 
 ## C. Protocol
 
-### C1 `/v1/responses` endpoint · P1
+### C1 `/v1/responses` endpoint · P1 · Done (SDK run pending)
 - Support the OpenAI Responses API (used by default by newer clients such as Codex).
-- Convert `input` and `instructions` and pass them to `flatten_messages`, reusing `Gateway.chat_stream`.
-- Streaming must emit Responses API events (`response.created`, `response.output_text.delta`, `response.completed`, ...).
-- **Done when**: the official OpenAI SDK's `client.responses.create()` works both streaming and non-streaming.
+- Implemented in v0.3: `input` / `instructions` are flattened into `Gateway.chat_stream`, and streaming emits `response.created`, `response.output_text.delta`, `response.completed` and the surrounding item/content events.
+- **Remaining**: run the official OpenAI SDK's `client.responses.create()` against a live account, streaming and non-streaming.
 
-### C2 `/v1/images/edits` endpoint · P1
+### C2 `/v1/images/edits` endpoint · P1 · Done (SDK run pending)
 - Parse the multipart form (`image` / `image[]`, `prompt`, `size`, `response_format`).
-- Put the uploaded images into `ImageRequest.reference_images` and reuse the response shaping from `generate_images`.
-- **Done when**: the official SDK's `client.images.edit()` works.
+- Implemented in v0.3: uploaded files become `ImageRequest.image` references and reuse the `generate_images` shaping. `mask` is rejected with `InvalidRequest` because muse.ai cannot inpaint.
+- **Remaining**: run the official SDK's `client.images.edit()` against a live account.
 
 ### C3 Emulated tool calling · P2
 - muse.ai has no native function calling. The idea is to describe the available tools and an output format in the prompt, parse tool calls out of the reply, and convert them to OpenAI's `tool_calls` format.
@@ -149,9 +148,10 @@ Done. A follow-up whose `messages` continue the conversation already on the page
 
 ## E. Operations
 
-### E1 Automatic media cleanup · P2
-- Generated images and videos stay in `data/media/` forever; there is no cleanup.
-- Add retention-time or size-limit settings and clean up periodically in the background.
+### E1 Automatic media cleanup · P2 · Done
+- `MUSE2API_MEDIA_RETENTION_DAYS` enables mtime-based cleanup of generated `img_` and `vid_` files.
+- Cleanup runs once at startup and hourly in the existing housekeeping loop; `0` keeps the previous no-cleanup behavior.
+- Files that do not match the generated media naming contract are preserved.
 
 ### E2 Multiple API keys and rate limiting · P3
 - There is currently a single API key and a single admin key.

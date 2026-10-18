@@ -5,7 +5,15 @@
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e '.[dev]'
-pytest && ruff check .
+ruff format .
+ruff check .
+pytest
+cd frontend
+npm ci
+npm run format
+npm run lint
+npm test
+npm run build
 ```
 
 The default is `MUSE2API_DRIVER=mock`, so you can work on the API layer and front end without any account.
@@ -29,6 +37,12 @@ Available tasks are listed in [TODO.md](TODO.md). Before starting, open an issue
 2. Register it in `drivers/registry.py` and add its name to `config.DriverName`.
 3. Implement at least `chat_stream`; leave other capabilities raising `FeatureNotImplemented` until they are done.
 4. Add tests and documentation.
+
+## Packaging
+
+After the frontend build, create a wheel with `python -m pip wheel . --no-deps -w dist` and inspect that it contains `muse2api/web/dashboard.html` and its referenced assets. Keep `.env`, all data directories, encryption keys, browser profiles, virtualenvs and `node_modules` out of delivery archives.
+
+For local UI development, run the backend normally and `npm run dev` from `frontend`; its API proxy defaults to `http://127.0.0.1:18610`. On Windows, activate with `.venv\\Scripts\\activate` (PowerShell: `.venv\\Scripts\\Activate.ps1`) instead of the POSIX `source` command.
 
 ## Submitting changes
 
