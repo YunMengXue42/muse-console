@@ -76,7 +76,9 @@ class Gateway:
                 async with self._lease(tried, req.conversation_hint) as lease:
                     emitted = False
                     try:
-                        async with aclosing(self.driver.chat_stream(lease.account, req)) as upstream:
+                        async with aclosing(
+                            self.driver.chat_stream(lease.account, req)
+                        ) as upstream:
                             async for delta in upstream:
                                 if delta:
                                     emitted = True
@@ -88,7 +90,9 @@ class Gateway:
                         # Once text reached the client we cannot transparently switch accounts.
                         if emitted or not self._should_retry(exc, attempt, tried):
                             raise
-                        log.warning("chat failed on %s (%s), failing over", lease.account.id, exc.code)
+                        log.warning(
+                            "chat failed on %s (%s), failing over", lease.account.id, exc.code
+                        )
 
     async def _run(
         self,

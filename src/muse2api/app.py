@@ -47,9 +47,7 @@ async def _housekeeping(services: Services) -> None:
             and now - last_media_prune >= _MEDIA_PRUNE_INTERVAL
         ):
             last_media_prune = now
-            await asyncio.to_thread(
-                services.media.prune, services.settings.media_retention_days
-            )
+            await asyncio.to_thread(services.media.prune, services.settings.media_retention_days)
 
 
 def create_app(settings: Settings | None = None, driver: MuseDriver | None = None) -> FastAPI:
