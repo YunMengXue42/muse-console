@@ -355,3 +355,36 @@ async def test_owned_launch_has_no_wildcard_origin_and_stops_on_cancel(tmp_path,
     assert "--remote-allow-origins=*" not in args
     assert "--remote-debugging-address=127.0.0.1" in args
     assert launched.returncode == 0 and process.proc is None
+
+
+@pytest.mark.parametrize(("no_sandbox", "expected"), [(True, True), (False, False)])
+async def test_no_sandbox_flag_follows_explicit_setting(
+    tmp_path, monkeypatch, no_sandbox, expected
+):
+    args = []
+
+    async def launch(*command, **kwargs):
+        args.extend(command)
+
+        class Process:
+            returncode = 0
+
+            def terminate(self):
+                pass
+
+            async def wait(self):
+                return 0
+
+        return Process()
+
+    process = ChromiumProcess("fake-chromium", 0, tmp_path / "profile", no_sandbox=no_sandbox)
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", launch)
+    monkeypatch.setattr("os.geteuid", lambda: 1000, raising=False)
+
+    async def no_wait(_seconds):
+        return None
+
+    monkeypatch.setattr(asyncio, "sleep", no_wait)
+    with pytest.raises(RuntimeError):
+        await process.start()
+    assert ("--no-sandbox" in args) is expected

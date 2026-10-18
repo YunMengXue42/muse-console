@@ -114,6 +114,7 @@ class BrowserDriver(MuseDriver):
             self.settings.profile_dir,
             self.settings.headless,
             proxy=self.settings.browser_proxy,
+            no_sandbox=self.settings.chromium_no_sandbox,
         )
         try:
             ws_url = await self._chromium.start()

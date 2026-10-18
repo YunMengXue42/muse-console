@@ -65,6 +65,12 @@ class Settings(BaseSettings):
     )
     browser_profile_dir: Path | None = None
     page_ready_timeout: float = 45.0
+    chromium_no_sandbox: bool = Field(
+        default=False,
+        description="Pass --no-sandbox to Chromium. Needed when the container runs as a "
+        "non-root user without user-namespace sandbox support; keep off when the "
+        "sandbox works, since it weakens browser isolation.",
+    )
 
     # --- timeouts (seconds) ---
     chat_timeout: float = 300.0
