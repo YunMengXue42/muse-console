@@ -9,9 +9,12 @@ dist/
 .ruff_cache/
 .coverage
 htmlcov/
+node_modules/
+*.tsbuildinfo
 
 .env
 data/
+data-preview/
 *.log
 
 .idea/

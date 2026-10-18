@@ -1,3 +1,10 @@
+FROM node:24-bookworm-slim AS console
+WORKDIR /console
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
 FROM python:3.12-slim
 
 RUN apt-get update \
@@ -9,6 +16,7 @@ WORKDIR /app
 
 COPY pyproject.toml README.md ./
 COPY src ./src
+COPY --from=console /src/muse2api/web/ ./src/muse2api/web/
 RUN pip install --no-cache-dir .
 
 ENV MUSE2API_HOST=0.0.0.0 \
