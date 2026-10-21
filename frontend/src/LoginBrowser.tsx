@@ -18,6 +18,8 @@ export function LoginBrowser({
   const [current, setCurrent] = useState(session),
     [image, setImage] = useState(""),
     [text, setText] = useState(""),
+    [masked, setMasked] = useState(true),
+    [now, setNow] = useState(() => Date.now()),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const active = useRef(true),
@@ -35,7 +37,13 @@ export function LoginBrowser({
     typeof current.expires_at === "number"
       ? current.expires_at * 1000
       : Date.parse(current.expires_at);
-  const expired = current.status === "expired" || Date.now() >= expiry;
+  const expired = current.status === "expired" || now >= expiry;
+  const remainingSec = Math.max(0, Math.ceil((expiry - now) / 1000));
+  useEffect(() => {
+    if (expired) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [expired]);
   useEffect(() => {
     active.current = true;
     let timer: ReturnType<typeof setTimeout>;
@@ -160,7 +168,10 @@ export function LoginBrowser({
       </p>
       <div className="session-meta">
         <span>会话 {current.status}</span>
-        <span>到期 {time(current.expires_at)}</span>
+        <span>
+          到期 {time(current.expires_at)}
+          {!expired ? `（剩余 ${remainingSec}s）` : ""}
+        </span>
       </div>
       {error && (
         <p role="alert" className="error">
@@ -206,31 +217,52 @@ export function LoginBrowser({
           >
             <input
               aria-label="发送到上游页面的文本"
-              type="password"
+              type={masked ? "password" : "text"}
               autoComplete="off"
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="先点击页面中的输入框，再输入文本"
             />
+            <button
+              type="button"
+              onClick={() => setMasked((v) => !v)}
+              aria-pressed={!masked}
+            >
+              {masked ? "显示文本" : "隐藏文本"}
+            </button>
             <button disabled={busy || !text}>发送到页面</button>
           </form>
           <div className="toolbar">
-            {["Enter", "Tab", "Backspace"].map((key) => (
+            {(
+              [
+                ["Enter", "Enter"],
+                ["Tab", "Tab"],
+                ["Backspace", "退格"],
+                ["Escape", "Esc"],
+                ["ArrowUp", "↑"],
+                ["ArrowDown", "↓"],
+                ["ArrowLeft", "←"],
+                ["ArrowRight", "→"],
+              ] as const
+            ).map(([key, label]) => (
               <button
                 key={key}
+                type="button"
                 disabled={busy}
                 onClick={() => void input({ type: "key", key })}
               >
-                {key === "Backspace" ? "退格" : key}
+                {label}
               </button>
             ))}
             <button
+              type="button"
               disabled={busy}
               onClick={() => void input({ type: "scroll", delta_y: -500 })}
             >
               向上滚动
             </button>
             <button
+              type="button"
               disabled={busy}
               onClick={() => void input({ type: "scroll", delta_y: 500 })}
             >

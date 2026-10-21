@@ -1,5 +1,4 @@
 import type { Key, Task, RequestRow, Status, Pool } from "./types";
-import { badge, statusNames } from "./status";
 import { PoolPage } from "./pages/PoolPage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { TasksPage } from "./pages/TasksPage";
@@ -14,9 +13,15 @@ import {
   type ImportResult,
   type LoginSession,
 } from "./api";
-import { Icon, Modal } from "./ui";
-import { LoginBrowser } from "./LoginBrowser";
-import { CredentialDevices } from "./CredentialDevices";
+import { Icon } from "./ui";
+import { ConsoleModals } from "./ConsoleModals";
+import {
+  formatConsoleHash,
+  parseConsoleHash,
+  parsePrometheusMetrics,
+  type ParsedMetrics,
+} from "./console-utils";
+
 const pages = ["账号池", "调用概览", "任务中心", "请求日志", "API 密钥"];
 const descriptions = [
   "管理上游会话与请求调度。",
@@ -25,11 +30,13 @@ const descriptions = [
   "按状态或账号查询请求。",
   "管理应用密钥与访问权限。",
 ];
-function printable(value: unknown) {
-  return typeof value === "string" ? value : JSON.stringify(value, null, 2);
-}
+
 /** 全部页面共用认证、操作反馈与顺序轮询；输入草稿独立于服务器快照。 */
 export default function App() {
+  const initialRoute = useMemo(() => {
+    const saved = sessionStorage.getItem("muse.console.key") ?? "";
+    return saved ? parseConsoleHash(window.location.hash) : { page: 0 };
+  }, []);
   const [key, setKey] = useState(
       () => sessionStorage.getItem("muse.console.key") ?? "",
     ),
@@ -39,7 +46,7 @@ export default function App() {
   const [theme, setTheme] = useState(
       () => localStorage.getItem("muse.console.theme") ?? "light",
     ),
-    [page, setPage] = useState(0),
+    [page, setPage] = useState(initialRoute.page),
     [toast, setToast] = useState(""),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(false),
@@ -48,21 +55,31 @@ export default function App() {
     [accounts, setAccounts] = useState<Account[]>([]),
     [pool, setPool] = useState<Pool>(),
     [stats, setStats] = useState<Stats>(),
+    [promMetrics, setPromMetrics] = useState<ParsedMetrics>(),
     [tasks, setTasks] = useState<Task[]>([]),
     [requests, setRequests] = useState<RequestRow[]>([]),
     [total, setTotal] = useState(0),
     [keys, setKeys] = useState<Key[]>([]),
     [builtin, setBuiltin] = useState<Key[]>([]);
-  const [windowValue, setWindowValue] = useState("24h"),
-    [filter, setFilter] = useState(""),
-    [accountFilter, setAccountFilter] = useState(""),
-    [hidePolls, setHidePolls] = useState(true),
+  const [windowValue, setWindowValue] = useState(
+      initialRoute.windowValue ?? "24h",
+    ),
+    [filter, setFilter] = useState(initialRoute.filter ?? ""),
+    [accountFilter, setAccountFilter] = useState(
+      initialRoute.accountFilter ?? "",
+    ),
+    [pathFilter, setPathFilter] = useState(initialRoute.pathFilter ?? ""),
+    [keyFilter, setKeyFilter] = useState(initialRoute.keyFilter ?? ""),
+    [hidePolls, setHidePolls] = useState(initialRoute.hidePolls ?? true),
     [offset, setOffset] = useState(0),
     [search, setSearch] = useState(""),
     [refresh, setRefresh] = useState(0);
   const [devicesOpen, setDevicesOpen] = useState(false);
   const [modal, setModal] = useState<"import" | "login" | "key" | null>(null),
     [edit, setEdit] = useState<Account | null>(null),
+    [maxConcurrency, setMaxConcurrency] = useState(""),
+    [mergeSource, setMergeSource] = useState<Account | null>(null),
+    [mergeTarget, setMergeTarget] = useState(""),
     [keyEdit, setKeyEdit] = useState<Key | null>(null),
     [label, setLabel] = useState(""),
     [cookies, setCookies] = useState(""),
@@ -89,6 +106,21 @@ export default function App() {
   const logout = useCallback(() => {
     generation.current++;
     sessionStorage.removeItem("muse.console.key");
+    if (window.location.hash) {
+      window.history.replaceState(
+        null,
+        "",
+        window.location.pathname + window.location.search,
+      );
+    }
+    setPage(0);
+    setWindowValue("24h");
+    setFilter("");
+    setAccountFilter("");
+    setPathFilter("");
+    setKeyFilter("");
+    setHidePolls(true);
+    setOffset(0);
     setSession(null);
     setDevicesOpen(false);
     setKey("");
@@ -96,6 +128,9 @@ export default function App() {
     setSecret("");
     setContent("");
     setCookies("");
+    setMaxConcurrency("");
+    setMergeSource(null);
+    setMergeTarget("");
     setPreview(null);
     setModal(null);
     setEdit(null);
@@ -105,6 +140,7 @@ export default function App() {
     setStatus(undefined);
     setAccounts([]);
     setStats(undefined);
+    setPromMetrics(undefined);
     setRequests([]);
     setTasks([]);
     setKeys([]);
@@ -125,6 +161,56 @@ export default function App() {
   }, [theme]);
   useEffect(() => () => clearTimeout(toastTimer.current), []);
   useEffect(() => {
+    if (!key) {
+      if (window.location.hash) {
+        window.history.replaceState(
+          null,
+          "",
+          window.location.pathname + window.location.search,
+        );
+      }
+      return;
+    }
+    const nextHash = formatConsoleHash({
+      page,
+      windowValue,
+      filter,
+      accountFilter,
+      pathFilter,
+      keyFilter,
+      hidePolls,
+    });
+    if (window.location.hash !== nextHash) {
+      window.history.replaceState(null, "", nextHash);
+    }
+  }, [
+    key,
+    page,
+    windowValue,
+    filter,
+    accountFilter,
+    pathFilter,
+    keyFilter,
+    hidePolls,
+  ]);
+  useEffect(() => {
+    if (!key) return;
+    function onHashChange() {
+      const route = parseConsoleHash(window.location.hash);
+      setPage(route.page);
+      if (route.windowValue !== undefined) setWindowValue(route.windowValue);
+      if (route.filter !== undefined) setFilter(route.filter);
+      if (route.accountFilter !== undefined)
+        setAccountFilter(route.accountFilter);
+      if (route.pathFilter !== undefined) setPathFilter(route.pathFilter);
+      if (route.keyFilter !== undefined) setKeyFilter(route.keyFilter);
+      if (route.hidePolls !== undefined) setHidePolls(route.hidePolls);
+      setOffset(0);
+    }
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, [key]);
+  useEffect(() => {
     if (!key) return;
     const controller = new AbortController();
     let stopped = false;
@@ -133,6 +219,7 @@ export default function App() {
     setLoading(true);
     setError("");
     async function load() {
+      clearTimeout(timer);
       try {
         const common = await api.request<Status>(
           "/status",
@@ -157,13 +244,23 @@ export default function App() {
           setPool(p);
         }
         if (page === 1) {
-          const data = await api.request<Stats>(
-            `/stats?window=${windowValue}`,
-            "GET",
-            undefined,
-            controller.signal,
-          );
-          if (!stopped) setStats(data);
+          const [data, rawMetrics] = await Promise.all([
+            api.request<Stats>(
+              `/stats?window=${windowValue}`,
+              "GET",
+              undefined,
+              controller.signal,
+            ),
+            api.requestText("/metrics", controller.signal).catch(() => ""),
+          ]);
+          if (!stopped) {
+            setStats(data);
+            setPromMetrics(
+              rawMetrics.startsWith("# ")
+                ? parsePrometheusMetrics(rawMetrics)
+                : undefined,
+            );
+          }
         }
         if (page === 2) {
           const data = await api.request<{ data: Task[] }>(
@@ -182,6 +279,8 @@ export default function App() {
           });
           if (filter) query.set("status", filter);
           if (accountFilter) query.set("account_id", accountFilter);
+          if (pathFilter) query.set("path", pathFilter);
+          if (keyFilter) query.set("key_id", keyFilter);
           const data = await api.request<{ data: RequestRow[]; total: number }>(
             `/requests?${query}`,
             "GET",
@@ -211,13 +310,25 @@ export default function App() {
       } finally {
         if (!stopped) {
           setLoading(false);
-          timer = setTimeout(() => void load(), 10000);
+          if (document.visibilityState !== "hidden") {
+            timer = setTimeout(() => void load(), 10000);
+          }
         }
       }
     }
+    function onVisibilityChange() {
+      if (stopped) return;
+      if (document.visibilityState === "hidden") {
+        clearTimeout(timer);
+      } else {
+        void load();
+      }
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
     void load();
     return () => {
       stopped = true;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       controller.abort();
       clearTimeout(timer);
     };
@@ -228,6 +339,8 @@ export default function App() {
     windowValue,
     filter,
     accountFilter,
+    pathFilter,
+    keyFilter,
     hidePolls,
     offset,
     refresh,
@@ -384,6 +497,9 @@ export default function App() {
               {i === 0 && metrics && (
                 <span className="nav-count">{metrics.total}</span>
               )}
+              {i === 2 && status?.tasks && status.tasks.pending > 0 && (
+                <span className="nav-count">{status.tasks.pending}</span>
+              )}
             </button>
           ))}
         </nav>
@@ -497,6 +613,12 @@ export default function App() {
             setEdit={setEdit}
             setLabel={setLabel}
             setCookies={setCookies}
+            setMaxConcurrency={setMaxConcurrency}
+            setMergeSource={(acc) => {
+              setMergeSource(acc);
+              setMergeTarget("");
+            }}
+            capabilities={status?.capabilities}
             openModal={openModal}
             setPage={setPage}
             ask={ask}
@@ -507,6 +629,17 @@ export default function App() {
             stats={stats}
             windowValue={windowValue}
             setWindowValue={setWindowValue}
+            accounts={accounts}
+            promMetrics={promMetrics}
+            setDetail={setDetail}
+            onFilterRequests={({ accountId, keyId, status: st }) => {
+              setAccountFilter(accountId ?? "");
+              setKeyFilter(keyId ?? "");
+              setFilter(st ?? "");
+              setPathFilter("");
+              setOffset(0);
+              setPage(3);
+            }}
           />
         )}
         {page === 2 && (
@@ -526,6 +659,12 @@ export default function App() {
             setFilter={setFilter}
             accountFilter={accountFilter}
             setAccountFilter={setAccountFilter}
+            pathFilter={pathFilter}
+            setPathFilter={setPathFilter}
+            keyFilter={keyFilter}
+            setKeyFilter={setKeyFilter}
+            accounts={accounts}
+            keys={keys}
             hidePolls={hidePolls}
             setHidePolls={setHidePolls}
             offset={offset}
@@ -540,363 +679,57 @@ export default function App() {
             builtin={builtin}
             setKeyEdit={setKeyEdit}
             setLabel={setLabel}
+            setNote={setNote}
             ask={ask}
             api={api}
             openModal={openModal}
           />
         )}
       </main>
-      {devicesOpen && (
-        <CredentialDevices
-          api={api}
-          accounts={accounts}
-          onClose={() => setDevicesOpen(false)}
-        />
-      )}
-      {modal === "login" && (
-        <Modal title="连接上游账号" onClose={() => setModal(null)}>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void act(async () => {
-                const value = await api.request<LoginSession>(
-                  "/login-sessions",
-                  "POST",
-                  { label },
-                );
-                setSession(value);
-                setModal(null);
-              });
-            }}
-          >
-            <p className="muted">
-              在 muse.ai 网页逐号登录，手动完成验证码；驱动不支持时会报错。
-            </p>
-            <label>
-              账号备注
-              <input
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder="例如：团队主账号"
-                maxLength={200}
-              />
-            </label>
-            <footer>
-              <button type="button" onClick={() => setModal(null)}>
-                取消
-              </button>
-              <button className="primary" disabled={busy}>
-                打开网页登录
-              </button>
-            </footer>
-          </form>
-        </Modal>
-      )}
-      {session && (
-        <LoginBrowser
-          api={api}
-          session={session}
-          notify={notify}
-          onClose={() => setSession(null)}
-          onComplete={() => {
-            setSession(null);
-            setRefresh((v) => v + 1);
-          }}
-        />
-      )}
-      {modal === "import" && (
-        <Modal
-          title="批量导入 Cookie"
-          wide
-          onClose={() => {
-            setModal(null);
-            setContent("");
-            setPreview(null);
-          }}
-        >
-          <p className="muted">
-            支持 JSON 或文本；预览确认后入池。Cookie 不在浏览器持久保存。
-          </p>
-          <label>
-            选择文件
-            <input
-              type="file"
-              accept=".json,.txt,application/json,text/plain"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file)
-                  void file
-                    .text()
-                    .then((value) => {
-                      setContent(value);
-                      setPreview(null);
-                      setImported(false);
-                    })
-                    .catch(() => notify("文件读取失败"));
-              }}
-            />
-          </label>
-          <label>
-            Cookie 内容
-            <textarea
-              rows={7}
-              value={content}
-              spellCheck={false}
-              autoComplete="off"
-              onChange={(e) => {
-                setContent(e.target.value);
-                setPreview(null);
-                setImported(false);
-              }}
-              placeholder="粘贴 Cookie JSON 或文本"
-            />
-          </label>
-          {preview && (
-            <>
-              <div className="import-summary">
-                {Object.entries(preview.summary).map(([name, value]) => (
-                  <span className="badge" key={name}>
-                    {statusNames[name] ?? name} {value}
-                  </span>
-                ))}
-              </div>
-              <div className="import-results">
-                {preview.data.map((row, i) => (
-                  <div key={`${row.index}-${i}`}>
-                    <span>
-                      #{row.index} {row.label}
-                    </span>
-                    {badge(row.status)}
-                    {row.message && <small>{row.message}</small>}
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-          <footer>
-            <button
-              onClick={() => {
-                setModal(null);
-                setContent("");
-              }}
-            >
-              关闭
-            </button>
-            <button
-              disabled={busy || !content.trim()}
-              onClick={() =>
-                void act(async () => {
-                  setPreview(
-                    await api.request<ImportResult>(
-                      "/accounts/import",
-                      "POST",
-                      { content, preview: true },
-                    ),
-                  );
-                  setImported(false);
-                })
-              }
-            >
-              预览检查
-            </button>
-            <button
-              className="primary"
-              disabled={busy || !preview || !preview.summary.ready || imported}
-              onClick={() =>
-                void act(async () => {
-                  setPreview(
-                    await api.request<ImportResult>(
-                      "/accounts/import",
-                      "POST",
-                      { content, preview: false },
-                    ),
-                  );
-                  setImported(true);
-                  setContent("");
-                }, "导入已完成，请检查逐条结果")
-              }
-            >
-              确认入池
-            </button>
-          </footer>
-        </Modal>
-      )}
-      {edit && (
-        <Modal
-          title="编辑账号"
-          onClose={() => {
-            setEdit(null);
-            setCookies("");
-          }}
-        >
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void act(async () => {
-                let parsed: unknown;
-                try {
-                  parsed = cookies.trim() ? JSON.parse(cookies) : undefined;
-                } catch {
-                  throw new Error("Cookie 必须是 JSON 对象。");
-                }
-                if (
-                  parsed &&
-                  (typeof parsed !== "object" ||
-                    Array.isArray(parsed) ||
-                    Object.values(parsed).some((v) => typeof v !== "string"))
-                )
-                  throw new Error("Cookie 必须是名称到字符串的 JSON 对象。");
-                await api.request(`/accounts/${edit.id}`, "PATCH", {
-                  label,
-                  ...(parsed ? { cookies: parsed } : {}),
-                });
-                setEdit(null);
-                setCookies("");
-              }, "账号已更新");
-            }}
-          >
-            <label>
-              账号备注
-              <input value={label} onChange={(e) => setLabel(e.target.value)} />
-            </label>
-            <label>
-              更新 Cookie（可选）
-              <textarea
-                rows={5}
-                value={cookies}
-                onChange={(e) => setCookies(e.target.value)}
-                placeholder='留空保留现有 Cookie；填写 {"name":"value"}'
-              />
-            </label>
-            <p className="fine">现有 Cookie 不回传到此输入框。</p>
-            <footer>
-              <button type="button" onClick={() => setEdit(null)}>
-                取消
-              </button>
-              <button className="primary" disabled={busy}>
-                保存修改
-              </button>
-            </footer>
-          </form>
-        </Modal>
-      )}
-      {modal === "key" && (
-        <Modal title="创建 API 密钥" onClose={() => setModal(null)}>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void act(async () => {
-                const result = await api.request<{ api_key: string }>(
-                  "/keys",
-                  "POST",
-                  { name: label.trim(), note },
-                );
-                setSecret(result.api_key);
-                setModal(null);
-              }, "密钥已创建");
-            }}
-          >
-            <label>
-              密钥名称
-              <input
-                required
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder="例如：生产应用"
-              />
-            </label>
-            <label>
-              备注
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                rows={3}
-              />
-            </label>
-            <footer>
-              <button type="button" onClick={() => setModal(null)}>
-                取消
-              </button>
-              <button className="primary" disabled={busy || !label.trim()}>
-                创建密钥
-              </button>
-            </footer>
-          </form>
-        </Modal>
-      )}
-      {keyEdit && (
-        <Modal title="重命名密钥" onClose={() => setKeyEdit(null)}>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void act(async () => {
-                await api.request(`/keys/${keyEdit.id}`, "PATCH", {
-                  name: label.trim(),
-                });
-                setKeyEdit(null);
-              }, "密钥名称已更新");
-            }}
-          >
-            <label>
-              名称
-              <input
-                required
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-              />
-            </label>
-            <footer>
-              <button type="button" onClick={() => setKeyEdit(null)}>
-                取消
-              </button>
-              <button className="primary" disabled={busy || !label.trim()}>
-                保存
-              </button>
-            </footer>
-          </form>
-        </Modal>
-      )}
-      {secret && (
-        <Modal title="保存你的新密钥" onClose={() => setSecret("")}>
-          <p className="muted">
-            此密钥只显示一次。关闭后无法再次查看，请保存在安全位置。
-          </p>
-          <div className="secret mono">{secret}</div>
-          <footer>
-            <button onClick={() => void copy(secret)}>复制密钥</button>
-            <button className="primary" onClick={() => setSecret("")}>
-              已安全保存
-            </button>
-          </footer>
-        </Modal>
-      )}
-      {confirm && (
-        <Modal
-          title="确认操作"
-          onClose={() => {
-            if (!busy) setConfirm(null);
-          }}
-        >
-          <p>{confirm.text}</p>
-          <footer>
-            <button disabled={busy} onClick={() => setConfirm(null)}>
-              取消
-            </button>
-            <button
-              className="primary"
-              disabled={busy}
-              onClick={() => void act(confirm.run, "操作已完成")}
-            >
-              确认
-            </button>
-          </footer>
-        </Modal>
-      )}
-      {detail && (
-        <Modal title={detail.title} wide onClose={() => setDetail(null)}>
-          <pre className="detail">{printable(detail.body) ?? "无结果"}</pre>
-        </Modal>
-      )}
+      <ConsoleModals
+        api={api}
+        busy={busy}
+        act={act}
+        notify={notify}
+        copy={copy}
+        onRefresh={() => setRefresh((v) => v + 1)}
+        accounts={accounts}
+        pool={pool}
+        devicesOpen={devicesOpen}
+        setDevicesOpen={setDevicesOpen}
+        modal={modal}
+        setModal={setModal}
+        edit={edit}
+        setEdit={setEdit}
+        maxConcurrency={maxConcurrency}
+        setMaxConcurrency={setMaxConcurrency}
+        mergeSource={mergeSource}
+        setMergeSource={setMergeSource}
+        mergeTarget={mergeTarget}
+        setMergeTarget={setMergeTarget}
+        keyEdit={keyEdit}
+        setKeyEdit={setKeyEdit}
+        label={label}
+        setLabel={setLabel}
+        cookies={cookies}
+        setCookies={setCookies}
+        note={note}
+        setNote={setNote}
+        content={content}
+        setContent={setContent}
+        preview={preview}
+        setPreview={setPreview}
+        imported={imported}
+        setImported={setImported}
+        secret={secret}
+        setSecret={setSecret}
+        session={session}
+        setSession={setSession}
+        detail={detail}
+        setDetail={setDetail}
+        confirm={confirm}
+        setConfirm={setConfirm}
+      />
       {toast && (
         <div className="toast" role="status">
           {toast}

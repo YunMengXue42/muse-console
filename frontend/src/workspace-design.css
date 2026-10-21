@@ -196,154 +196,6 @@ h3 {
 .workspace-foot {
   font-size: var(--text-caption);
 }
-.pool-page button,
-.pool-page input,
-.pool-page select {
-  border-radius: 999px;
-}
-.pool-page input,
-.pool-page select {
-  background: var(--soft);
-  border-color: transparent;
-}
-.pool-page .pool-metrics {
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--panel);
-  padding: 24px 0;
-  margin-bottom: 28px;
-}
-.pool-page .pool-metrics section:first-child {
-  padding-left: 24px;
-}
-.pool-page .pool-metrics section {
-  border: 0;
-  position: relative;
-}
-.pool-page .pool-metrics section + section::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 15%;
-  height: 70%;
-  width: 1px;
-  background: var(--line);
-}
-.pool-page .pool-metrics strong {
-  font-size: var(--text-display);
-  font-weight: 600;
-  letter-spacing: 0;
-  margin: 10px 0 6px;
-}
-.pool-page .pool-metrics section:nth-child(2) strong {
-  color: var(--ink);
-}
-.pool-page .pool-accounts {
-  border-radius: 18px;
-}
-.pool-page h2 {
-  font-size: var(--text-section);
-  letter-spacing: 0;
-}
-.pool-page .pool-accounts > header {
-  padding-bottom: 24px;
-}
-.pool-page .pool-accounts > header p {
-  font-size: var(--text-sm);
-  margin-top: 6px;
-}
-.pool-page .pool-filters {
-  gap: 4px;
-}
-.pool-page .pool-filters button {
-  border: 0;
-  min-height: 40px;
-  padding: 8px 16px;
-}
-.pool-page .pool-filters button[aria-pressed="true"] {
-  color: var(--primary);
-  background: var(--tint);
-}
-.pool-page .pool-filters button:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-.pool-page .table-tools > input {
-  background: var(--soft);
-  border-color: transparent;
-  padding: 10px 16px;
-}
-.pool-page .table-tools select {
-  background: var(--soft);
-  border-color: transparent;
-}
-.pool-page .pool-table table {
-  min-width: 900px;
-}
-.pool-page .pool-table th {
-  background: var(--side);
-  border-top: 0;
-  padding-top: 12px;
-  padding-bottom: 12px;
-}
-.pool-page .pool-table td {
-  padding-top: 22px;
-  padding-bottom: 22px;
-}
-.pool-page .pool-initial {
-  display: none;
-}
-.pool-page .pool-identity {
-  min-width: 180px;
-}
-.pool-page .pool-identity strong {
-  font-weight: 600;
-}
-.pool-page .pool-identity small {
-  margin-top: 6px;
-  color: var(--muted);
-}
-.pool-page .row-actions {
-  gap: 2px;
-}
-.pool-page .row-actions button {
-  min-height: 36px;
-  padding-inline: 8px;
-  border-radius: 999px;
-  color: var(--muted);
-}
-.pool-page .row-actions button:first-child {
-  color: var(--primary);
-  background: var(--tint);
-  padding-inline: 14px;
-  margin-right: 6px;
-}
-.pool-page .row-actions button.danger-text {
-  color: var(--danger);
-  border-left: 1px solid var(--line);
-  border-radius: 0;
-  margin-left: 6px;
-  padding-left: 12px;
-}
-.pool-page .row-actions button:focus-visible {
-  background: var(--tint);
-}
-.pool-page .panel-foot {
-  color: var(--muted);
-  background: var(--panel);
-  padding-block: 18px;
-}
-.pool-page .pool-guide {
-  border-bottom: 0;
-  padding: 0 8px;
-}
-.pool-page .pool-guide summary {
-  color: var(--muted);
-}
-.pool-page .pool-guide summary:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 4px;
-}
 .modal {
   animation: muse-dialog-in 180ms ease-out;
 }
@@ -386,33 +238,6 @@ h3 {
   }
   .page-header button {
     font-size: var(--text-body);
-    min-height: 44px;
-  }
-  .pool-page .pool-metrics {
-    padding: 8px 0;
-  }
-  .pool-page .pool-metrics section {
-    padding: 16px 20px;
-  }
-  .pool-page .pool-metrics section:first-child {
-    padding-left: 20px;
-  }
-  .pool-page .pool-metrics section:nth-child(3)::before {
-    display: none;
-  }
-  .pool-page .pool-table table {
-    min-width: 0;
-  }
-  .pool-page .pool-table td {
-    padding-block: 10px;
-  }
-  .pool-page .pool-table td:first-child {
-    padding-bottom: 16px;
-  }
-  .pool-page .row-actions {
-    flex-wrap: wrap;
-  }
-  .pool-page .row-actions button {
     min-height: 44px;
   }
 }
@@ -483,6 +308,20 @@ h3 {
 }
 .device-pairing section[aria-label="操作确认"] button {
   margin: 16px 8px 0 0;
+}
+.device-pairing .pairing-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.device-pairing .pairing-controls label {
+  margin: 0;
+}
+@media (max-width: 640px) {
+  .device-pairing .pairing-controls {
+    grid-template-columns: 1fr;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   *,

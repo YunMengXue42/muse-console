@@ -8,12 +8,17 @@
 .pool-page button,
 .pool-page input,
 .pool-page select {
-  border-radius: 8px;
+  border-radius: 999px;
   font-size: var(--text-body);
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
     color 160ms ease;
+}
+.pool-page input,
+.pool-page select {
+  background: var(--soft);
+  border-color: transparent;
 }
 .pool-page button:disabled {
   cursor: not-allowed;
@@ -26,18 +31,29 @@
 .pool-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-bottom: 24px;
-  padding: 20px 0;
-  border-block: 1px solid var(--line);
+  margin-bottom: 28px;
+  padding: 24px 0;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--panel);
 }
 .pool-metrics section {
   min-width: 0;
   padding: 0 24px;
-  border-left: 1px solid var(--line);
+  border: 0;
+  position: relative;
 }
 .pool-metrics section:first-child {
-  padding-left: 0;
-  border-left: 0;
+  padding-left: 24px;
+}
+.pool-metrics section + section::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 15%;
+  height: 70%;
+  width: 1px;
+  background: var(--line);
 }
 .pool-metrics span,
 .pool-metrics small {
@@ -47,14 +63,12 @@
 }
 .pool-metrics strong {
   display: block;
-  margin: 8px 0 4px;
-  font-size: var(--text-title);
+  margin: 10px 0 6px;
+  font-size: var(--text-display);
   line-height: 1.2;
   font-weight: 600;
+  letter-spacing: 0;
   font-variant-numeric: tabular-nums;
-}
-.pool-metrics section:nth-child(2) strong {
-  color: var(--primary);
 }
 .pool-layout {
   display: grid;
@@ -65,15 +79,15 @@
   min-width: 0;
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 18px;
   overflow: hidden;
 }
 .pool-page .pool-accounts > header {
-  padding: 24px 24px 20px;
+  padding: 24px;
 }
 .pool-page .pool-accounts > header p {
-  margin-top: 4px;
-  font-size: var(--text-caption);
+  margin-top: 6px;
+  font-size: var(--text-sm);
 }
 .pool-page .badge {
   font-size: var(--text-caption);
@@ -82,13 +96,13 @@
 .pool-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px;
   padding: 0 24px 16px;
 }
 .pool-filters button {
-  min-height: 36px;
-  padding: 4px 12px;
-  border: 1px solid transparent;
+  min-height: 40px;
+  padding: 8px 16px;
+  border: 0;
   background: transparent;
   color: var(--muted);
 }
@@ -97,8 +111,11 @@
 }
 .pool-filters button[aria-pressed="true"] {
   background: var(--tint);
-  border-color: var(--primary);
   color: var(--primary);
+}
+.pool-filters button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 .pool-filters button span {
   font-size: var(--text-caption);
@@ -112,9 +129,9 @@
   flex: 1 1 240px;
   max-width: 480px;
   min-width: 0;
-  border: 1px solid var(--line);
-  background: var(--bg);
-  padding: 8px 12px;
+  border: 1px solid transparent;
+  background: var(--soft);
+  padding: 10px 16px;
   min-height: 40px;
 }
 .pool-page .table-tools .inline {
@@ -128,15 +145,15 @@
   min-width: 144px;
   min-height: 40px;
   padding: 8px 12px;
-  border: 1px solid var(--line);
-  background: var(--panel);
+  border: 1px solid transparent;
+  background: var(--soft);
 }
 .pool-table {
   overflow-x: auto;
   overscroll-behavior-x: contain;
 }
 .pool-table table {
-  min-width: 960px;
+  min-width: 900px;
   width: 100%;
   border-collapse: collapse;
 }
@@ -156,12 +173,14 @@
 .pool-table th {
   font-size: var(--text-caption);
   font-weight: 500;
-  background: var(--bg);
-  border-block: 1px solid var(--line);
+  background: var(--side);
+  border-bottom: 1px solid var(--line);
+  padding-block: 12px;
 }
 .pool-table td {
   font-size: var(--text-body);
   border-bottom: 1px solid var(--line);
+  padding-block: 22px;
 }
 .pool-counts {
   display: inline-flex;
@@ -178,19 +197,7 @@
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  min-width: 200px;
-}
-.pool-initial {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: var(--soft);
-  color: var(--muted);
-  font-size: var(--text-body);
-  font-weight: 600;
+  min-width: 180px;
 }
 .pool-identity > div {
   min-width: 0;
@@ -204,11 +211,12 @@
 }
 .pool-identity small {
   font-size: var(--text-caption);
-  margin-top: 4px;
+  margin-top: 6px;
+  color: var(--muted);
   max-width: 240px;
 }
 .pool-page .row-actions {
-  gap: 4px;
+  gap: 2px;
   flex-wrap: nowrap;
   min-width: 220px;
 }
@@ -216,10 +224,25 @@
   padding: 4px 8px;
   min-height: 36px;
   font-size: var(--text-caption);
-  border-radius: 8px;
+  border-radius: 999px;
+  color: var(--muted);
   text-decoration: none;
 }
-.pool-page .row-actions button:hover:not(:disabled) {
+.pool-page .row-actions button:first-child {
+  color: var(--primary);
+  background: var(--tint);
+  padding-inline: 14px;
+  margin-right: 6px;
+}
+.pool-page .row-actions button.danger-text {
+  color: var(--danger);
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  margin-left: 6px;
+  padding-left: 12px;
+}
+.pool-page .row-actions button:hover:not(:disabled),
+.pool-page .row-actions button:focus-visible {
   background: var(--tint);
 }
 .pool-page .panel-foot {
@@ -227,7 +250,9 @@
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 8px 16px;
-  padding: 16px 24px;
+  padding: 18px 24px;
+  color: var(--muted);
+  background: var(--panel);
   font-size: var(--text-caption);
 }
 .pool-page .empty {
@@ -238,14 +263,19 @@
   margin: 8px 0 16px;
 }
 .pool-guide {
-  border-bottom: 1px solid var(--line);
-  padding: 0 0 16px;
+  border-bottom: 0;
+  padding: 0 8px 16px;
 }
 .pool-guide summary {
   cursor: pointer;
   font-weight: 600;
+  color: var(--muted);
   padding: 8px 0;
   border-radius: 8px;
+}
+.pool-guide summary:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
 }
 .pool-guide summary span {
   margin-left: 16px;
@@ -292,17 +322,18 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px 0;
     margin-bottom: 20px;
-    padding: 16px 0;
+    padding: 8px 0;
   }
   .pool-metrics section {
-    padding: 0 16px;
+    padding: 16px 20px;
   }
-  .pool-metrics section:nth-child(odd) {
-    padding-left: 0;
-    border-left: 0;
+  .pool-metrics section:first-child {
+    padding-left: 20px;
+  }
+  .pool-metrics section:nth-child(3)::before {
+    display: none;
   }
   .pool-metrics section:nth-child(n + 3) {
-    padding-top: 16px;
     border-top: 1px solid var(--line);
   }
   .pool-page .pool-accounts > header {
@@ -346,9 +377,12 @@
     justify-content: space-between;
     align-items: flex-start;
     gap: 12px;
-    padding: 8px 0;
+    padding: 10px 0;
     border: 0;
     font-size: var(--text-body);
+  }
+  .pool-table td:first-child {
+    padding-bottom: 16px;
   }
   .pool-table td::before {
     content: attr(data-label);
@@ -372,7 +406,7 @@
     justify-content: flex-end;
   }
   .pool-page .row-actions button {
-    min-height: 40px;
+    min-height: 44px;
   }
   .pool-page .panel-foot {
     padding: 16px;

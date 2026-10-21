@@ -42,6 +42,8 @@ export function CredentialDevices({
   const [message, setMessage] = useState("");
   const [revision, setRevision] = useState(0);
   const [now, setNow] = useState(Date.now());
+  const [pairingLabel, setPairingLabel] = useState("");
+  const [newAccountLimit, setNewAccountLimit] = useState(1);
   const [deviceId, setDeviceId] = useState("");
   const [captureId, setCaptureId] = useState("");
   const [accountId, setAccountId] = useState("");
@@ -161,10 +163,41 @@ export function CredentialDevices({
       {message && <p role="status">{message}</p>}
       <h3>一次性配对</h3>
       <p className="fine">
-        点击生成，短时有效，仅可兑换一次；到期时间见下方。设备有效期由服务端配置，允许自动新增
+        点击生成，短时有效，仅可兑换一次；到期时间见下方。设备有效期由服务端配置，默认允许自动新增
         1
         个账号，仍受服务端权限限制。挑战仅存于弹窗内存，关闭即隐藏，不自动复制。兑换后刷新设备列表。
       </p>
+      <div className="pairing-controls">
+        <label>
+          配对设备备注（可选）
+          <input
+            maxLength={100}
+            autoComplete="off"
+            value={pairingLabel}
+            disabled={busy || loading}
+            placeholder="例如：办公主力浏览器"
+            onChange={(e) => setPairingLabel(e.target.value)}
+          />
+        </label>
+        <label>
+          自动新增账号额度（0–10）
+          <input
+            type="number"
+            min={0}
+            max={10}
+            value={newAccountLimit}
+            disabled={busy || loading}
+            onChange={(e) => {
+              const parsed = Number(e.target.value);
+              setNewAccountLimit(
+                Number.isNaN(parsed)
+                  ? 0
+                  : Math.max(0, Math.min(10, Math.trunc(parsed))),
+              );
+            }}
+          />
+        </label>
+      </div>
       <button
         disabled={busy || loading}
         onClick={() =>
@@ -173,7 +206,13 @@ export function CredentialDevices({
             const result = await api.request<Challenge>(
               "/credential-devices/pairings",
               "POST",
-              { label: "", new_account_limit: 1 },
+              {
+                label: pairingLabel.trim(),
+                new_account_limit: Math.max(
+                  0,
+                  Math.min(10, Number(newAccountLimit) || 0),
+                ),
+              },
             );
             setNow(Date.now());
             setChallenge(result);
@@ -192,11 +231,16 @@ export function CredentialDevices({
                 autoComplete="off"
                 spellCheck={false}
                 value={challenge.challenge}
+                onFocus={(e) => e.currentTarget.select()}
               />
             </label>
             <p className="fine">
-              到期时间：{time(challenge.expires_at)}
-              。请在已核对的扩展中手动输入；不要分享或记录此挑战。
+              到期时间：{time(challenge.expires_at)}（剩余{" "}
+              {Math.max(
+                0,
+                Math.ceil((expires(challenge.expires_at) - now) / 1000),
+              )}
+              s）。请在已核对的扩展中手动输入；不要分享或记录此挑战。
             </p>
           </>
         ) : (
@@ -296,7 +340,7 @@ export function CredentialDevices({
             <option value="">选择有效设备</option>
             {activeDevices.map((d) => (
               <option key={d.id} value={d.id}>
-                {d.id}
+                {d.label ? `${d.id} (${d.label})` : d.id}
               </option>
             ))}
           </select>
@@ -329,7 +373,8 @@ export function CredentialDevices({
             <option value="">选择现有账号</option>
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.id}
+                {a.label ? `${a.id} (${a.label})` : a.id}
+                {a.credential_version ? ` · v${a.credential_version}` : ""}
               </option>
             ))}
           </select>

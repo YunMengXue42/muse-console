@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/Python-3.10%2B-blue?logo=python" alt="Python" />
   <img src="https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi" alt="FastAPI" />
   <img src="https://img.shields.io/badge/API-OpenAI%20Compatible-green" alt="OpenAI Compatible" />
-  <img src="https://img.shields.io/badge/status-v0.3.5%20console-blue" alt="Status" />
+  <img src="https://img.shields.io/badge/status-v0.3.6%20console-blue" alt="Status" />
   <img src="https://img.shields.io/badge/License-MIT-lightgrey" alt="License" />
 </p>
 
@@ -42,7 +42,7 @@ The project focuses on **clean engineering and easy collaboration**:
 
 ## Status
 
-> **v0.3.5**: adds optional streaming heartbeats, Prometheus metrics at `/admin/metrics` and automatic re-submission when a video reply arrives as text only. **v0.3.1, Muse Console rebuild**: account scheduling, encrypted persistence, batch import, isolated manual browser login and a React/TypeScript console are implemented. Offline regression tests exercise the real service boundaries with fake upstreams; successful live Muse authentication and generation are not implied by those tests.
+> **v0.3.6**: console upgrade — URL-hash routes, Prometheus metrics view, request filters by path/key, per-account concurrency and account merge. **v0.3.5**: adds optional streaming heartbeats, Prometheus metrics at `/admin/metrics` and automatic re-submission when a video reply arrives as text only. **v0.3.1, Muse Console rebuild**: account scheduling, encrypted persistence, batch import, isolated manual browser login and a React/TypeScript console are implemented. Offline regression tests exercise the real service boundaries with fake upstreams; successful live Muse authentication and generation are not implied by those tests.
 
 | Module | Status | Notes |
 |---|---|---|

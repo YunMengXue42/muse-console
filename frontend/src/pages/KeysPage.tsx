@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Api } from "../api";
+import { Api, time } from "../api";
 import type { Key, Setter, Ask, ModalKind } from "../types";
 import { Empty } from "../ui";
 import { badge } from "../status";
@@ -11,6 +11,7 @@ export function KeysPage({
   builtin,
   setKeyEdit,
   setLabel,
+  setNote,
   ask,
   api,
   openModal,
@@ -19,6 +20,7 @@ export function KeysPage({
   builtin: Key[];
   setKeyEdit: Setter<Key | null>;
   setLabel: Setter<string>;
+  setNote?: Setter<string>;
   ask: Ask;
   api: Api;
   openModal: (kind: ModalKind) => void;
@@ -92,65 +94,80 @@ export function KeysPage({
                 </tr>
               </thead>
               <tbody>
-                {keys.map((k) => (
-                  <tr key={k.id}>
-                    <td data-label="名称 / 前缀">
-                      <div className="console-identity">
-                        <strong>{k.name || "未命名密钥"}</strong>
-                        <small className="mono">{k.prefix}…</small>
-                      </div>
-                    </td>
-                    <td data-label="状态">
-                      {badge(k.revoked ? "disabled" : "active")}
-                    </td>
-                    <td data-label="总调用" className="console-number">
-                      {k.usage.total}
-                    </td>
-                    <td data-label="24h 请求 / 错误" className="console-number">
-                      {k.usage.requests_24h} / {k.usage.errors_24h}
-                    </td>
-                    <td data-label="操作">
-                      <div className="row-actions">
-                        <button
-                          className="console-action"
-                          onClick={() => {
-                            setKeyEdit(k);
-                            setLabel(k.name);
-                          }}
-                        >
-                          重命名
-                        </button>
-                        <button
-                          className={
-                            k.revoked ? "console-action" : "console-caution"
-                          }
-                          onClick={() =>
-                            ask(
-                              `${k.revoked ? "恢复" : "吊销"}密钥「${k.name}」？${k.revoked ? "" : "现有应用将立即失去访问权限。"}`,
-                              () =>
-                                api.request(`/keys/${k.id}`, "PATCH", {
-                                  revoked: !k.revoked,
-                                }),
-                            )
-                          }
-                        >
-                          {k.revoked ? "恢复" : "吊销"}
-                        </button>
-                        <button
-                          className="danger-text"
-                          onClick={() =>
-                            ask(
-                              `永久删除密钥「${k.name}」？此操作不可撤销。`,
-                              () => api.request(`/keys/${k.id}`, "DELETE"),
-                            )
-                          }
-                        >
-                          删除
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {keys.map((k) => {
+                  const lastUsed = k.usage.last_request_at ?? k.last_used_at;
+                  return (
+                    <tr key={k.id}>
+                      <td data-label="名称 / 前缀">
+                        <div className="console-identity">
+                          <strong>{k.name || "未命名密钥"}</strong>
+                          <small className="mono">{k.prefix}…</small>
+                          {k.note && <small className="muted">{k.note}</small>}
+                        </div>
+                      </td>
+                      <td data-label="状态">
+                        {badge(k.revoked ? "disabled" : "active")}
+                      </td>
+                      <td data-label="总调用" className="console-number">
+                        <div className="console-identity">
+                          <span>{k.usage.total}</span>
+                          {lastUsed ? (
+                            <small className="muted">
+                              最近 {time(lastUsed)}
+                            </small>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td
+                        data-label="24h 请求 / 错误"
+                        className="console-number"
+                      >
+                        {k.usage.requests_24h} / {k.usage.errors_24h}
+                      </td>
+                      <td data-label="操作">
+                        <div className="row-actions">
+                          <button
+                            className="console-action"
+                            onClick={() => {
+                              setKeyEdit(k);
+                              setLabel(k.name);
+                              setNote?.(k.note ?? "");
+                            }}
+                          >
+                            重命名
+                          </button>
+                          <button
+                            className={
+                              k.revoked ? "console-action" : "console-caution"
+                            }
+                            onClick={() =>
+                              ask(
+                                `${k.revoked ? "恢复" : "吊销"}密钥「${k.name}」？${k.revoked ? "" : "现有应用将立即失去访问权限。"}`,
+                                () =>
+                                  api.request(`/keys/${k.id}`, "PATCH", {
+                                    revoked: !k.revoked,
+                                  }),
+                              )
+                            }
+                          >
+                            {k.revoked ? "恢复" : "吊销"}
+                          </button>
+                          <button
+                            className="danger-text"
+                            onClick={() =>
+                              ask(
+                                `永久删除密钥「${k.name}」？此操作不可撤销。`,
+                                () => api.request(`/keys/${k.id}`, "DELETE"),
+                              )
+                            }
+                          >
+                            删除
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -175,6 +192,9 @@ export function KeysPage({
                 <span>{k.usage.total} 次总调用</span>
                 <small>
                   24h 请求 {k.usage.requests_24h} / 错误 {k.usage.errors_24h}
+                  {k.usage.last_request_at
+                    ? ` · 最近 ${time(k.usage.last_request_at)}`
+                    : ""}
                 </small>
               </div>
             ))}

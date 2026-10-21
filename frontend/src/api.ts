@@ -47,6 +47,20 @@ export class Api {
     }
     return data as T;
   }
+  /** 请求纯文本管理接口（如 /admin/metrics Prometheus 暴露格式）。 */
+  async requestText(path: string, signal?: AbortSignal): Promise<string> {
+    const response = await fetch(`/admin${path}`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${this.key}` },
+      signal,
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      if (response.status === 401) this.unauthorized();
+      throw new ApiError(response.status, `请求失败（${response.status}）`);
+    }
+    return response.text();
+  }
 }
 /** 账号表的公开字段，不接收或展示 Cookie 明文。 */
 export interface Account {

@@ -60,10 +60,15 @@ describe("远程网页登录", () => {
       />,
     );
     await screen.findByAltText(/实时截图/);
-    await user.type(
-      screen.getByLabelText("发送到上游页面的文本"),
-      "private-text",
-    );
+    const textInput = screen.getByLabelText(
+      "发送到上游页面的文本",
+    ) as HTMLInputElement;
+    expect(textInput.type).toBe("password");
+    await user.click(screen.getByRole("button", { name: "显示文本" }));
+    expect(textInput.type).toBe("text");
+    await user.click(screen.getByRole("button", { name: "隐藏文本" }));
+    expect(textInput.type).toBe("password");
+    await user.type(textInput, "private-text");
     await user.click(screen.getByRole("button", { name: "发送到页面" }));
     await waitFor(() =>
       expect(
@@ -75,6 +80,12 @@ describe("远程网页登录", () => {
     expect(
       (screen.getByLabelText("发送到上游页面的文本") as HTMLInputElement).value,
     ).toBe("");
+    await user.click(screen.getByRole("button", { name: "Esc" }));
+    await waitFor(() =>
+      expect(
+        calls.some((c) => (c.body as { key?: string })?.key === "Escape"),
+      ).toBe(true),
+    );
     await user.click(screen.getByRole("button", { name: "完成验证并入池" }));
     await screen.findByText("请先完成验证码");
     expect(complete).not.toHaveBeenCalled();

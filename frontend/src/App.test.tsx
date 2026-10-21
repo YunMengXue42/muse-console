@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
 const status = {
@@ -229,5 +235,230 @@ describe("控制台完整交互", () => {
     await screen.findByText("one-time-test-key");
     await user.click(screen.getByRole("button", { name: "已安全保存" }));
     expect(screen.queryByText("one-time-test-key")).toBeNull();
+  });
+  it("打通后端多维统计、任务媒体预览、请求筛选与账号并发/合并操作", async () => {
+    const baseApi = mockApi();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const path = String(input);
+        if (
+          path === "/admin/accounts" &&
+          (!init?.method || init.method === "GET")
+        ) {
+          return new Response(
+            JSON.stringify({
+              data: [
+                {
+                  id: "acc_main",
+                  label: "主力账号",
+                  enabled: true,
+                  status: "active",
+                  effective_status: "available",
+                  inflight: 0,
+                  max_concurrency: 2,
+                  effective_max_concurrency: 2,
+                  credential_version: 3,
+                  success_count: 10,
+                  fail_count: 0,
+                  last_used_at: 1700000000,
+                },
+                {
+                  id: "acc_dup",
+                  label: "重复账号",
+                  enabled: true,
+                  status: "active",
+                  effective_status: "available",
+                  inflight: 0,
+                  effective_max_concurrency: 2,
+                  success_count: 1,
+                  fail_count: 0,
+                  last_used_at: null,
+                },
+              ],
+            }),
+            { headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (path.startsWith("/admin/stats?")) {
+          return new Response(
+            JSON.stringify({
+              total: 5,
+              errors: 1,
+              server_errors: 1,
+              error_rate: 0.2,
+              latency_ms: { p50: 40, p95: 120 },
+              series: [{ t: 1700000000, count: 5, errors: 1 }],
+              by_model: [{ model: "muse-video", count: 5, errors: 1 }],
+              by_account: [{ account_id: "acc_main", count: 5, errors: 1 }],
+              by_key: [
+                {
+                  key_id: "key_prod",
+                  key_name: "生产画布",
+                  count: 5,
+                  errors: 1,
+                },
+              ],
+              by_status: [{ status_code: 200, count: 4, errors: 0 }],
+            }),
+            { headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (path === "/admin/metrics") {
+          const prom = [
+            "# HELP muse_chat_first_token_seconds Seconds from lease to first chat delta.",
+            "# TYPE muse_chat_first_token_seconds histogram",
+            'muse_chat_first_token_seconds_sum{account="acc_main"} 6.4',
+            'muse_chat_first_token_seconds_count{account="acc_main"} 2',
+            "# HELP muse_generation_seconds Media generation wall time.",
+            "# TYPE muse_generation_seconds histogram",
+            'muse_generation_seconds_sum{kind="video",result="ok"} 150',
+            'muse_generation_seconds_count{kind="video",result="ok"} 2',
+            "# HELP muse_media_outcomes_total Browser media generation events by kind and outcome code.",
+            "# TYPE muse_media_outcomes_total counter",
+            'muse_media_outcomes_total{kind="video",outcome="retry_text_only"} 2',
+            'muse_media_outcomes_total{kind="video",outcome="succeeded_after_retry"} 1',
+            "# HELP muse_upstream_requests_total Gateway upstream calls by operation, account and result.",
+            "# TYPE muse_upstream_requests_total counter",
+            'muse_upstream_requests_total{account="acc_main",op="video",result="ok"} 2',
+            "",
+          ].join("\n");
+          return new Response(prom, {
+            headers: { "Content-Type": "text/plain; version=0.0.4" },
+          });
+        }
+        if (path === "/admin/tasks") {
+          return new Response(
+            JSON.stringify({
+              data: [
+                {
+                  id: "task_vid_1",
+                  status: "succeeded",
+                  kind: "video",
+                  progress: 100,
+                  created_at: 1700000000,
+                  updated_at: 1700000075,
+                  request: {
+                    prompt: "海边日落航拍镜头",
+                    size: "1280x720",
+                    duration: 10,
+                  },
+                  result: {
+                    url: "http://localhost/v1/media/vid_1234567890abcdef.mp4?expires=9999999999&signature=abc",
+                    mime: "video/mp4",
+                  },
+                  error: null,
+                },
+              ],
+            }),
+            { headers: { "Content-Type": "application/json" } },
+          );
+        }
+        return baseApi(input, init);
+      }),
+    );
+
+    const user = await signIn();
+    // 账号编辑并发上限与合并
+    await user.click(screen.getAllByRole("button", { name: "编辑" })[0]);
+    const mcInput = screen.getByLabelText(
+      "单账号并发上限（可选）",
+    ) as HTMLInputElement;
+    expect(mcInput.value).toBe("2");
+    await user.clear(mcInput);
+    await user.type(mcInput, "4");
+    await user.click(screen.getByRole("button", { name: "保存修改" }));
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        "/admin/accounts/acc_main",
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({ label: "主力账号", max_concurrency: 4 }),
+        }),
+      ),
+    );
+
+    await user.click(screen.getAllByRole("button", { name: "合并" })[1]);
+    await user.selectOptions(screen.getByLabelText("目标账号"), "acc_main");
+    await user.click(screen.getByRole("button", { name: "确认合并" }));
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        "/admin/accounts/acc_dup/merge",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ into: "acc_main" }),
+        }),
+      ),
+    );
+
+    // 概览多维分布、0.3.5 Prometheus 实时指标与点击跳转请求日志
+    await user.click(screen.getByRole("button", { name: "调用概览" }));
+    await screen.findByText("5xx 错误 1 次");
+    await screen.findByText("3.20 s");
+    expect(screen.getByText("75.0 s")).toBeTruthy();
+    expect(screen.getByText("重投后成功 1 次")).toBeTruthy();
+    expect(screen.getByText("只回文本重投")).toBeTruthy();
+    await user.click(
+      screen.getByRole("button", { name: "查看 Prometheus 指标" }),
+    );
+    const metricsDialog = screen.getByRole("dialog", {
+      name: "Prometheus 指标 (/admin/metrics)",
+    });
+    await user.click(
+      within(metricsDialog).getAllByRole("button", { name: "关闭" })[0],
+    );
+    await screen.findByText("生产画布");
+    await user.click(screen.getByRole("button", { name: "生产画布" }));
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        "/admin/requests?hide_polls=true&limit=50&offset=0&key_id=key_prod",
+        expect.anything(),
+      ),
+    );
+
+    // 任务中心 Prompt、耗时与媒体内嵌预览
+    await user.click(screen.getByRole("button", { name: "任务中心" }));
+    await screen.findByText("海边日落航拍镜头");
+    expect(screen.getByText("耗时 1m 15s")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "结果详情" }));
+    const dialog = screen.getByRole("dialog", { name: "任务 task_vid_1" });
+    const video = dialog.querySelector("video");
+    expect(video?.getAttribute("src")).toBe(
+      "/v1/media/vid_1234567890abcdef.mp4?expires=9999999999&signature=abc",
+    );
+  });
+  it("登录态支持 URL Hash 状态恢复与同步，并在标签页切回前台时立即刷新", async () => {
+    sessionStorage.setItem("muse.console.key", "admin-test");
+    window.history.replaceState(
+      null,
+      "",
+      "#requests?status=failed&account_id=acc_hash",
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("heading", { name: "请求记录" });
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        "/admin/requests?hide_polls=true&limit=50&offset=0&status=failed&account_id=acc_hash",
+        expect.anything(),
+      ),
+    );
+    await user.click(screen.getByRole("button", { name: "调用概览" }));
+    await user.click(screen.getByRole("button", { name: "近 7 天" }));
+    expect(window.location.hash).toBe("#overview?window=7d");
+    const callCountBeforeVisible = (fetch as ReturnType<typeof vi.fn>).mock
+      .calls.length;
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => "visible",
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+    await waitFor(() =>
+      expect(
+        (fetch as ReturnType<typeof vi.fn>).mock.calls.length,
+      ).toBeGreaterThan(callCountBeforeVisible),
+    );
+    await user.click(screen.getByRole("button", { name: "退出控制台" }));
+    expect(window.location.hash).toBe("");
   });
 });

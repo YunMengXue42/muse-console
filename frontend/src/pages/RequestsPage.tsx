@@ -1,7 +1,7 @@
-import { time } from "../api";
-import type { RequestRow, Setter, Detail } from "../types";
+import { time, type Account } from "../api";
+import type { RequestRow, Key, Setter, Detail } from "../types";
 import { Empty } from "../ui";
-import { badge } from "../status";
+import { badge, statusNames } from "../status";
 import "../console-pages.css";
 
 /** 页面只渲染快照并转交操作；轮询由 App 统一负责。 */
@@ -12,6 +12,12 @@ export function RequestsPage({
   setFilter,
   accountFilter,
   setAccountFilter,
+  pathFilter = "",
+  setPathFilter,
+  keyFilter = "",
+  setKeyFilter,
+  accounts = [],
+  keys = [],
   hidePolls,
   setHidePolls,
   offset,
@@ -25,6 +31,12 @@ export function RequestsPage({
   setFilter: Setter<string>;
   accountFilter: string;
   setAccountFilter: Setter<string>;
+  pathFilter?: string;
+  setPathFilter?: Setter<string>;
+  keyFilter?: string;
+  setKeyFilter?: Setter<string>;
+  accounts?: Account[];
+  keys?: Key[];
   hidePolls: boolean;
   setHidePolls: Setter<boolean>;
   offset: number;
@@ -32,6 +44,9 @@ export function RequestsPage({
   loading: boolean;
   setDetail: Setter<Detail | null>;
 }) {
+  const hasActiveFilter = Boolean(
+    filter || accountFilter || pathFilter || keyFilter,
+  );
   return (
     <section className="console-page requests-page panel">
       <header>
@@ -59,6 +74,7 @@ export function RequestsPage({
         <label>
           账号 ID
           <input
+            list="request-account-options"
             value={accountFilter}
             placeholder="按账号 ID 筛选"
             onChange={(e) => {
@@ -66,7 +82,55 @@ export function RequestsPage({
               setOffset(0);
             }}
           />
+          <datalist id="request-account-options">
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.label || a.id}
+              </option>
+            ))}
+          </datalist>
         </label>
+        {setPathFilter && (
+          <label>
+            接口路径
+            <select
+              value={pathFilter}
+              onChange={(e) => {
+                setPathFilter(e.target.value);
+                setOffset(0);
+              }}
+            >
+              <option value="">全部接口</option>
+              <option value="/v1/chat/completions">Chat (/v1/chat)</option>
+              <option value="/v1/responses">Responses (/v1/responses)</option>
+              <option value="/v1/images">图像 (/v1/images)</option>
+              <option value="/v1/videos">视频 (/v1/videos)</option>
+            </select>
+          </label>
+        )}
+        {setKeyFilter && (
+          <label>
+            应用密钥
+            <input
+              list="request-key-options"
+              value={keyFilter}
+              placeholder="按密钥 ID 筛选"
+              onChange={(e) => {
+                setKeyFilter(e.target.value);
+                setOffset(0);
+              }}
+            />
+            <datalist id="request-key-options">
+              <option value="admin">admin（内置管理员）</option>
+              <option value="legacy">legacy（内置默认密钥）</option>
+              {keys.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.name || k.id}
+                </option>
+              ))}
+            </datalist>
+          </label>
+        )}
         <label className="check">
           <input
             type="checkbox"
@@ -78,6 +142,21 @@ export function RequestsPage({
           />
           隐藏任务轮询
         </label>
+        {hasActiveFilter && (
+          <button
+            type="button"
+            className="console-action"
+            onClick={() => {
+              setFilter("");
+              setAccountFilter("");
+              setPathFilter?.("");
+              setKeyFilter?.("");
+              setOffset(0);
+            }}
+          >
+            清除筛选
+          </button>
+        )}
       </div>
       {requests.length ? (
         <div className="table-wrap">
@@ -97,25 +176,50 @@ export function RequestsPage({
                   <td data-label="时间">{time(r.ts)}</td>
                   <td data-label="请求">
                     <div className="console-identity">
-                      <strong>{r.method}</strong>
+                      <div>
+                        <strong>{r.method}</strong>
+                        {r.stream ? (
+                          <span className="badge stream-tag">SSE</span>
+                        ) : null}
+                      </div>
                       <small className="mono">{r.path}</small>
+                      {r.error && (
+                        <small className="danger-text">{r.error}</small>
+                      )}
                     </div>
                   </td>
                   <td data-label="模型 / 账号">
                     <div className="console-identity">
                       {r.model ?? "—"}
-                      <small className="mono">{r.account_id ?? "—"}</small>
+                      <small className="mono">
+                        {r.account_id ?? "—"}
+                        {r.key_name ? ` · ${r.key_name}` : ""}
+                      </small>
                     </div>
                   </td>
                   <td data-label="状态">
-                    {badge(
-                      r.task_status === "failed"
-                        ? "failed"
-                        : String(r.status_code),
-                    )}
+                    <div className="console-identity">
+                      {badge(
+                        r.task_status === "failed"
+                          ? "failed"
+                          : String(r.status_code),
+                      )}
+                      {r.task_status && r.task_status !== "failed" && (
+                        <small className="muted">
+                          任务 {statusNames[r.task_status] ?? r.task_status}
+                        </small>
+                      )}
+                    </div>
                   </td>
                   <td data-label="耗时" className="mono">
-                    {r.latency_ms} ms
+                    <div className="console-identity">
+                      <span>{r.latency_ms} ms</span>
+                      {r.task_ms != null && (
+                        <small className="mono">
+                          任务 {(r.task_ms / 1000).toFixed(1)}s
+                        </small>
+                      )}
+                    </div>
                   </td>
                   <td data-label="详情">
                     <button

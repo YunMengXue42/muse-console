@@ -1,10 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "../pool-design.css";
 import type { Account } from "../api";
 import { Api, time } from "../api";
-import type { Pool, Setter, Act, ModalKind, Ask } from "../types";
+import type { Pool, Setter, Act, ModalKind, Ask, Status } from "../types";
 import { Empty } from "../ui";
 import { badge } from "../status";
+
+function formatRemaining(untilSec?: number, nowMs = Date.now()): string | null {
+  if (!untilSec) return null;
+  const diffSec = Math.ceil(untilSec - nowMs / 1000);
+  if (diffSec <= 0) return null;
+  if (diffSec < 60) return `${diffSec}s 后恢复`;
+  const m = Math.floor(diffSec / 60);
+  const s = diffSec % 60;
+  return s ? `${m}m ${s}s 后恢复` : `${m}m 后恢复`;
+}
 
 /** 页面只渲染快照并转交操作；轮询由 App 统一负责。 */
 export function PoolPage({
@@ -19,6 +29,9 @@ export function PoolPage({
   setEdit,
   setLabel,
   setCookies,
+  setMaxConcurrency,
+  setMergeSource,
+  capabilities,
   openModal,
   setPage,
   ask,
@@ -34,11 +47,26 @@ export function PoolPage({
   setEdit: Setter<Account | null>;
   setLabel: Setter<string>;
   setCookies: Setter<string>;
+  setMaxConcurrency?: Setter<string>;
+  setMergeSource?: Setter<Account | null>;
+  capabilities?: Status["capabilities"];
   openModal: (kind: ModalKind) => void;
   setPage: Setter<number>;
   ask: Ask;
 }) {
   const [filter, setFilter] = useState("all");
+  const [now, setNow] = useState(() => Date.now());
+  const hasCooling = accounts.some(
+    (a) =>
+      ["cooling", "cooldown"].includes(a.effective_status ?? a.status) &&
+      (a.cooldown_until ?? 0) * 1000 > now,
+  );
+  useEffect(() => {
+    if (!hasCooling) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [hasCooling]);
+
   const accountStatus = (account: Account) =>
     account.effective_status ?? account.status;
   const available = (account: Account) =>
@@ -75,7 +103,13 @@ export function PoolPage({
         {[
           ["账号总数", metrics?.total, "已接入的上游会话"],
           ["可调度", metrics?.available, "可以接收新请求"],
-          ["占用槽位", metrics?.inflight, "正在执行的并发请求"],
+          [
+            "占用槽位",
+            metrics?.inflight,
+            metrics?.waiting
+              ? `正在执行 · ${metrics.waiting} 个请求排队中`
+              : "正在执行的并发请求",
+          ],
           [
             "需要关注",
             metrics
@@ -163,109 +197,159 @@ export function PoolPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleAccounts.map((a) => (
-                    <tr key={a.id}>
-                      <td data-label="账号标识">
-                        <div className="pool-identity">
-                          <span className="pool-initial" aria-hidden="true">
-                            {Array.from(
-                              a.label.trim() || a.id,
-                            )[0]?.toUpperCase() || "?"}
-                          </span>
-                          <div>
-                            <strong>{a.label || "未命名账号"}</strong>
-                            <small className="mono">{a.id}</small>
-                            {a.last_error && (
-                              <small className="danger-text">
-                                {a.last_error}
+                  {visibleAccounts.map((a) => {
+                    const effStatus = a.effective_status ?? a.status;
+                    const cooldownText = ["cooling", "cooldown"].includes(
+                      effStatus,
+                    )
+                      ? formatRemaining(a.cooldown_until, now)
+                      : null;
+                    const quota = a.meta?.quota;
+                    return (
+                      <tr key={a.id}>
+                        <td data-label="账号标识">
+                          <div className="pool-identity">
+                            <div>
+                              <strong>{a.label || "未命名账号"}</strong>
+                              <small className="mono">
+                                {a.id}
+                                {a.credential_version
+                                  ? ` · v${a.credential_version}`
+                                  : ""}
+                              </small>
+                              {quota && (
+                                <small className="muted">
+                                  {quota.plan ? `${quota.plan} · ` : ""}
+                                  {quota.remaining != null
+                                    ? `余量 ${quota.remaining}`
+                                    : quota.credits != null
+                                      ? `积分 ${quota.credits}`
+                                      : ""}
+                                </small>
+                              )}
+                              {a.last_error && (
+                                <small className="danger-text">
+                                  {a.last_error}
+                                </small>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td data-label="状态">
+                          <div className="console-identity">
+                            {badge(effStatus)}
+                            {cooldownText && (
+                              <small className="mono muted">
+                                {cooldownText}
                               </small>
                             )}
                           </div>
-                        </div>
-                      </td>
-                      <td data-label="状态">
-                        {badge(a.effective_status ?? a.status)}
-                      </td>
-                      <td data-label="并发" className="mono">
-                        {a.inflight ?? 0} / {a.effective_max_concurrency ?? "—"}
-                      </td>
-                      <td data-label="成功 / 失败" className="mono">
-                        <span className="pool-counts">
-                          {a.success_count}{" "}
-                          <span className="muted">/ {a.fail_count}</span>
-                        </span>
-                      </td>
-                      <td data-label="最近使用">{time(a.last_used_at)}</td>
-                      <td data-label="操作">
-                        <div className="row-actions">
-                          <button
-                            onClick={() => {
-                              setEdit(a);
-                              setLabel(a.label);
-                              setCookies("");
-                            }}
-                          >
-                            编辑
-                          </button>
-                          <button
-                            disabled={busy}
-                            onClick={() =>
-                              void act(
-                                async () => {
+                        </td>
+                        <td data-label="并发" className="mono">
+                          {a.inflight ?? 0} /{" "}
+                          {a.effective_max_concurrency ?? "—"}
+                          {a.max_concurrency != null && (
+                            <small className="muted">独立上限</small>
+                          )}
+                        </td>
+                        <td data-label="成功 / 失败" className="mono">
+                          <span className="pool-counts">
+                            {a.success_count}{" "}
+                            <span className="muted">/ {a.fail_count}</span>
+                          </span>
+                        </td>
+                        <td data-label="最近使用">{time(a.last_used_at)}</td>
+                        <td data-label="操作">
+                          <div className="row-actions">
+                            <button
+                              onClick={() => {
+                                setEdit(a);
+                                setLabel(a.label);
+                                setCookies("");
+                                setMaxConcurrency?.(
+                                  a.max_concurrency != null
+                                    ? String(a.max_concurrency)
+                                    : "",
+                                );
+                              }}
+                            >
+                              编辑
+                            </button>
+                            <button
+                              disabled={busy}
+                              onClick={() =>
+                                void act(
+                                  async () => {
+                                    await api.request(
+                                      `/accounts/${a.id}`,
+                                      "PATCH",
+                                      { enabled: !a.enabled },
+                                    );
+                                  },
+                                  a.enabled ? "账号已停用" : "账号已启用",
+                                )
+                              }
+                            >
+                              {a.enabled ? "停用" : "启用"}
+                            </button>
+                            <button
+                              disabled={
+                                busy || capabilities?.renew_session === false
+                              }
+                              title={
+                                capabilities?.renew_session === false
+                                  ? "当前驱动不支持会话保活"
+                                  : undefined
+                              }
+                              onClick={() =>
+                                void act(async () => {
                                   await api.request(
-                                    `/accounts/${a.id}`,
-                                    "PATCH",
-                                    { enabled: !a.enabled },
+                                    `/accounts/${a.id}/renew`,
+                                    "POST",
                                   );
-                                },
-                                a.enabled ? "账号已停用" : "账号已启用",
-                              )
-                            }
-                          >
-                            {a.enabled ? "停用" : "启用"}
-                          </button>
-                          <button
-                            disabled={busy}
-                            onClick={() =>
-                              void act(async () => {
-                                await api.request(
-                                  `/accounts/${a.id}/renew`,
-                                  "POST",
-                                );
-                              }, "保活请求已完成")
-                            }
-                          >
-                            保活
-                          </button>
-                          <button
-                            disabled={busy}
-                            onClick={() =>
-                              void act(async () => {
-                                await api.request(
-                                  `/accounts/${a.id}/reset`,
-                                  "POST",
-                                );
-                              }, "状态已重置")
-                            }
-                          >
-                            重置
-                          </button>
-                          <button
-                            className="danger-text"
-                            onClick={() =>
-                              ask(
-                                `删除账号「${a.label || a.id}」？此操作不可撤销。`,
-                                () =>
-                                  api.request(`/accounts/${a.id}`, "DELETE"),
-                              )
-                            }
-                          >
-                            删除
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                                }, "保活请求已完成")
+                              }
+                            >
+                              保活
+                            </button>
+                            <button
+                              disabled={busy}
+                              onClick={() =>
+                                void act(async () => {
+                                  await api.request(
+                                    `/accounts/${a.id}/reset`,
+                                    "POST",
+                                  );
+                                }, "状态已重置")
+                              }
+                            >
+                              重置
+                            </button>
+                            {setMergeSource && accounts.length > 1 && (
+                              <button
+                                disabled={busy}
+                                onClick={() => setMergeSource(a)}
+                              >
+                                合并
+                              </button>
+                            )}
+                            <button
+                              className="danger-text"
+                              onClick={() =>
+                                ask(
+                                  `删除账号「${a.label || a.id}」？此操作不可撤销。`,
+                                  () =>
+                                    api.request(`/accounts/${a.id}`, "DELETE"),
+                                )
+                              }
+                            >
+                              删除
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
               {!visibleAccounts.length && (

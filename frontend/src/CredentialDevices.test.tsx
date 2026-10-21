@@ -213,4 +213,24 @@ describe("扩展设备配对", () => {
     await screen.findByText("配对挑战已过期，请重新生成。");
     expect(screen.queryByDisplayValue("one-time-secret")).toBeNull();
   });
+  it("支持自定义配对设备备注与新增账号额度", async () => {
+    const { fetcher, user } = setup();
+    await screen.findByRole("button", { name: "撤销设备 device/1" });
+    await user.type(
+      screen.getByLabelText("配对设备备注（可选）"),
+      "  办公电脑  ",
+    );
+    const limitInput = screen.getByLabelText("自动新增账号额度（0–10）");
+    await user.clear(limitInput);
+    await user.type(limitInput, "3");
+    await user.click(screen.getByRole("button", { name: "生成配对挑战" }));
+    await screen.findByDisplayValue("one-time-secret");
+    const request = fetcher.mock.calls.find(([path]) =>
+      path.endsWith("/pairings"),
+    );
+    expect(JSON.parse(String(request?.[1].body))).toEqual({
+      label: "办公电脑",
+      new_account_limit: 3,
+    });
+  });
 });
