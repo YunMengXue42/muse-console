@@ -47,6 +47,7 @@ from ..base import (
 from . import dom
 from .cdp import CDPError, CDPSession
 from .chromium import ChromiumProcess, find_chromium
+from .media_wait import Act, MediaWait
 from .profile_safety import validate_owned_paths
 
 log = logging.getLogger(__name__)
@@ -1090,92 +1091,69 @@ class BrowserDriver(MuseDriver):
         on_progress,
         cancel: asyncio.Event | None,
     ) -> dict:
-        base_atts = len(base.get("attachments", []))
-        base_count = base.get("agentCount", 0)
         grace = self._MEDIA_GRACE.get(kind, 8.0)
-        ask_grace = self._ASK_GRACE.get(kind, grace)
-        started = time.monotonic()
-        text_done_at: float | None = None
-        denied = asked_to_attach = busy = False
-        while True:
-            elapsed = time.monotonic() - started
-            if elapsed >= timeout and not (busy and elapsed < timeout * self._OVERRUN_FACTOR):
-                break
+        w = MediaWait.from_base(
+            base,
+            kind=kind,
+            timeout=timeout,
+            grace=grace,
+            ask_grace=self._ASK_GRACE.get(kind, grace),
+            overrun_factor=self._OVERRUN_FACTOR,
+            started=time.monotonic(),
+        )
+        while not w.expired(time.monotonic()):
             if cancel and cancel.is_set():
                 raise asyncio.CancelledError
             await asyncio.sleep(0.6)
             st = await self._state(tab)
-            if st.get("approval"):
+            step = w.step(st, time.monotonic())
+            if step.act is Act.DENY:
                 await self._deny_approvals(tab)
-                denied, text_done_at = True, None
                 continue
-            new_atts = st.get("attachments", [])[base_atts:]
-            fresh = [a for a in new_atts if a.get("src") and a.get("kind") == kind]
-            if fresh:
-                return fresh[-1]
-            busy = bool(st.get("generating")) or any(kind in (a.get("tid") or "") for a in new_atts)
-            elapsed = time.monotonic() - started
+            if step.act is Act.RETURN:
+                return step.attachment
             if on_progress:
-                on_progress(min(95, int(elapsed / timeout * 100)))
-            # An attachment node for this kind is on the page but its (blob) src
-            # has not loaded yet -> media is still finalising, keep waiting.
-            if any(kind in (a.get("tid") or "") for a in new_atts):
-                text_done_at = None
-                continue
-            # No attachment yet. The reply may be genuinely text-only (a refusal),
-            # or the attachment may simply lag the completion sentence.
-            text = st.get("lastText", "")
-            if st.get("agentCount", 0) > base_count and text and not st.get("generating"):
-                if text_done_at is None:
-                    text_done_at = time.monotonic()
-                elif time.monotonic() - text_done_at >= (ask_grace if asked_to_attach else grace):
-                    if not asked_to_attach:
-                        # The agent often finishes with the file only in its workspace:
-                        # after a denied upload, after post-processing that it shows as
-                        # an image gallery (raw, QC crops and final mixed together), or
-                        # when it recognises a repeat request and points at the earlier
-                        # file. Asking once gets the final file attached in chat.
-                        metrics.media_outcome(kind, "attachment_requested")
-                        log.info(
-                            "%s not attached (%s); code=attachment_requested reply_chars=%d",
-                            kind,
-                            "denied approval" if denied else "text-only reply",
-                            len(text),
-                        )
-                        await self._send(
-                            tab,
-                            f"Please attach the final {kind} file here in "
-                            "the chat"
-                            + (
-                                " instead of uploading it."
-                                if denied
-                                else ", as a single attachment."
-                            ),
-                        )
-                        asked_to_attach, text_done_at = True, None
-                        base_count = st.get("agentCount", 0)
-                        continue
-                    # Last resort: media delivered as a link in the text bubble.
-                    probe = await tab.session.evaluate(dom.LAST_BUBBLE_MEDIA) or {}
-                    url = self._pick_media_url(probe.get("links", []), kind)
-                    if url:
-                        metrics.media_outcome(kind, "media_link_detected")
-                        log.info("%s code=media_link_detected", kind)
-                        return {"src": url, "kind": kind}
-                    log.info(
-                        "%s: no media after %.0fs grace; code=media_missing links_count=%d html_chars=%d",
-                        kind,
-                        grace,
-                        len(probe.get("links", [])),
-                        len(probe.get("html", "")),
-                    )
-                    metrics.media_outcome(kind, "media_missing")
-                    raise UpstreamRefused("upstream replied with text only (code=media_missing)")
-            else:
-                text_done_at = None
+                on_progress(w.progress(time.monotonic()))
+            if step.act is Act.ASK:
+                # The agent often finishes with the file only in its workspace:
+                # after a denied upload, after post-processing that it shows as
+                # an image gallery (raw, QC crops and final mixed together), or
+                # when it recognises a repeat request and points at the earlier
+                # file. Asking once gets the final file attached in chat.
+                metrics.media_outcome(kind, "attachment_requested")
+                log.info(
+                    "%s not attached (%s); code=attachment_requested reply_chars=%d",
+                    kind,
+                    "denied approval" if step.denied else "text-only reply",
+                    step.reply_chars,
+                )
+                await self._send(
+                    tab,
+                    f"Please attach the final {kind} file here in the chat"
+                    + (" instead of uploading it." if step.denied else ", as a single attachment."),
+                )
+            elif step.act is Act.PROBE:
+                # Last resort: media delivered as a link in the text bubble.
+                probe = await tab.session.evaluate(dom.LAST_BUBBLE_MEDIA) or {}
+                url = self._pick_media_url(probe.get("links", []), kind)
+                if url:
+                    metrics.media_outcome(kind, "media_link_detected")
+                    log.info("%s code=media_link_detected", kind)
+                    return {"src": url, "kind": kind}
+                log.info(
+                    "%s: no media after %.0fs grace; code=media_missing links_count=%d html_chars=%d",
+                    kind,
+                    grace,
+                    len(probe.get("links", [])),
+                    len(probe.get("html", "")),
+                )
+                metrics.media_outcome(kind, "media_missing")
+                raise UpstreamRefused("upstream replied with text only (code=media_missing)")
         metrics.media_outcome(kind, "timeout")
-        if busy:
-            log.warning("%s still generating after %.0fs; giving up", kind, elapsed)
+        if w.busy:
+            log.warning(
+                "%s still generating after %.0fs; giving up", kind, time.monotonic() - w.started
+            )
         raise UpstreamTimeout(f"{kind} generation timed out")
 
     _VIDEO_EXT = (".mp4", ".webm", ".mov", ".m4v")
