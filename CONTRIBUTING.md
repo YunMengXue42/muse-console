@@ -2,7 +2,7 @@
 
 ## Setup
 
-Clone from the actual project repository URL into `muse-console` and run these commands from that directory. The upstream attribution URL in README is not a clone URL for this project. The distribution/CLI is `muse-console`, the Python module/package is `muse_console`, and packaged UI assets live in `src/muse_console/web`.
+Clone `https://github.com/YunMengXue42/muse-console.git` and run these commands from that directory. The upstream attribution URL in README is not a clone URL for this project. The distribution/CLI is `muse-console`, the Python module/package is `muse_console`, and packaged UI assets live in `src/muse_console/web`.
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
@@ -60,3 +60,5 @@ For local UI development, run the backend normally and `npm run dev` from `front
 
 - Branch names: `feat/<module>`, `fix/<issue>`.
 - Make sure `pytest` and `ruff check .` pass before opening a PR.
+- Add a line to [CHANGELOG.md](CHANGELOG.md) for user-visible changes.
+- Report security problems privately as described in [SECURITY.md](SECURITY.md).

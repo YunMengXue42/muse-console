@@ -18,11 +18,11 @@ Priorities: **P0** must be done first · **P1** core feature · **P2** better ex
 | A2 | Test the browser driver with real accounts | P0 | `drivers/browser/` | | Previous single-account sample passed; hardening revision and multi-account load pending |
 | A3 | Verify how image/video generation is triggered | P0 | `drivers/browser/driver.py` | | Previous image/video sample passed; bounded downloader live regression pending |
 | A4 | Verify session renewal | P0 | `upstream/muse.py` | | Not started |
-| A5 | Verify the Docker image builds and runs | P1 | `Dockerfile` | | Not started |
-| A6 | Enable GitHub Actions CI | P1 | `.github/workflows/ci.yml` | | Not started |
+| A5 | Verify the Docker image builds and runs | P1 | `Dockerfile` | | CI mock smoke job exists; real-driver container not verified |
+| A6 | Enable GitHub Actions CI | P1 | `.github/workflows/ci.yml` | | Workflow in repo; first hosted run with the public repository |
 | B1 | Direct HTTP protocol driver | P1 | `drivers/http/` | | Not started |
 | B2 | Reuse conversation threads to cut first-token latency | P2 | `drivers/browser/` | | Done |
-| B3 | Quota lookup | P2 | `MuseDriver.quota` | | Not started |
+| B3 | Quota lookup | P2 | `MuseDriver.quota` | | Admin endpoint and mock done; browser driver pending |
 | C1 | `/v1/responses` endpoint | P1 | `api/routes/responses.py` | | Done: streamed Responses events; official SDK run pending |
 | C2 | `/v1/images/edits` endpoint | P1 | `api/routes/images.py` | | Done: multipart references, `mask` rejected |
 | C3 | Emulated tool calling | P2 | `core/prompt.py` | | Not started |

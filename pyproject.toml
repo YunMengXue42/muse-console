@@ -9,7 +9,7 @@ description = "OpenAI-compatible gateway for muse.ai with pluggable upstream dri
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
-authors = [{ name = "www222fff" }]
+authors = [{ name = "www222fff" }, { name = "YunMengXue42" }]
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
@@ -21,6 +21,11 @@ dependencies = [
     "python-multipart>=0.0.9",
     "cryptography>=44",
 ]
+
+[project.urls]
+Homepage = "https://github.com/YunMengXue42/muse-console"
+Issues = "https://github.com/YunMengXue42/muse-console/issues"
+Changelog = "https://github.com/YunMengXue42/muse-console/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 # background="transparent" for /v1/images/generations (BiRefNet + edge colour estimation)

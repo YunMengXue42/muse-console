@@ -1,0 +1,44 @@
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not paste cookies, API keys or `.env` contents. Security problems: see SECURITY.md."
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `/healthz` or the git tag
+    validations:
+      required: true
+  - type: dropdown
+    id: driver
+    attributes:
+      label: Driver
+      options: [browser, mock, http]
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: OS, Python version, Docker or source install
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Request body / curl with secrets removed
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs actual
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      render: text

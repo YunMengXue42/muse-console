@@ -8,7 +8,8 @@
   <img src="https://img.shields.io/badge/Python-3.10%2B-blue?logo=python" alt="Python" />
   <img src="https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi" alt="FastAPI" />
   <img src="https://img.shields.io/badge/API-OpenAI%20Compatible-green" alt="OpenAI Compatible" />
-  <img src="https://img.shields.io/badge/status-v0.3.6%20console-blue" alt="Status" />
+  <a href="https://github.com/YunMengXue42/muse-console/actions/workflows/ci.yml"><img src="https://github.com/YunMengXue42/muse-console/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <img src="https://img.shields.io/badge/version-v0.3.6-blue" alt="Version" />
   <img src="https://img.shields.io/badge/License-MIT-lightgrey" alt="License" />
 </p>
 
@@ -459,4 +460,4 @@ Muse Console is derived from [www222fff/muse2api](https://github.com/www222fff/m
 
 [LICENSE](LICENSE) retains the original MIT terms and `Copyright (c) 2026 www222fff`. Redistributed copies and substantial portions must retain that copyright and permission notice, including in packages and container images. The rename does not transfer copyright or imply upstream endorsement.
 
-The distribution/CLI name is `muse-console`; the Python module/package is `muse_console`. No new GitHub organization, maintainer identity, published PyPI release or Docker registry image is asserted here. Installation examples use the local source, and Compose builds a local image.
+Muse Console is maintained independently at [YunMengXue42/muse-console](https://github.com/YunMengXue42/muse-console). The distribution/CLI name is `muse-console`; the Python module/package is `muse_console`. There is no published PyPI release or Docker registry image; installation examples use the local source, and Compose builds a local image. See [CHANGELOG.md](CHANGELOG.md) for release notes and [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
