@@ -1,0 +1,461 @@
+/* Local refinements of the original Muse console; no shell or modal overrides. */
+.console-page {
+  min-width: 0;
+  max-width: 100%;
+  color: var(--ink);
+  font-size: var(--text-body);
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
+}
+.console-page h2 {
+  font-size: var(--text-section);
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+.console-page.panel,
+.console-page .panel,
+.console-page .metrics {
+  border-radius: 18px;
+}
+.console-page.panel > header,
+.console-page .panel > header {
+  padding: 24px;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+.console-page header > .muted {
+  font-size: var(--text-caption);
+  overflow-wrap: anywhere;
+}
+.console-page button,
+.console-page input,
+.console-page select {
+  font-size: var(--text-body);
+  border-radius: 999px;
+  min-width: 0;
+  max-width: 100%;
+}
+.console-page button {
+  min-height: 40px;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease;
+}
+.console-page :is(button, input, select):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+.console-page button:disabled:active {
+  transform: none;
+}
+.console-page .table-wrap {
+  max-width: 100%;
+  overscroll-behavior-x: contain;
+}
+.console-page table {
+  table-layout: fixed;
+}
+.console-page th {
+  font-size: var(--text-caption);
+  font-weight: 500;
+  background: var(--side);
+  padding-block: 12px;
+}
+.console-page td {
+  font-size: var(--text-body);
+  padding-block: 20px;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+.console-page :is(th, td) {
+  padding-inline: 16px;
+}
+.console-page :is(th, td):first-child {
+  padding-left: 24px;
+}
+.console-page :is(th, td):last-child {
+  padding-right: 24px;
+}
+.console-page td small {
+  font-size: var(--text-caption);
+  line-height: 1.6;
+  max-width: 100%;
+  margin-top: 4px;
+}
+.console-page .console-identity {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.console-page .console-number {
+  text-align: right;
+}
+.console-page .badge {
+  font-size: var(--text-caption);
+  line-height: 1.5;
+  border-radius: 999px;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.console-page .row-actions {
+  min-width: 0;
+  gap: 4px 6px;
+}
+.console-page .row-actions button,
+.console-page button.console-action,
+.console-page button.console-caution {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: var(--text-caption);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: normal;
+  background: transparent;
+  color: var(--muted);
+}
+.console-page button.console-action {
+  color: var(--primary);
+  background: var(--tint);
+}
+.console-page button.console-caution {
+  color: var(--danger);
+}
+.console-page .row-actions button.danger-text {
+  border-color: var(--line);
+}
+.console-page .row-actions button:hover:not(:disabled),
+.console-page button.console-action:hover:not(:disabled) {
+  background: var(--soft);
+}
+.console-page button.console-caution:hover:not(:disabled),
+.console-page button.danger-text:hover:not(:disabled) {
+  background: var(--danger-bg);
+}
+.console-page .empty {
+  padding: 48px 24px;
+}
+.console-page .empty-mark {
+  margin-bottom: 16px;
+}
+.console-page .empty h3 {
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+.console-page .empty p {
+  font-size: var(--text-caption);
+  margin: 8px auto 20px;
+  max-width: 360px;
+}
+.console-page .empty button {
+  font-size: var(--text-body);
+}
+.console-page .section-controls {
+  gap: 6px;
+  margin-bottom: 20px;
+}
+.console-page .section-controls > span {
+  font-size: var(--text-caption);
+  margin-right: 10px;
+}
+.console-page .section-controls button {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  padding-inline: 16px;
+}
+.console-page .section-controls button:hover {
+  background: var(--soft);
+}
+.console-page .section-controls button[aria-pressed="true"] {
+  color: var(--primary);
+  background: var(--tint);
+}
+.console-page .metrics {
+  margin-bottom: 24px;
+}
+.console-page .metrics section {
+  min-width: 0;
+  padding: 24px;
+  overflow-wrap: anywhere;
+}
+.console-page .metrics strong {
+  font-size: var(--text-display);
+  font-weight: 600;
+  letter-spacing: 0;
+  margin: 10px 0 6px;
+}
+.console-page .metrics small {
+  display: block;
+  font-size: var(--text-caption);
+}
+.console-page .console-plot {
+  display: grid;
+  grid-template-columns: minmax(28px, max-content) minmax(0, 1fr);
+  gap: 12px;
+  margin: 8px 24px 0;
+}
+.console-page .console-y-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: right;
+  color: var(--muted);
+  font-size: var(--text-caption);
+}
+.console-page .chart {
+  min-width: 0;
+  margin: 8px 0;
+  height: 200px;
+  gap: 2px;
+  background: repeating-linear-gradient(
+    to top,
+    transparent 0,
+    transparent calc(50% - 1px),
+    var(--line) calc(50% - 1px),
+    var(--line) 50%
+  );
+}
+.console-page .chart-column {
+  min-width: 0;
+}
+.console-page .chart-axis {
+  margin: 8px 24px 24px;
+  padding-left: 40px;
+  gap: 16px;
+  font-size: var(--text-caption);
+}
+.console-page .chart-axis span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.console-page .chart-axis span:last-child {
+  text-align: right;
+}
+.console-page .table-tools {
+  padding: 0 24px 20px;
+  gap: 16px;
+  align-items: flex-end;
+}
+.console-page .table-tools label {
+  flex: 0 1 180px;
+  min-width: 0;
+  gap: 6px;
+  font-size: var(--text-caption);
+  font-weight: 500;
+  color: var(--muted);
+}
+.console-page .table-tools label:nth-child(2) {
+  flex: 1 1 220px;
+  max-width: 360px;
+}
+.console-page .table-tools :is(input, select) {
+  min-width: 0;
+  font-size: var(--text-body);
+  min-height: 40px;
+  padding: 8px 14px;
+}
+.console-page .table-tools .check {
+  flex: 0 1 auto;
+  min-height: 40px;
+  gap: 8px;
+  justify-content: flex-start;
+}
+.console-page .table-tools input[type="checkbox"] {
+  flex: 0 0 17px;
+  min-height: 17px;
+  padding: 0;
+}
+.console-page .pagination {
+  flex-wrap: wrap;
+  padding: 18px 24px;
+  font-size: var(--text-caption);
+  gap: 8px;
+}
+.console-page .pagination button {
+  font-size: var(--text-body);
+}
+.keys-page .api-endpoint {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px 32px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+.api-endpoint-copy {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.api-endpoint-copy .muted {
+  font-size: var(--text-caption);
+}
+.api-endpoint-field {
+  display: flex;
+  align-items: center;
+  flex: 1 1 360px;
+  min-width: 0;
+  gap: 8px;
+}
+.console-page .api-endpoint-field input {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  border-color: var(--line);
+  border-radius: 10px;
+  background: var(--side);
+  color: var(--ink);
+  padding: 10px 14px;
+  text-overflow: ellipsis;
+}
+.api-endpoint-field button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.api-endpoint-feedback:not(:empty) {
+  flex-basis: 100%;
+  color: var(--danger);
+  font-size: var(--text-caption);
+}
+.api-endpoint-feedback:empty {
+  display: none;
+}
+.console-page .console-key-hint {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--soft);
+}
+.console-page .builtin {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0 24px 24px;
+  gap: 12px;
+}
+.console-page .builtin > div {
+  min-width: 0;
+  background: var(--side);
+  padding: 18px 20px;
+  font-size: var(--text-body);
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+.console-page .builtin strong {
+  font-weight: 600;
+}
+.console-page .builtin small {
+  font-size: var(--text-caption);
+}
+@media (max-width: 1100px) and (min-width: 801px) {
+  .console-page :is(th, td) {
+    padding-inline: 12px;
+  }
+  .console-page .metrics section {
+    padding: 20px 16px;
+  }
+}
+@media (max-width: 800px) {
+  .console-page.panel > header,
+  .console-page .panel > header {
+    padding: 20px 16px;
+    align-items: flex-start;
+  }
+  .console-page .metrics section {
+    padding: 20px 16px;
+  }
+  .console-page .metrics strong {
+    font-size: var(--text-title);
+  }
+  .console-page .table-wrap table,
+  .console-page .table-wrap tbody {
+    min-width: 0;
+    width: 100%;
+  }
+  .console-page .table-wrap tr {
+    margin: 0 12px 12px;
+    padding: 10px 12px;
+  }
+  .console-page .table-wrap td,
+  .console-page .table-wrap td:first-child,
+  .console-page .table-wrap td:last-child {
+    display: grid;
+    grid-template-columns: minmax(72px, 30%) minmax(0, 1fr);
+    gap: 12px;
+    padding: 8px 0;
+    font-size: var(--text-body);
+    align-items: start;
+    text-align: right;
+  }
+  .console-page .table-wrap td::before {
+    font-size: var(--text-caption);
+    font-family: inherit;
+    margin: 0;
+  }
+  .console-page .table-wrap td > * {
+    min-width: 0;
+    max-width: 100%;
+    justify-self: end;
+  }
+  .console-page .table-wrap td .console-identity {
+    width: 100%;
+  }
+  .console-page .row-actions {
+    justify-content: flex-end;
+  }
+  .console-page .row-actions button,
+  .console-page button.console-action,
+  .console-page button.console-caution {
+    min-height: 44px;
+  }
+  .console-page .table-tools {
+    padding: 0 16px 20px;
+    gap: 12px;
+  }
+  .console-page .table-tools label,
+  .console-page .table-tools label:nth-child(2) {
+    flex: 1 1 160px;
+    max-width: none;
+  }
+  .console-page .table-tools .check {
+    flex-basis: 100%;
+  }
+  .console-page .console-plot {
+    margin-inline: 16px;
+    gap: 8px;
+  }
+  .console-page .chart {
+    height: 180px;
+    gap: 1px;
+  }
+  .console-page .chart-axis {
+    margin-inline: 16px;
+    padding-left: 36px;
+  }
+  .console-page .pagination {
+    padding: 16px;
+  }
+  .console-page .pagination > span {
+    flex-basis: 100%;
+  }
+  .console-page .pagination button {
+    min-height: 44px;
+  }
+  .console-page .builtin {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0 16px 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .console-page *,
+  .console-page *::before,
+  .console-page *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+  .console-page button:active {
+    transform: none;
+  }
+}

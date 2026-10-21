@@ -109,6 +109,18 @@ async function signIn() {
   return user;
 }
 describe("控制台完整交互", () => {
+  it("登录页只保留单个密钥提示与底部短说明", () => {
+    render(<App />);
+    expect(screen.getByRole("heading", { name: "Muse Console" })).toBeTruthy();
+    expect(
+      screen.getByLabelText("管理员 Key").getAttribute("placeholder"),
+    ).toBe("管理员 Key");
+    expect(screen.queryByText("管理员 Key")).toBeNull();
+    expect(screen.queryByText("YOUR PRIVATE WORKSPACE")).toBeNull();
+    expect(screen.queryByText(/sessionStorage/)).toBeNull();
+    const caption = screen.getByText("管理账号与 API 调用");
+    expect(caption.parentElement?.lastElementChild).toBe(caption);
+  });
   it("概览窗口、任务取消确认与日志筛选发出真实契约请求", async () => {
     const user = await signIn();
     await user.click(screen.getByRole("button", { name: "调用概览" }));
@@ -139,6 +151,40 @@ describe("控制台完整交互", () => {
         expect.anything(),
       ),
     );
+  });
+  it("实例状态保持可读，主题切换不影响登录", async () => {
+    const user = await signIn();
+    expect(screen.getByText("驱动在线")).toBeTruthy();
+    const indicator = screen.getByRole("status").querySelector(".dot.online");
+    expect(indicator?.getAttribute("aria-hidden")).toBe("true");
+    expect(screen.getByText("vtest")).toBeTruthy();
+    const originalTheme = document.documentElement.dataset.theme;
+    await user.click(screen.getByRole("button", { name: "切换主题" }));
+    expect(document.documentElement.dataset.theme).not.toBe(originalTheme);
+    expect(sessionStorage.getItem("muse.console.key")).toBe("admin-test");
+    expect(screen.getByRole("button", { name: "退出控制台" })).toBeTruthy();
+  });
+  it("驱动异常时不显示在线动效标记", async () => {
+    const api = mockApi();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
+        String(input) === "/admin/status"
+          ? Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  ...status,
+                  driver: { ...status.driver, ok: false },
+                }),
+                { headers: { "Content-Type": "application/json" } },
+              ),
+            )
+          : api(input, init),
+      ),
+    );
+    await signIn();
+    expect(screen.getByText("驱动异常")).toBeTruthy();
+    expect(screen.getByRole("status").querySelector(".online")).toBeNull();
   });
   it("登录会话仅保存在 sessionStorage，退出清理", async () => {
     const user = await signIn();

@@ -16,13 +16,14 @@ import {
 } from "./api";
 import { Icon, Modal } from "./ui";
 import { LoginBrowser } from "./LoginBrowser";
+import { CredentialDevices } from "./CredentialDevices";
 const pages = ["账号池", "调用概览", "任务中心", "请求日志", "API 密钥"];
 const descriptions = [
-  "统一管理上游会话，让每一次调用都有序发生。",
-  "从真实请求中，了解服务的运行状况。",
-  "追踪异步任务，查看结果与失败原因。",
-  "每一次请求，都有迹可循。",
-  "为不同应用分配独立凭据与访问权限。",
+  "管理上游会话与请求调度。",
+  "查看请求统计与服务状态。",
+  "查看异步任务、结果与失败原因。",
+  "按状态或账号查询请求。",
+  "管理应用密钥与访问权限。",
 ];
 function printable(value: unknown) {
   return typeof value === "string" ? value : JSON.stringify(value, null, 2);
@@ -59,6 +60,7 @@ export default function App() {
     [offset, setOffset] = useState(0),
     [search, setSearch] = useState(""),
     [refresh, setRefresh] = useState(0);
+  const [devicesOpen, setDevicesOpen] = useState(false);
   const [modal, setModal] = useState<"import" | "login" | "key" | null>(null),
     [edit, setEdit] = useState<Account | null>(null),
     [keyEdit, setKeyEdit] = useState<Key | null>(null),
@@ -88,6 +90,7 @@ export default function App() {
     generation.current++;
     sessionStorage.removeItem("muse.console.key");
     setSession(null);
+    setDevicesOpen(false);
     setKey("");
     setDraft("");
     setSecret("");
@@ -290,10 +293,32 @@ export default function App() {
   }
   const themeButton = (
     <button
+      className="theme-toggle"
       onClick={() => setTheme(theme === "light" ? "dark" : "light")}
       aria-label="切换主题"
+      title={theme === "light" ? "切换深色模式" : "切换浅色模式"}
     >
-      {theme === "light" ? "深色模式" : "浅色模式"}
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        {theme === "light" ? (
+          <path d="M20.5 13a8.5 8.5 0 0 1-9.5-9.5A8.5 8.5 0 1 0 20.5 13Z" />
+        ) : (
+          <>
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" />
+          </>
+        )}
+      </svg>
+      <span>{theme === "light" ? "深色模式" : "浅色模式"}</span>
     </button>
   );
   if (!key)
@@ -307,23 +332,16 @@ export default function App() {
             void authenticate();
           }}
         >
-          <img
-            src="/assets/muse-logo.svg"
-            alt="muse.ai"
-            className="brand-logo"
-          />
-          <span className="eyebrow">MUSE2API / MANAGEMENT</span>
           <h1>Muse Console</h1>
-          <p className="muted">你的账号与调用，在同一个工作台。</p>
           <label>
-            管理员 Key
             <input
+              aria-label="管理员 Key"
+              placeholder="管理员 Key"
               required
               type="password"
               autoComplete="off"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="输入管理员 Key"
             />
           </label>
           {loginError && (
@@ -337,11 +355,7 @@ export default function App() {
           >
             {authenticating ? "验证中…" : "进入控制台"}
           </button>
-          <p className="fine">
-            凭据仅保存在当前标签页的 sessionStorage，退出即清理。
-            <br />
-            非官方管理工具，与 muse.ai 无隶属关系。
-          </p>
+          <p className="fine login-caption">管理账号与 API 调用</p>
         </form>
       </div>
     );
@@ -349,16 +363,17 @@ export default function App() {
   return (
     <div className="shell">
       <aside className="sidebar">
-        <a className="brand" href="/dashboard">
-          <img src="/assets/muse-logo.svg" alt="muse.ai" />
-          <span>Console</span>
+        <a className="brand" href="/dashboard" aria-label="Muse Console 首页">
+          <span className="brand-wordmark">
+            Muse<span>Console</span>
+          </span>
         </a>
-        <p className="side-caption">非官方管理工具</p>
         <nav aria-label="主导航">
           {pages.map((name, i) => (
             <button
               className={page === i ? "selected" : ""}
               key={name}
+              aria-current={page === i ? "page" : undefined}
               onClick={() => {
                 setPage(i);
                 setError("");
@@ -372,28 +387,64 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <div className="side-bottom">
-          <div className="driver">
-            <span className={`dot ${status?.driver.ok ? "online" : ""}`} />
-            <div>
-              {status?.driver.driver ?? "连接中"}
-              <small>
+        <div className="side-bottom" aria-label="实例与偏好">
+          <div className="instance-status" role="status">
+            <span
+              className={`dot ${status ? (status.driver.ok ? "online" : "") : "pending"}`}
+              aria-hidden="true"
+            />
+            <div className="instance-copy">
+              <span className="instance-state">
                 {status
-                  ? `v${status.version} · ${status.driver.ok ? "驱动在线" : "驱动异常"}`
-                  : "等待服务响应"}
-              </small>
+                  ? status.driver.ok
+                    ? "驱动在线"
+                    : "驱动异常"
+                  : "连接中"}
+              </span>
+              <span className="instance-meta">
+                <span>{status?.driver.driver ?? "等待服务响应"}</span>
+                {status && (
+                  <span className="instance-version">v{status.version}</span>
+                )}
+              </span>
             </div>
           </div>
-          {themeButton}
-          <button onClick={logout}>退出控制台</button>
-          <small>muse2api · 自托管工作台</small>
+          <div className="instance-actions">
+            {themeButton}
+            <button
+              className="console-logout"
+              onClick={logout}
+              aria-label="退出控制台"
+              title="退出控制台"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M10 4H5v16h5m4-12 4 4-4 4m-5-4h13" />
+              </svg>
+              <span>退出</span>
+            </button>
+          </div>
         </div>
       </aside>
-      <main>
+      <main className={page === 0 ? "pool-workspace" : undefined}>
+        {status?.driver.driver === "mock" && (
+          <div className="workspace-context">
+            <span className="environment-label">演示环境 · 模拟数据</span>
+          </div>
+        )}
         <header className="page-header">
           <div>
             <div className="eyebrow">
-              WORKSPACE / {String(page + 1).padStart(2, "0")}
+              {page === 0 ? "ACCOUNT MANAGEMENT" : "MUSE CONSOLE"}
             </div>
             <h1>{pages[page]}</h1>
             <p className="muted">{descriptions[page]}</p>
@@ -404,6 +455,9 @@ export default function App() {
             </button>
             {page === 0 && (
               <>
+                <button onClick={() => setDevicesOpen(true)}>
+                  扩展设备配对
+                </button>
                 <button onClick={() => openModal("import")}>
                   批量导入 Cookie
                 </button>
@@ -427,7 +481,7 @@ export default function App() {
         )}
         {loading && (
           <div className="loading" role="status">
-            正在同步真实数据…
+            正在同步数据…
           </div>
         )}
         {page === 0 && (
@@ -491,11 +545,14 @@ export default function App() {
             openModal={openModal}
           />
         )}
-        <div className="workspace-foot">
-          Muse Console{" "}
-          <span>非官方 muse.ai 管理工具 · 数据来自当前自托管服务</span>
-        </div>
       </main>
+      {devicesOpen && (
+        <CredentialDevices
+          api={api}
+          accounts={accounts}
+          onClose={() => setDevicesOpen(false)}
+        />
+      )}
       {modal === "login" && (
         <Modal title="连接上游账号" onClose={() => setModal(null)}>
           <form
@@ -513,8 +570,7 @@ export default function App() {
             }}
           >
             <p className="muted">
-              打开 muse.ai
-              真实登录页面。每次仅登录一个账号，验证码需要手动完成。当前驱动不支持时会显示真实错误。
+              在 muse.ai 网页逐号登录，手动完成验证码；驱动不支持时会报错。
             </p>
             <label>
               账号备注
@@ -559,8 +615,7 @@ export default function App() {
           }}
         >
           <p className="muted">
-            支持 JSON 或文本文件。先预览检查，确认后才写入账号池。Cookie
-            不在浏览器持久保存。
+            支持 JSON 或文本；预览确认后入池。Cookie 不在浏览器持久保存。
           </p>
           <label>
             选择文件
@@ -713,7 +768,7 @@ export default function App() {
                 placeholder='留空保留现有 Cookie；填写 {"name":"value"}'
               />
             </label>
-            <p className="fine">现有 Cookie 已隐藏，不会回传到此输入框。</p>
+            <p className="fine">现有 Cookie 不回传到此输入框。</p>
             <footer>
               <button type="button" onClick={() => setEdit(null)}>
                 取消

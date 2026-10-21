@@ -2,6 +2,7 @@ import { time } from "../api";
 import type { RequestRow, Setter, Detail } from "../types";
 import { Empty } from "../ui";
 import { badge } from "../status";
+import "../console-pages.css";
 
 /** 页面只渲染快照并转交操作；轮询由 App 统一负责。 */
 export function RequestsPage({
@@ -32,7 +33,7 @@ export function RequestsPage({
   setDetail: Setter<Detail | null>;
 }) {
   return (
-    <section className="panel">
+    <section className="console-page requests-page panel">
       <header>
         <h2>请求记录</h2>
         <span className="badge">{total} 条</span>
@@ -95,12 +96,16 @@ export function RequestsPage({
                 <tr key={r.id}>
                   <td data-label="时间">{time(r.ts)}</td>
                   <td data-label="请求">
-                    <strong>{r.method}</strong>
-                    <small className="mono">{r.path}</small>
+                    <div className="console-identity">
+                      <strong>{r.method}</strong>
+                      <small className="mono">{r.path}</small>
+                    </div>
                   </td>
                   <td data-label="模型 / 账号">
-                    {r.model ?? "—"}
-                    <small className="mono">{r.account_id ?? "—"}</small>
+                    <div className="console-identity">
+                      {r.model ?? "—"}
+                      <small className="mono">{r.account_id ?? "—"}</small>
+                    </div>
                   </td>
                   <td data-label="状态">
                     {badge(
@@ -114,6 +119,7 @@ export function RequestsPage({
                   </td>
                   <td data-label="详情">
                     <button
+                      className="console-action"
                       onClick={() =>
                         setDetail({ title: `请求 #${r.id}`, body: r })
                       }
@@ -127,7 +133,7 @@ export function RequestsPage({
           </table>
         </div>
       ) : (
-        <Empty text="没有符合筛选条件的请求" />
+        <Empty text="暂无匹配请求" />
       )}
       <div className="pagination">
         <span>

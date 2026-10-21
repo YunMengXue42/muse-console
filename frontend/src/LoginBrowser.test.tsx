@@ -128,3 +128,41 @@ describe("远程网页登录", () => {
     await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
   });
 });
+
+it("自动完成只通知一次，卸载不再 DELETE 或请求截图", async () => {
+  const fetcher = vi.fn(
+    async () =>
+      new Response(
+        JSON.stringify({
+          id: "auto",
+          status: "completed",
+          expires_at: Date.now() / 1000 + 60,
+          width: 1280,
+          height: 900,
+        }),
+      ),
+  );
+  vi.stubGlobal("fetch", fetcher);
+  const complete = vi.fn(),
+    notify = vi.fn();
+  const view = render(
+    <LoginBrowser
+      api={new Api("test")}
+      session={{
+        id: "auto",
+        status: "pending",
+        expires_at: Date.now() / 1000 + 600,
+        width: 1280,
+        height: 900,
+      }}
+      onClose={vi.fn()}
+      onComplete={complete}
+      notify={notify}
+    />,
+  );
+  await waitFor(() => expect(complete).toHaveBeenCalledTimes(1));
+  expect(notify).toHaveBeenCalledTimes(1);
+  window.dispatchEvent(new Event("pagehide"));
+  view.unmount();
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});

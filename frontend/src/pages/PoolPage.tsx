@@ -1,3 +1,5 @@
+import { useState } from "react";
+import "../pool-design.css";
 import type { Account } from "../api";
 import { Api, time } from "../api";
 import type { Pool, Setter, Act, ModalKind, Ask } from "../types";
@@ -36,9 +38,40 @@ export function PoolPage({
   setPage: Setter<number>;
   ask: Ask;
 }) {
+  const [filter, setFilter] = useState("all");
+  const accountStatus = (account: Account) =>
+    account.effective_status ?? account.status;
+  const available = (account: Account) =>
+    ["active", "available"].includes(accountStatus(account));
+  const attention = (account: Account) =>
+    ["invalid", "cooling", "cooldown", "disabled"].includes(
+      accountStatus(account),
+    );
+  const filters = [
+    { value: "all", label: "全部", count: accounts.length },
+    {
+      value: "available",
+      label: "可用",
+      count: accounts.filter(available).length,
+    },
+    {
+      value: "attention",
+      label: "需关注",
+      count: accounts.filter(attention).length,
+    },
+  ];
+  const visibleAccounts = accounts.filter(
+    (account) =>
+      `${account.label} ${account.id}`
+        .toLowerCase()
+        .includes(search.trim().toLowerCase()) &&
+      (filter === "all" ||
+        (filter === "available" ? available(account) : attention(account))),
+  );
+
   return (
-    <>
-      <div className="metrics">
+    <div className="pool-page">
+      <div className="pool-metrics" aria-label="账号池概览">
         {[
           ["账号总数", metrics?.total, "已接入的上游会话"],
           ["可调度", metrics?.available, "可以接收新请求"],
@@ -60,15 +93,26 @@ export function PoolPage({
           </section>
         ))}
       </div>
-      <div className="account-layout">
-        <section className="panel">
+      <div className="pool-layout">
+        <section className="panel pool-accounts" aria-label="上游账号列表">
           <header>
             <div>
               <h2>上游账号</h2>
-              <p className="muted">会话就绪后，自动参与请求调度。</p>
+              <p className="muted">就绪会话自动参与调度。</p>
             </div>
             <span className="badge">{accounts.length} 个账号</span>
           </header>
+          <div className="pool-filters" role="group" aria-label="账号状态筛选">
+            {filters.map((item) => (
+              <button
+                key={item.value}
+                aria-pressed={filter === item.value}
+                onClick={() => setFilter(item.value)}
+              >
+                {item.label} <span>{item.count}</span>
+              </button>
+            ))}
+          </div>
           <div className="table-tools">
             <input
               aria-label="搜索账号"
@@ -97,8 +141,13 @@ export function PoolPage({
             </label>
           </div>
           {accounts.length ? (
-            <div className="table-wrap">
-              <table>
+            <div
+              className="pool-table"
+              tabIndex={0}
+              role="region"
+              aria-label="账号表格，可横向滚动"
+            >
+              <table aria-label="上游账号">
                 <thead>
                   <tr>
                     {[
@@ -114,162 +163,172 @@ export function PoolPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {accounts
-                    .filter((a) =>
-                      `${a.label} ${a.id}`
-                        .toLowerCase()
-                        .includes(search.toLowerCase()),
-                    )
-                    .map((a) => (
-                      <tr key={a.id}>
-                        <td data-label="账号标识">
-                          <strong>{a.label || "未命名账号"}</strong>
-                          <small className="mono">{a.id}</small>
-                          {a.last_error && (
-                            <small className="danger-text">
-                              {a.last_error}
-                            </small>
-                          )}
-                        </td>
-                        <td data-label="状态">
-                          {badge(a.effective_status ?? a.status)}
-                        </td>
-                        <td data-label="并发" className="mono">
-                          {a.inflight ?? 0} /{" "}
-                          {a.effective_max_concurrency ?? "—"}
-                        </td>
-                        <td data-label="成功 / 失败" className="mono">
+                  {visibleAccounts.map((a) => (
+                    <tr key={a.id}>
+                      <td data-label="账号标识">
+                        <div className="pool-identity">
+                          <span className="pool-initial" aria-hidden="true">
+                            {Array.from(
+                              a.label.trim() || a.id,
+                            )[0]?.toUpperCase() || "?"}
+                          </span>
+                          <div>
+                            <strong>{a.label || "未命名账号"}</strong>
+                            <small className="mono">{a.id}</small>
+                            {a.last_error && (
+                              <small className="danger-text">
+                                {a.last_error}
+                              </small>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td data-label="状态">
+                        {badge(a.effective_status ?? a.status)}
+                      </td>
+                      <td data-label="并发" className="mono">
+                        {a.inflight ?? 0} / {a.effective_max_concurrency ?? "—"}
+                      </td>
+                      <td data-label="成功 / 失败" className="mono">
+                        <span className="pool-counts">
                           {a.success_count}{" "}
                           <span className="muted">/ {a.fail_count}</span>
-                        </td>
-                        <td data-label="最近使用">{time(a.last_used_at)}</td>
-                        <td data-label="操作">
-                          <div className="row-actions">
-                            <button
-                              onClick={() => {
-                                setEdit(a);
-                                setLabel(a.label);
-                                setCookies("");
-                              }}
-                            >
-                              编辑
-                            </button>
-                            <button
-                              disabled={busy}
-                              onClick={() =>
-                                void act(
-                                  async () => {
-                                    await api.request(
-                                      `/accounts/${a.id}`,
-                                      "PATCH",
-                                      { enabled: !a.enabled },
-                                    );
-                                  },
-                                  a.enabled ? "账号已停用" : "账号已启用",
-                                )
-                              }
-                            >
-                              {a.enabled ? "停用" : "启用"}
-                            </button>
-                            <button
-                              disabled={busy}
-                              onClick={() =>
-                                void act(async () => {
+                        </span>
+                      </td>
+                      <td data-label="最近使用">{time(a.last_used_at)}</td>
+                      <td data-label="操作">
+                        <div className="row-actions">
+                          <button
+                            onClick={() => {
+                              setEdit(a);
+                              setLabel(a.label);
+                              setCookies("");
+                            }}
+                          >
+                            编辑
+                          </button>
+                          <button
+                            disabled={busy}
+                            onClick={() =>
+                              void act(
+                                async () => {
                                   await api.request(
-                                    `/accounts/${a.id}/renew`,
-                                    "POST",
+                                    `/accounts/${a.id}`,
+                                    "PATCH",
+                                    { enabled: !a.enabled },
                                   );
-                                }, "保活请求已完成")
-                              }
-                            >
-                              保活
-                            </button>
-                            <button
-                              disabled={busy}
-                              onClick={() =>
-                                void act(async () => {
-                                  await api.request(
-                                    `/accounts/${a.id}/reset`,
-                                    "POST",
-                                  );
-                                }, "状态已重置")
-                              }
-                            >
-                              重置
-                            </button>
-                            <button
-                              className="danger-text"
-                              onClick={() =>
-                                ask(
-                                  `删除账号「${a.label || a.id}」？此操作不可撤销。`,
-                                  () =>
-                                    api.request(`/accounts/${a.id}`, "DELETE"),
-                                )
-                              }
-                            >
-                              删除
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                                },
+                                a.enabled ? "账号已停用" : "账号已启用",
+                              )
+                            }
+                          >
+                            {a.enabled ? "停用" : "启用"}
+                          </button>
+                          <button
+                            disabled={busy}
+                            onClick={() =>
+                              void act(async () => {
+                                await api.request(
+                                  `/accounts/${a.id}/renew`,
+                                  "POST",
+                                );
+                              }, "保活请求已完成")
+                            }
+                          >
+                            保活
+                          </button>
+                          <button
+                            disabled={busy}
+                            onClick={() =>
+                              void act(async () => {
+                                await api.request(
+                                  `/accounts/${a.id}/reset`,
+                                  "POST",
+                                );
+                              }, "状态已重置")
+                            }
+                          >
+                            重置
+                          </button>
+                          <button
+                            className="danger-text"
+                            onClick={() =>
+                              ask(
+                                `删除账号「${a.label || a.id}」？此操作不可撤销。`,
+                                () =>
+                                  api.request(`/accounts/${a.id}`, "DELETE"),
+                              )
+                            }
+                          >
+                            删除
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
-              {search &&
-                !accounts.some((a) =>
-                  `${a.label} ${a.id}`
-                    .toLowerCase()
-                    .includes(search.toLowerCase()),
-                ) && <Empty text="没有匹配的账号" />}
+              {!visibleAccounts.length && (
+                <div role="status">
+                  <Empty text="没有匹配的账号">
+                    <p className="muted">更换名称、ID 或清除筛选。</p>
+                    <button
+                      onClick={() => {
+                        setSearch("");
+                        setFilter("all");
+                      }}
+                    >
+                      清除筛选
+                    </button>
+                  </Empty>
+                </div>
+              )}
             </div>
           ) : (
-            <Empty text="从第一个账号开始">
+            <Empty text="暂无账号">
               <button className="primary" onClick={() => openModal("login")}>
                 登录上游账号
               </button>
             </Empty>
           )}
           <div className="panel-foot">
-            {pool
-              ? `并发上限 ${pool.max_concurrency} · 冷却 ${pool.cooldown}s · 获取超时 ${pool.acquire_timeout}s`
-              : "调度配置等待同步"}
+            <span aria-live="polite">
+              显示 {visibleAccounts.length} / {accounts.length} 个账号
+            </span>
+            <span>
+              {pool
+                ? `并发上限 ${pool.max_concurrency} · 冷却 ${pool.cooldown}s · 获取超时 ${pool.acquire_timeout}s`
+                : "调度配置等待同步"}
+            </span>
           </div>
         </section>
-        <aside className="guide">
-          <span className="eyebrow">GET STARTED</span>
-          <h2>
-            连接。验证。
-            <br />
-            开始调用。
-          </h2>
-          {[
-            [
-              "连接上游账号",
-              "逐号打开真实网页完成登录，或批量导入已有 Cookie。",
-            ],
-            [
-              "验证会话状态",
-              "账号显示可调度后即可使用。验证码需在登录页面手动完成。",
-            ],
-            [
-              "分配调用密钥",
-              "为你的应用创建独立 API Key，在调用概览追踪运行状况。",
-            ],
-          ].map(([title, body], i) => (
-            <div className="step" key={title}>
-              <span>{String(i + 1).padStart(2, "0")}</span>
-              <div>
-                <h3>{title}</h3>
-                <p>{body}</p>
+        <details className="pool-guide">
+          <summary>
+            接入说明 <span>连接账号 → 验证会话 → 分配密钥</span>
+          </summary>
+          <div className="pool-guide-steps">
+            {[
+              ["连接上游账号", "逐号网页登录，或批量导入 Cookie。"],
+              ["验证会话状态", "可调度后即可使用；验证码需手动完成。"],
+              ["分配调用密钥", "为应用创建独立 API Key。"],
+            ].map(([title, body], i) => (
+              <div className="step" key={title}>
+                <span>{String(i + 1).padStart(2, "0")}</span>
+                <div>
+                  <h3>{title}</h3>
+                  <p>{body}</p>
+                </div>
               </div>
-            </div>
-          ))}
-          <button onClick={() => setPage(4)}>管理 API 密钥 →</button>
-          <p className="fine">
-            请仅接入你有权使用的账号。Cookie 属于敏感凭据，不要公开分享。
-          </p>
-        </aside>
+            ))}
+          </div>
+          <div className="pool-guide-foot">
+            <button onClick={() => setPage(4)}>管理 API 密钥 →</button>
+            <p className="fine">
+              仅接入有权使用的账号；Cookie 是敏感凭据，勿公开分享。
+            </p>
+          </div>
+        </details>
       </div>
-    </>
+    </div>
   );
 }

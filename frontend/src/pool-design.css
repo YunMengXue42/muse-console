@@ -1,0 +1,397 @@
+/* Account-pool styles stay local; theme colors come from the console tokens. */
+.pool-page {
+  min-width: 0;
+  color: var(--ink);
+  font-size: var(--text-body);
+  line-height: 1.6;
+}
+.pool-page button,
+.pool-page input,
+.pool-page select {
+  border-radius: 8px;
+  font-size: var(--text-body);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+.pool-page button:disabled {
+  cursor: not-allowed;
+}
+.pool-page h2 {
+  font-size: var(--text-section);
+  line-height: 28px;
+  letter-spacing: 0;
+}
+.pool-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 24px;
+  padding: 20px 0;
+  border-block: 1px solid var(--line);
+}
+.pool-metrics section {
+  min-width: 0;
+  padding: 0 24px;
+  border-left: 1px solid var(--line);
+}
+.pool-metrics section:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+.pool-metrics span,
+.pool-metrics small {
+  display: block;
+  color: var(--muted);
+  font-size: var(--text-caption);
+}
+.pool-metrics strong {
+  display: block;
+  margin: 8px 0 4px;
+  font-size: var(--text-title);
+  line-height: 1.2;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.pool-metrics section:nth-child(2) strong {
+  color: var(--primary);
+}
+.pool-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+.pool-page .pool-accounts {
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.pool-page .pool-accounts > header {
+  padding: 24px 24px 20px;
+}
+.pool-page .pool-accounts > header p {
+  margin-top: 4px;
+  font-size: var(--text-caption);
+}
+.pool-page .badge {
+  font-size: var(--text-caption);
+  padding: 4px 8px;
+}
+.pool-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 24px 16px;
+}
+.pool-filters button {
+  min-height: 36px;
+  padding: 4px 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+}
+.pool-filters button:hover {
+  background: var(--soft);
+}
+.pool-filters button[aria-pressed="true"] {
+  background: var(--tint);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.pool-filters button span {
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+.pool-page .table-tools {
+  padding: 0 24px 20px;
+  gap: 16px;
+}
+.pool-page .table-tools > input {
+  flex: 1 1 240px;
+  max-width: 480px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  padding: 8px 12px;
+  min-height: 40px;
+}
+.pool-page .table-tools .inline {
+  margin: 0 0 0 auto;
+  gap: 8px;
+  font-size: var(--text-caption);
+  flex: 0 1 auto;
+}
+.pool-page .table-tools select {
+  width: auto;
+  min-width: 144px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.pool-table {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.pool-table table {
+  min-width: 960px;
+  width: 100%;
+  border-collapse: collapse;
+}
+.pool-table th,
+.pool-table td {
+  padding: 16px;
+  vertical-align: middle;
+}
+.pool-table th:first-child,
+.pool-table td:first-child {
+  padding-left: 24px;
+}
+.pool-table th:last-child,
+.pool-table td:last-child {
+  padding-right: 24px;
+}
+.pool-table th {
+  font-size: var(--text-caption);
+  font-weight: 500;
+  background: var(--bg);
+  border-block: 1px solid var(--line);
+}
+.pool-table td {
+  font-size: var(--text-body);
+  border-bottom: 1px solid var(--line);
+}
+.pool-counts {
+  display: inline-flex;
+  gap: 0.35em;
+  white-space: nowrap;
+}
+.pool-table tbody tr {
+  transition: background-color 220ms ease;
+}
+.pool-table tbody tr:hover {
+  background: color-mix(in srgb, var(--primary) 3%, var(--panel));
+}
+.pool-identity {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  min-width: 200px;
+}
+.pool-initial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+.pool-identity > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pool-identity strong {
+  display: block;
+  font-size: var(--text-body);
+  font-weight: 600;
+  max-width: 240px;
+}
+.pool-identity small {
+  font-size: var(--text-caption);
+  margin-top: 4px;
+  max-width: 240px;
+}
+.pool-page .row-actions {
+  gap: 4px;
+  flex-wrap: nowrap;
+  min-width: 220px;
+}
+.pool-page .row-actions button {
+  padding: 4px 8px;
+  min-height: 36px;
+  font-size: var(--text-caption);
+  border-radius: 8px;
+  text-decoration: none;
+}
+.pool-page .row-actions button:hover:not(:disabled) {
+  background: var(--tint);
+}
+.pool-page .panel-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 16px 24px;
+  font-size: var(--text-caption);
+}
+.pool-page .empty {
+  padding: 48px 24px;
+}
+.pool-page .empty p {
+  font-size: var(--text-caption);
+  margin: 8px 0 16px;
+}
+.pool-guide {
+  border-bottom: 1px solid var(--line);
+  padding: 0 0 16px;
+}
+.pool-guide summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 8px 0;
+  border-radius: 8px;
+}
+.pool-guide summary span {
+  margin-left: 16px;
+  color: var(--muted);
+  font-size: var(--text-caption);
+  font-weight: 400;
+}
+.pool-guide-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  padding: 16px 0;
+}
+.pool-guide .step {
+  display: flex;
+  margin: 0;
+  gap: 12px;
+}
+.pool-guide .step > span {
+  color: var(--primary);
+  font-size: var(--text-caption);
+  padding-top: 0;
+}
+.pool-guide .step h3 {
+  font-size: var(--text-body);
+}
+.pool-guide .step p {
+  font-size: var(--text-caption);
+  margin-top: 4px;
+}
+.pool-guide-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+}
+.pool-guide-foot button {
+  min-height: 36px;
+  padding: 4px 12px;
+  color: var(--primary);
+}
+@media (max-width: 800px) {
+  .pool-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 0;
+    margin-bottom: 20px;
+    padding: 16px 0;
+  }
+  .pool-metrics section {
+    padding: 0 16px;
+  }
+  .pool-metrics section:nth-child(odd) {
+    padding-left: 0;
+    border-left: 0;
+  }
+  .pool-metrics section:nth-child(n + 3) {
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+  }
+  .pool-page .pool-accounts > header {
+    padding: 20px 16px;
+  }
+  .pool-filters {
+    padding: 0 16px 16px;
+  }
+  .pool-page .table-tools {
+    padding: 0 16px 16px;
+    gap: 12px;
+  }
+  .pool-page .table-tools > input {
+    max-width: none;
+    flex-basis: 100%;
+  }
+  .pool-page .table-tools .inline {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .pool-table table,
+  .pool-table tbody {
+    display: block;
+    min-width: 0;
+  }
+  .pool-table thead {
+    display: none;
+  }
+  .pool-table tr {
+    display: block;
+    margin: 0 12px 12px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+  .pool-table td,
+  .pool-table td:first-child,
+  .pool-table td:last-child {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 8px 0;
+    border: 0;
+    font-size: var(--text-body);
+  }
+  .pool-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: var(--text-caption);
+    flex-shrink: 0;
+  }
+  .pool-table td:first-child::before {
+    display: none;
+  }
+  .pool-identity {
+    min-width: 0;
+  }
+  .pool-identity strong,
+  .pool-identity small {
+    max-width: 100%;
+  }
+  .pool-page .row-actions {
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .pool-page .row-actions button {
+    min-height: 40px;
+  }
+  .pool-page .panel-foot {
+    padding: 16px;
+  }
+  .pool-guide summary span {
+    display: block;
+    margin: 4px 0 0 16px;
+  }
+  .pool-guide-steps {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pool-page *,
+  .pool-page *::before,
+  .pool-page *::after {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}

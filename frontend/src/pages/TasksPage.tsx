@@ -2,6 +2,7 @@ import { Api, time } from "../api";
 import type { Task, Setter, Detail, Ask } from "../types";
 import { Empty } from "../ui";
 import { badge } from "../status";
+import "../console-pages.css";
 
 /** 页面只渲染快照并转交操作；轮询由 App 统一负责。 */
 export function TasksPage({
@@ -18,7 +19,7 @@ export function TasksPage({
   api: Api;
 }) {
   return (
-    <section className="panel">
+    <section className="console-page tasks-page panel">
       <header>
         <h2>最近任务</h2>
         <span className="muted">自动同步 · 最多 100 条</span>
@@ -45,6 +46,7 @@ export function TasksPage({
                   <td data-label="操作">
                     <div className="row-actions">
                       <button
+                        className="console-action"
                         onClick={() =>
                           setDetail({
                             title: `任务 ${task.id}`,
@@ -61,6 +63,7 @@ export function TasksPage({
                         task.status,
                       ) && (
                         <button
+                          className="console-caution"
                           disabled={busy}
                           onClick={() =>
                             ask(`取消任务 ${task.id}？`, async () => {

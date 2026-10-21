@@ -56,21 +56,46 @@ export interface Account {
   status: string;
   effective_status?: string;
   inflight: number;
+  max_concurrency?: number | null;
   effective_max_concurrency: number;
+  credential_version?: number;
+  created_at?: number;
   success_count: number;
   fail_count: number;
   last_used_at: number | null;
-  last_error?: string;
+  last_error?: string | null;
   cooldown_until?: number;
+  cookies?: Record<string, string>;
+  meta?: {
+    quota?: {
+      checked_at?: number;
+      remaining?: number;
+      total?: number;
+      used?: number;
+      limit?: number;
+      credits?: number;
+      reset_at?: number;
+      plan?: string;
+    };
+  };
 }
 /** 统计响应直接对应后端窗口聚合。 */
 export interface Stats {
   total: number;
   errors: number;
+  server_errors?: number;
   error_rate: number;
   latency_ms: { p50: number | null; p95: number | null };
   series: { t: number; count: number; errors: number }[];
   by_model: { model: string | null; count: number; errors: number }[];
+  by_account?: { account_id: string | null; count: number; errors: number }[];
+  by_key?: {
+    key_id: string | null;
+    key_name: string | null;
+    count: number;
+    errors: number;
+  }[];
+  by_status?: { status_code: number; count: number; errors: number }[];
 }
 /** 批量导入预览与执行使用相同结果结构。 */
 export interface ImportResult {

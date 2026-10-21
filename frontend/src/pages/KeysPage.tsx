@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { Api } from "../api";
 import type { Key, Setter, Ask, ModalKind } from "../types";
 import { Empty } from "../ui";
 import { badge } from "../status";
+import "../console-pages.css";
 
 /** 页面只渲染快照并转交操作；轮询由 App 统一负责。 */
 export function KeysPage({
@@ -21,12 +23,48 @@ export function KeysPage({
   api: Api;
   openModal: (kind: ModalKind) => void;
 }) {
+  const baseUrl = `${window.location.origin}/v1`;
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
+    "idle",
+  );
+  async function copyAddress() {
+    try {
+      await navigator.clipboard.writeText(baseUrl);
+      setCopyState("copied");
+    } catch {
+      setCopyState("failed");
+    }
+  }
   return (
-    <>
+    <div className="console-page keys-page">
+      <section
+        className="panel api-endpoint"
+        aria-labelledby="api-endpoint-title"
+      >
+        <div className="api-endpoint-copy">
+          <h2 id="api-endpoint-title">调用地址</h2>
+          <span className="muted">Base URL</span>
+        </div>
+        <div className="api-endpoint-field">
+          <input
+            aria-label="调用地址"
+            value={baseUrl}
+            readOnly
+            spellCheck={false}
+            onFocus={(event) => event.currentTarget.select()}
+          />
+          <button className="console-action" onClick={copyAddress}>
+            {copyState === "copied" ? "已复制" : "复制地址"}
+          </button>
+        </div>
+        <span className="api-endpoint-feedback" role="status">
+          {copyState === "failed" ? "复制失败，请选中地址复制" : ""}
+        </span>
+      </section>
       <section className="panel">
         <header>
           <h2>应用密钥</h2>
-          <span className="muted">明文仅在创建时显示一次</span>
+          <span className="muted console-key-hint">明文仅在创建时显示一次</span>
         </header>
         {keys.length ? (
           <div className="table-wrap">
@@ -40,7 +78,16 @@ export function KeysPage({
                     "24h 请求 / 错误",
                     "操作",
                   ].map((t) => (
-                    <th key={t}>{t}</th>
+                    <th
+                      key={t}
+                      className={
+                        ["总调用", "24h 请求 / 错误"].includes(t)
+                          ? "console-number"
+                          : undefined
+                      }
+                    >
+                      {t}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -48,19 +95,24 @@ export function KeysPage({
                 {keys.map((k) => (
                   <tr key={k.id}>
                     <td data-label="名称 / 前缀">
-                      <strong>{k.name || "未命名密钥"}</strong>
-                      <small className="mono">{k.prefix}…</small>
+                      <div className="console-identity">
+                        <strong>{k.name || "未命名密钥"}</strong>
+                        <small className="mono">{k.prefix}…</small>
+                      </div>
                     </td>
                     <td data-label="状态">
                       {badge(k.revoked ? "disabled" : "active")}
                     </td>
-                    <td data-label="总调用">{k.usage.total}</td>
-                    <td data-label="24h 请求 / 错误" className="mono">
+                    <td data-label="总调用" className="console-number">
+                      {k.usage.total}
+                    </td>
+                    <td data-label="24h 请求 / 错误" className="console-number">
                       {k.usage.requests_24h} / {k.usage.errors_24h}
                     </td>
                     <td data-label="操作">
                       <div className="row-actions">
                         <button
+                          className="console-action"
                           onClick={() => {
                             setKeyEdit(k);
                             setLabel(k.name);
@@ -69,6 +121,9 @@ export function KeysPage({
                           重命名
                         </button>
                         <button
+                          className={
+                            k.revoked ? "console-action" : "console-caution"
+                          }
                           onClick={() =>
                             ask(
                               `${k.revoked ? "恢复" : "吊销"}密钥「${k.name}」？${k.revoked ? "" : "现有应用将立即失去访问权限。"}`,
@@ -100,7 +155,7 @@ export function KeysPage({
             </table>
           </div>
         ) : (
-          <Empty text="尚未创建应用密钥">
+          <Empty text="暂无应用密钥">
             <button className="primary" onClick={() => openModal("key")}>
               创建首个密钥
             </button>
@@ -110,7 +165,7 @@ export function KeysPage({
       <section className="panel spaced">
         <header>
           <h2>内置身份</h2>
-          <span className="muted">由服务配置管理，不可在此修改</span>
+          <span className="muted">由服务配置管理，此处不可修改</span>
         </header>
         {builtin.length ? (
           <div className="builtin">
@@ -128,6 +183,6 @@ export function KeysPage({
           <Empty text="无内置身份记录" />
         )}
       </section>
-    </>
+    </div>
   );
 }

@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   build: {
-    outDir: "../src/muse2api/web",
+    outDir: "../src/muse_console/web",
     emptyOutDir: true,
     rollupOptions: { input: "dashboard.html" },
   },

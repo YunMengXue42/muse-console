@@ -1,0 +1,494 @@
+/* Refine the original Muse-like foundation without replacing its visual language. */
+:root {
+  --duration-fast: 160ms;
+  --duration-status-cycle: 2800ms;
+}
+button {
+  font-size: var(--text-body);
+  font-weight: 500;
+}
+button:disabled:active {
+  transform: none;
+}
+h1 {
+  letter-spacing: 0;
+}
+h2,
+h3 {
+  letter-spacing: 0;
+}
+.brand .brand-wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: var(--text-title);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.brand .brand-wordmark > span {
+  font-size: var(--text-lg);
+  letter-spacing: 0;
+  font-weight: 400;
+  color: var(--muted);
+}
+.sidebar > .brand {
+  margin-bottom: 32px;
+}
+.sidebar nav button {
+  font-size: var(--text-body);
+  min-height: 44px;
+}
+.nav-count {
+  font-size: var(--text-caption);
+}
+.sidebar .side-bottom {
+  display: grid;
+  gap: 16px;
+  border-top: 1px solid var(--line);
+  padding: 20px 8px 0;
+}
+.instance-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.instance-status .dot {
+  position: relative;
+  flex: 0 0 7px;
+}
+.instance-status .dot.online::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border: 1px solid var(--good);
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  animation: muse-status-pulse var(--duration-status-cycle) linear infinite;
+}
+@keyframes muse-status-pulse {
+  0% {
+    transform: scale(0.55);
+    opacity: 0;
+  }
+  16% {
+    opacity: 0.32;
+  }
+  72%,
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+.instance-status .dot.pending {
+  background: var(--muted);
+}
+.instance-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.instance-state {
+  font-size: var(--text-caption);
+  font-weight: 500;
+  color: var(--ink);
+}
+.instance-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: var(--text-caption);
+  color: var(--muted);
+}
+.instance-version {
+  padding-left: 10px;
+  border-left: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+.instance-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.instance-actions button {
+  min-height: 40px;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--text-caption);
+  font-weight: 400;
+  white-space: nowrap;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+.instance-actions button:hover {
+  background: var(--soft);
+  color: var(--ink);
+}
+.instance-actions svg {
+  flex-shrink: 0;
+}
+.instance-actions .console-logout {
+  margin-left: auto;
+}
+.instance-actions .console-logout:hover {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+@media (max-width: 800px) {
+  .sidebar .side-bottom {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 0 0;
+  }
+  .instance-actions {
+    margin-left: auto;
+  }
+  .instance-actions button {
+    min-height: 44px;
+    padding-inline: 12px;
+  }
+}
+@media (max-width: 420px) {
+  .instance-actions .theme-toggle {
+    width: 44px;
+    padding: 0;
+  }
+  .instance-actions .theme-toggle > span {
+    display: none;
+  }
+}
+.workspace-context {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+  color: var(--muted);
+  font-size: var(--text-caption);
+}
+.environment-label {
+  padding: 4px 10px;
+  background: var(--soft);
+  border-radius: 999px;
+}
+.page-header {
+  align-items: center;
+  gap: 20px;
+}
+.page-header .eyebrow {
+  display: none;
+}
+.page-header h1 {
+  margin: 0 0 10px;
+}
+.page-header p {
+  font-size: var(--text-body);
+}
+.toolbar {
+  gap: 8px;
+}
+.workspace-foot {
+  font-size: var(--text-caption);
+}
+.pool-page button,
+.pool-page input,
+.pool-page select {
+  border-radius: 999px;
+}
+.pool-page input,
+.pool-page select {
+  background: var(--soft);
+  border-color: transparent;
+}
+.pool-page .pool-metrics {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--panel);
+  padding: 24px 0;
+  margin-bottom: 28px;
+}
+.pool-page .pool-metrics section:first-child {
+  padding-left: 24px;
+}
+.pool-page .pool-metrics section {
+  border: 0;
+  position: relative;
+}
+.pool-page .pool-metrics section + section::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 15%;
+  height: 70%;
+  width: 1px;
+  background: var(--line);
+}
+.pool-page .pool-metrics strong {
+  font-size: var(--text-display);
+  font-weight: 600;
+  letter-spacing: 0;
+  margin: 10px 0 6px;
+}
+.pool-page .pool-metrics section:nth-child(2) strong {
+  color: var(--ink);
+}
+.pool-page .pool-accounts {
+  border-radius: 18px;
+}
+.pool-page h2 {
+  font-size: var(--text-section);
+  letter-spacing: 0;
+}
+.pool-page .pool-accounts > header {
+  padding-bottom: 24px;
+}
+.pool-page .pool-accounts > header p {
+  font-size: var(--text-sm);
+  margin-top: 6px;
+}
+.pool-page .pool-filters {
+  gap: 4px;
+}
+.pool-page .pool-filters button {
+  border: 0;
+  min-height: 40px;
+  padding: 8px 16px;
+}
+.pool-page .pool-filters button[aria-pressed="true"] {
+  color: var(--primary);
+  background: var(--tint);
+}
+.pool-page .pool-filters button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.pool-page .table-tools > input {
+  background: var(--soft);
+  border-color: transparent;
+  padding: 10px 16px;
+}
+.pool-page .table-tools select {
+  background: var(--soft);
+  border-color: transparent;
+}
+.pool-page .pool-table table {
+  min-width: 900px;
+}
+.pool-page .pool-table th {
+  background: var(--side);
+  border-top: 0;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.pool-page .pool-table td {
+  padding-top: 22px;
+  padding-bottom: 22px;
+}
+.pool-page .pool-initial {
+  display: none;
+}
+.pool-page .pool-identity {
+  min-width: 180px;
+}
+.pool-page .pool-identity strong {
+  font-weight: 600;
+}
+.pool-page .pool-identity small {
+  margin-top: 6px;
+  color: var(--muted);
+}
+.pool-page .row-actions {
+  gap: 2px;
+}
+.pool-page .row-actions button {
+  min-height: 36px;
+  padding-inline: 8px;
+  border-radius: 999px;
+  color: var(--muted);
+}
+.pool-page .row-actions button:first-child {
+  color: var(--primary);
+  background: var(--tint);
+  padding-inline: 14px;
+  margin-right: 6px;
+}
+.pool-page .row-actions button.danger-text {
+  color: var(--danger);
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  margin-left: 6px;
+  padding-left: 12px;
+}
+.pool-page .row-actions button:focus-visible {
+  background: var(--tint);
+}
+.pool-page .panel-foot {
+  color: var(--muted);
+  background: var(--panel);
+  padding-block: 18px;
+}
+.pool-page .pool-guide {
+  border-bottom: 0;
+  padding: 0 8px;
+}
+.pool-page .pool-guide summary {
+  color: var(--muted);
+}
+.pool-page .pool-guide summary:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+}
+.modal {
+  animation: muse-dialog-in 180ms ease-out;
+}
+@keyframes muse-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 1280px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+@media (max-width: 800px) {
+  .brand .brand-wordmark {
+    font-size: var(--text-title);
+  }
+  .sidebar > .brand {
+    margin-bottom: 0;
+  }
+  .side-bottom > button {
+    font-size: var(--text-caption);
+    min-height: 40px;
+  }
+  .side-bottom .driver,
+  .driver small {
+    font-size: var(--text-caption);
+  }
+  .workspace-context {
+    margin-bottom: 20px;
+  }
+  .page-header h1 {
+    font-size: var(--text-display);
+  }
+  .page-header button {
+    font-size: var(--text-body);
+    min-height: 44px;
+  }
+  .pool-page .pool-metrics {
+    padding: 8px 0;
+  }
+  .pool-page .pool-metrics section {
+    padding: 16px 20px;
+  }
+  .pool-page .pool-metrics section:first-child {
+    padding-left: 20px;
+  }
+  .pool-page .pool-metrics section:nth-child(3)::before {
+    display: none;
+  }
+  .pool-page .pool-table table {
+    min-width: 0;
+  }
+  .pool-page .pool-table td {
+    padding-block: 10px;
+  }
+  .pool-page .pool-table td:first-child {
+    padding-bottom: 16px;
+  }
+  .pool-page .row-actions {
+    flex-wrap: wrap;
+  }
+  .pool-page .row-actions button {
+    min-height: 44px;
+  }
+}
+.modal {
+  font-size: var(--text-body);
+  line-height: 1.65;
+}
+.modal > header h2 {
+  font-size: var(--text-section);
+}
+.modal label,
+.modal input,
+.modal select,
+.modal textarea {
+  font-size: var(--text-body);
+}
+.modal .fine,
+.modal small {
+  font-size: var(--text-caption);
+}
+.modal dd {
+  margin: 4px 0 16px;
+  overflow-wrap: anywhere;
+}
+.modal dt {
+  color: var(--muted);
+  font-size: var(--text-caption);
+}
+.modal button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+.device-pairing .modal > h3 {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+  font-size: var(--text-lg);
+}
+.device-pairing .modal > h3 + p {
+  margin: 8px 0 16px;
+}
+.device-pairing dl {
+  background: var(--side);
+  padding: 20px;
+  border-radius: 14px;
+  margin: 20px 0 12px;
+}
+.device-pairing dd:last-child {
+  margin-bottom: 0;
+}
+.device-pairing .table-wrap {
+  margin-top: 16px;
+}
+.device-pairing td,
+.device-pairing th {
+  font-size: var(--text-caption);
+  overflow-wrap: anywhere;
+}
+.device-pairing section[aria-label="操作确认"] {
+  border: 1px solid var(--line);
+  padding: 20px;
+  border-radius: 14px;
+  margin-top: 24px;
+  background: var(--side);
+}
+.device-pairing section[aria-label="操作确认"] h3 {
+  margin-bottom: 12px;
+}
+.device-pairing section[aria-label="操作确认"] button {
+  margin: 16px 8px 0 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

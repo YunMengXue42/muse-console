@@ -1,0 +1,7 @@
+Muse Console Sans UI subset
+Derived from Noto Sans CJK SC (NotoSansSC-VF.ttf), SIL Open Font License 1.1.
+Source: https://github.com/notofonts/noto-cjk/tree/main/Sans/Variable/TTF/Subset
+Subset includes console and extension UI text plus Latin characters.
+Font family renamed to Muse Console Sans. Variable weight used: 400/500/600.
+Other user-supplied characters use the system sans-serif fallback.
+See OFL.txt for upstream copyright and license.

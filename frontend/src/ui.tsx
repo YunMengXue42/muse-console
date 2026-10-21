@@ -24,7 +24,7 @@ export function Modal({
   }, []);
   return (
     <div
-      className="veil"
+      className={`veil ${title === "扩展设备配对" ? "device-pairing" : ""}`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -88,7 +88,7 @@ export function Empty({
     <div className="empty">
       <span className="empty-mark">—</span>
       <h3>{text}</h3>
-      <p>接入账号或发起 API 调用后，真实数据将在此显示。</p>
+      <p>当前无可显示内容。</p>
       {children}
     </div>
   );

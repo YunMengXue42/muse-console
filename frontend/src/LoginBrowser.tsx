@@ -23,6 +23,14 @@ export function LoginBrowser({
   const active = useRef(true),
     done = useRef(false),
     inputLock = useRef(false);
+  const callbacks = useRef({ notify, onComplete });
+  callbacks.current = { notify, onComplete };
+  function finish() {
+    if (done.current) return;
+    done.current = true;
+    callbacks.current.notify("已验证登录并加入账号池");
+    callbacks.current.onComplete();
+  }
   const expiry =
     typeof current.expires_at === "number"
       ? current.expires_at * 1000
@@ -61,6 +69,12 @@ export function LoginBrowser({
         );
         if (!active.current) return;
         setCurrent(state);
+        if (state.status === "completed") {
+          terminal = true;
+          finish();
+          return;
+        }
+        if (done.current) return;
         const until =
           typeof state.expires_at === "number"
             ? state.expires_at * 1000
@@ -100,7 +114,7 @@ export function LoginBrowser({
           }
         }
       } finally {
-        if (active.current && !terminal)
+        if (active.current && !terminal && !done.current)
           timer = setTimeout(() => void poll(), 1500);
       }
     }
@@ -112,7 +126,7 @@ export function LoginBrowser({
   }, [api, session.id]);
   /** 逐个转发输入，不保存文本；服务器失败时保持窗口便于重试。 */
   async function input(payload: unknown) {
-    if (inputLock.current || expired) return;
+    if (inputLock.current || expired || done.current) return;
     inputLock.current = true;
     setBusy(true);
     try {
@@ -126,14 +140,12 @@ export function LoginBrowser({
     }
   }
   async function complete() {
-    if (inputLock.current) return;
+    if (inputLock.current || done.current) return;
     setBusy(true);
     inputLock.current = true;
     try {
       await api.request(`/login-sessions/${session.id}/complete`, "POST", {});
-      done.current = true;
-      notify("已验证登录并加入账号池");
-      onComplete();
+      finish();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -144,8 +156,7 @@ export function LoginBrowser({
   return (
     <Modal title="上游真实网页登录" wide onClose={onClose}>
       <p className="muted">
-        这是 muse.ai
-        的真实网页登录。请逐号登录，并手动完成验证码。输入内容不在本地保存。
+        在 muse.ai 网页逐号登录，手动完成验证码；输入不在本地保存。
       </p>
       <div className="session-meta">
         <span>会话 {current.status}</span>
@@ -232,7 +243,7 @@ export function LoginBrowser({
         <button onClick={onClose}>取消登录</button>
         <button
           className="primary"
-          disabled={busy || expired}
+          disabled={busy || expired || current.status === "completed"}
           onClick={() => void complete()}
         >
           {busy ? "处理中…" : "完成验证并入池"}
