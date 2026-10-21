@@ -21,6 +21,7 @@ from ...drivers.base import ChatRequest, InputImage
 from ...errors import InvalidRequest, MuseConsoleError
 from ...services.container import Services
 from ..deps import get_services, require_api_key
+from ..heartbeat import first_with_heartbeats, is_first
 from ..schemas import ResponsesRequest, validate_message
 
 log = logging.getLogger(__name__)
@@ -230,14 +231,17 @@ async def create_response(
             user=body.user,
         )
 
-    try:
-        first = await anext(stream)
-    except StopAsyncIteration:
-        first = ""
-    except BaseException:
-        chat.cancel.set()
-        await stream.aclose()
-        raise
+    heartbeat = svc.settings.stream_heartbeat_interval
+    first = ""
+    if heartbeat <= 0:
+        try:
+            first = await anext(stream)
+        except StopAsyncIteration:
+            first = ""
+        except BaseException:
+            chat.cancel.set()
+            await stream.aclose()
+            raise
 
     async def events() -> AsyncIterator[bytes]:
         sequence = 0
@@ -270,7 +274,14 @@ async def create_response(
         )
         produced: list[str] = []
         try:
-            for delta in (first,):
+            head = first
+            if heartbeat > 0:
+                async for beat in first_with_heartbeats(stream, heartbeat):
+                    if is_first(beat):
+                        head = beat[1]
+                    else:
+                        yield beat
+            for delta in (head,):
                 if delta:
                     produced.append(delta)
                     yield emit(

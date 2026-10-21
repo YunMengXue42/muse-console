@@ -18,6 +18,7 @@ from ...drivers.base import ChatRequest, InputImage
 from ...errors import InvalidRequest, MuseConsoleError
 from ...services.container import Services
 from ..deps import get_services, require_api_key
+from ..heartbeat import first_with_heartbeats, is_first
 from ..schemas import ChatCompletionRequest, validate_message
 
 log = logging.getLogger(__name__)
@@ -99,16 +100,19 @@ async def chat_completions(
             },
         }
 
-    # Pull the first delta before committing to a 200 so that account/upstream
-    # failures surface as proper HTTP errors instead of a broken event stream.
-    try:
-        first = await anext(stream)
-    except StopAsyncIteration:
-        first = ""
-    except BaseException:
-        cancel.set()
-        await stream.aclose()
-        raise
+    heartbeat = svc.settings.stream_heartbeat_interval
+    first = ""
+    if heartbeat <= 0:
+        # Pull the first delta before committing to a 200 so that account/upstream
+        # failures surface as proper HTTP errors instead of a broken event stream.
+        try:
+            first = await anext(stream)
+        except StopAsyncIteration:
+            first = ""
+        except BaseException:
+            cancel.set()
+            await stream.aclose()
+            raise
 
     def chunk(delta: dict, finish: str | None = None) -> dict:
         return {
@@ -122,7 +126,13 @@ async def chat_completions(
     async def events() -> AsyncIterator[bytes]:
         produced = first
         try:
-            yield _sse(chunk({"role": "assistant", "content": first}))
+            if heartbeat > 0:
+                async for item in first_with_heartbeats(stream, heartbeat):
+                    if is_first(item):
+                        produced = item[1]
+                    else:
+                        yield item
+            yield _sse(chunk({"role": "assistant", "content": produced}))
             async for delta in stream:
                 produced += delta
                 yield _sse(chunk({"content": delta}))

@@ -118,6 +118,9 @@ class Settings(BaseSettings):
     # --- timeouts (seconds) ---
     chat_timeout: float = 300.0
     first_token_timeout: float = 45.0
+    # >0: streaming requests answer 200 at once and send ": keepalive" SSE comments
+    # at this interval until the first token; errors then arrive as SSE error events.
+    stream_heartbeat_interval: float = Field(default=0.0, ge=0, le=60)
     image_timeout: float = 240.0
     video_timeout: float = 600.0
     # 视频整体预算上限（默认不缩短原有 600s 语义）：只用来给"上游只回文本"
