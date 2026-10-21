@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling>=1.24"]
+requires = ["hatchling==1.27.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "muse2api"
-version = "0.3.1"
+name = "muse-console"
+version = "0.3.4"
 description = "OpenAI-compatible gateway for muse.ai with pluggable upstream drivers"
 readme = "README.md"
 license = { text = "MIT" }
@@ -15,7 +15,8 @@ dependencies = [
     "uvicorn[standard]>=0.32",
     "pydantic>=2.9",
     "pydantic-settings>=2.5",
-    "httpx[socks]>=0.27",
+    "httpx[socks]>=0.27,<0.29",
+    "httpcore>=1.0.9,<1.1",
     "websockets>=13.0",
     "python-multipart>=0.0.9",
     "cryptography>=44",
@@ -35,13 +36,14 @@ dev = [
 ]
 
 [project.scripts]
-muse2api = "muse2api.__main__:main"
+muse-console = "muse_console.__main__:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/muse2api"]
+packages = ["src/muse_console"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
