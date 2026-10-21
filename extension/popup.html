@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>同步状态 · Muse Console</title>
+    <link rel="stylesheet" href="ui.css" />
+  </head>
+  <body class="popup-page">
+    <main class="popup-shell">
+      <header class="page-header">
+        <div class="brand">Muse <span>Console</span></div>
+        <span class="badge">扩展</span>
+      </header>
+      <section class="panel" aria-labelledby="popup-title">
+        <header class="section-heading">
+          <div>
+            <h1 id="popup-title">同步状态</h1>
+            <p class="fine">设备配对与同步结果</p>
+          </div>
+        </header>
+        <pre id="status" class="readout" role="status" aria-live="polite">
+正在读取状态…</pre>
+        <p class="fine status-note">不显示秘密。</p>
+      </section>
+      <button id="options" class="primary popup-action">
+        配对与授权设置 <span aria-hidden="true">→</span>
+      </button>
+      <p class="fine popup-foot">授权后，Muse 会话才会自动发送至配对服务器</p>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

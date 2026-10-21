@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>扩展静态演示 · Muse Console</title>
+    <link rel="stylesheet" href="ui.css" />
+  </head>
+  <body>
+    <main class="preview-shell">
+      <header class="page-header">
+        <div class="brand">Muse <span>Console</span></div>
+        <span class="badge">静态演示 · 非真实扩展</span>
+      </header>
+      <div class="preview-intro">
+        <h1>扩展界面预览</h1>
+        <p>
+          静态演示，不操作真实扩展，不读取或发送凭据，不连接接收服务器或配对。
+        </p>
+        <p class="fine">
+          仅用示例数据；复用本地页面和样式，移除页面脚本并禁用控件。
+        </p>
+      </div>
+      <nav class="preview-tabs" aria-label="选择预览界面">
+        <button
+          type="button"
+          data-page="options"
+          aria-pressed="true"
+          aria-controls="preview"
+        >
+          设置页
+        </button>
+        <button
+          type="button"
+          data-page="popup"
+          aria-pressed="false"
+          aria-controls="preview"
+        >
+          弹出面板
+        </button>
+      </nav>
+      <p id="preview-message" class="fine" role="status">正在载入静态预览…</p>
+      <iframe
+        id="preview"
+        class="preview-frame"
+        title="设置页静态演示（控件禁用）"
+        sandbox=""
+        hidden
+      ></iframe>
+      <p id="preview-error" class="preview-error" role="alert" hidden>
+        请通过本地 HTTP 服务打开 extension/preview.html，不支持
+        file://，无需安装扩展。
+      </p>
+      <noscript>请启用 JavaScript 载入静态预览；不调用扩展 API。</noscript>
+    </main>
+    <script>
+      const frame = document.getElementById("preview");
+      const message = document.getElementById("preview-message");
+      const error = document.getElementById("preview-error");
+      const buttons = document.querySelectorAll("[data-page]");
+      let request = 0;
+
+      async function show(page) {
+        const current = ++request;
+        const popup = page === "popup";
+        buttons.forEach((button) => {
+          button.setAttribute(
+            "aria-pressed",
+            String(button.dataset.page === page),
+          );
+        });
+        frame.hidden = true;
+        error.hidden = true;
+        message.textContent = "正在载入静态预览…";
+        try {
+          const response = await fetch(new URL(`${page}.html`, location.href));
+          if (!response.ok) throw new Error("本地页面不可用");
+          const doc = new DOMParser().parseFromString(
+            await response.text(),
+            "text/html",
+          );
+          doc.querySelectorAll("script").forEach((script) => script.remove());
+          doc.querySelectorAll("*").forEach((element) => {
+            for (const attribute of [...element.attributes]) {
+              if (attribute.name.startsWith("on"))
+                element.removeAttribute(attribute.name);
+            }
+          });
+          doc.querySelectorAll("link[rel='stylesheet']").forEach((link) => {
+            link.setAttribute("href", new URL("ui.css", location.href).href);
+          });
+          doc
+            .querySelectorAll("button, input, select, textarea")
+            .forEach((control) => {
+              control.disabled = true;
+            });
+          const identity = doc.getElementById("identity");
+          if (identity) {
+            identity.textContent =
+              "【演示身份】\norigin: https://demo.invalid\nserver_id: DEMO-SERVER\nfingerprint: DEMO-NOT-A-REAL-FINGERPRINT";
+            doc.getElementById("origin").value = "https://demo.invalid";
+          }
+          doc.getElementById("status").textContent =
+            "【演示状态】\n配对：已配对\n接收方：https://demo.invalid\n自动同步：已暂停\n待传候选：无\n无真实凭据。";
+          if (current !== request) return;
+          frame.classList.toggle("is-popup", popup);
+          frame.title = `${popup ? "弹出面板" : "设置页"}静态演示（控件禁用）`;
+          frame.srcdoc = "<!doctype html>\n" + doc.documentElement.outerHTML;
+          frame.hidden = false;
+          message.textContent = "静态演示 · 控件禁用 · 非真实状态";
+        } catch {
+          if (current !== request) return;
+          error.hidden = false;
+          message.textContent = "静态预览未载入。";
+        }
+      }
+      buttons.forEach((button) => {
+        button.addEventListener("click", () => show(button.dataset.page));
+      });
+      void show("options");
+    </script>
+  </body>
+</html>
