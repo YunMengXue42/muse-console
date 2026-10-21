@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import aclosing, asynccontextmanager
 from typing import TypeVar
 
 from ..accounts.model import Account
 from ..accounts.pool import AccountPool, Lease
+from ..core import metrics
 from ..drivers.base import ChatRequest, ImageRequest, MediaResult, MuseDriver, VideoRequest
 from ..errors import UpstreamError
 from .request_log import note_account
@@ -75,16 +77,22 @@ class Gateway:
             for attempt in range(self.max_failover + 1):
                 async with self._lease(tried, req.conversation_hint) as lease:
                     emitted = False
+                    started = time.monotonic()
+                    account_id = lease.account.id
                     try:
                         async with aclosing(
                             self.driver.chat_stream(lease.account, req)
                         ) as upstream:
                             async for delta in upstream:
+                                if delta and not emitted:
+                                    metrics.first_token(time.monotonic() - started, account_id)
                                 if delta:
                                     emitted = True
                                 yield delta
+                        metrics.upstream_result("chat", account_id, True)
                         return
                     except UpstreamError as exc:
+                        metrics.upstream_result("chat", account_id, False, exc.code)
                         lease.fail(exc)
                         tried.append(lease.account.id)
                         # Once text reached the client we cannot transparently switch accounts.
@@ -100,19 +108,26 @@ class Gateway:
         hint: str | None = None,
         *,
         retry: bool = True,
+        op: str = "media",
     ) -> T:
         # Media failures can mean a submission succeeded but its result is unknown,
         # or only part of a multi-image request completed. Never replay the call
         # without an explicit driver contract confirming that nothing was submitted.
         async with self._lease([], hint) as lease:
+            started = time.monotonic()
             try:
-                return await fn(lease.account)
+                result = await fn(lease.account)
             except UpstreamError as exc:
+                metrics.upstream_result(op, lease.account.id, False, exc.code)
+                metrics.generation(op, time.monotonic() - started, False)
                 lease.fail(exc)
                 raise
+            metrics.upstream_result(op, lease.account.id, True)
+            metrics.generation(op, time.monotonic() - started, True)
+            return result
 
     async def generate_image(self, req: ImageRequest) -> list[MediaResult]:
-        return await self._run(lambda acc: self.driver.generate_image(acc, req))
+        return await self._run(lambda acc: self.driver.generate_image(acc, req), op="image")
 
     async def generate_video(self, req: VideoRequest) -> MediaResult:
-        return await self._run(lambda acc: self.driver.generate_video(acc, req))
+        return await self._run(lambda acc: self.driver.generate_video(acc, req), op="video")

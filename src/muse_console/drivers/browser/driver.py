@@ -22,6 +22,7 @@ from urllib.parse import urlsplit
 from ...accounts.credentials import project_records, records_to_cdp
 from ...accounts.model import Account
 from ...config import Settings
+from ...core import metrics
 from ...core.prompt import followup_text
 from ...core.safe_download import download_public_media
 from ...errors import (
@@ -1134,6 +1135,7 @@ class BrowserDriver(MuseDriver):
                         # an image gallery (raw, QC crops and final mixed together), or
                         # when it recognises a repeat request and points at the earlier
                         # file. Asking once gets the final file attached in chat.
+                        metrics.media_outcome(kind, "attachment_requested")
                         log.info(
                             "%s not attached (%s); code=attachment_requested reply_chars=%d",
                             kind,
@@ -1157,6 +1159,7 @@ class BrowserDriver(MuseDriver):
                     probe = await tab.session.evaluate(dom.LAST_BUBBLE_MEDIA) or {}
                     url = self._pick_media_url(probe.get("links", []), kind)
                     if url:
+                        metrics.media_outcome(kind, "media_link_detected")
                         log.info("%s code=media_link_detected", kind)
                         return {"src": url, "kind": kind}
                     log.info(
@@ -1166,9 +1169,11 @@ class BrowserDriver(MuseDriver):
                         len(probe.get("links", [])),
                         len(probe.get("html", "")),
                     )
+                    metrics.media_outcome(kind, "media_missing")
                     raise UpstreamRefused("upstream replied with text only (code=media_missing)")
             else:
                 text_done_at = None
+        metrics.media_outcome(kind, "timeout")
         if busy:
             log.warning("%s still generating after %.0fs; giving up", kind, elapsed)
         raise UpstreamTimeout(f"{kind} generation timed out")
@@ -1330,6 +1335,7 @@ class BrowserDriver(MuseDriver):
                 except UpstreamRefused:
                     left = deadline - time.monotonic()
                     if attempt <= retries and left >= self._VIDEO_RETRY_MIN_LEFT:
+                        metrics.media_outcome(kind, "retry_text_only")
                         log.info(
                             "%s re-submitting after text-only reply; "
                             "code=retry_text_only attempt=%d left=%.0fs",
@@ -1340,6 +1346,9 @@ class BrowserDriver(MuseDriver):
                         continue
                     raise
                 result = await self._download(tab, att, kind)
+                metrics.media_outcome(
+                    kind, "succeeded" if attempt == 1 else "succeeded_after_retry"
+                )
                 finished = True
                 return result
         except CDPError:

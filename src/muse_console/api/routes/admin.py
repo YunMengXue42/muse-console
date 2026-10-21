@@ -6,6 +6,7 @@ import time
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 from ... import __version__
@@ -245,3 +246,20 @@ async def stats(
     window: Literal["1h", "24h", "7d"] = "24h", svc: Services = Depends(get_services)
 ) -> dict:
     return {"now": time.time(), **await svc.requests.stats(window)}
+
+
+@router.get("/metrics", include_in_schema=False)
+async def prometheus_metrics(svc: Services = Depends(get_services)) -> PlainTextResponse:
+    """Prometheus text exposition; process-local, resets on restart."""
+    from ...core import metrics
+
+    pool = svc.pool.stats()
+    gauges = [
+        "# HELP muse_pool_accounts Accounts in the pool by state.",
+        "# TYPE muse_pool_accounts gauge",
+    ]
+    for state, value in sorted(pool.items()):
+        if isinstance(value, int | float) and not isinstance(value, bool):
+            gauges.append(f'muse_pool_accounts{{state="{state}"}} {value}')
+    body = metrics.render() + "\n".join(gauges) + "\n"
+    return PlainTextResponse(body, media_type="text/plain; version=0.0.4")
