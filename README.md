@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/Python-3.10%2B-blue?logo=python" alt="Python" />
   <img src="https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi" alt="FastAPI" />
   <img src="https://img.shields.io/badge/API-OpenAI%20Compatible-green" alt="OpenAI Compatible" />
-  <img src="https://img.shields.io/badge/status-v0.3.1%20console-blue" alt="Status" />
+  <img src="https://img.shields.io/badge/status-v0.3.5%20console-blue" alt="Status" />
   <img src="https://img.shields.io/badge/License-MIT-lightgrey" alt="License" />
 </p>
 
@@ -42,7 +42,7 @@ The project focuses on **clean engineering and easy collaboration**:
 
 ## Status
 
-> **v0.3.1, Muse Console rebuild**: account scheduling, encrypted persistence, batch import, isolated manual browser login and a React/TypeScript console are implemented. Offline regression tests exercise the real service boundaries with fake upstreams; successful live Muse authentication and generation are not implied by those tests.
+> **v0.3.5**: adds optional streaming heartbeats, Prometheus metrics at `/admin/metrics` and automatic re-submission when a video reply arrives as text only. **v0.3.1, Muse Console rebuild**: account scheduling, encrypted persistence, batch import, isolated manual browser login and a React/TypeScript console are implemented. Offline regression tests exercise the real service boundaries with fake upstreams; successful live Muse authentication and generation are not implied by those tests.
 
 | Module | Status | Notes |
 |---|---|---|
@@ -427,8 +427,8 @@ All reserved modules and outstanding work are tracked in **[TODO.md](TODO.md)**,
 
 - **Live verification (do first)**: run live regression for the exact hardening revision, then multi-account load and 72-hour renewal observation. Earlier real-account samples are not substitutes.
 - **Drivers**: direct HTTP protocol driver, conversation thread reuse, quota lookup.
-- **Protocol**: official SDK acceptance for the implemented subset, mask-based inpainting and streaming heartbeats. Tool calling is not currently supported.
-- **Accounts, admin and operations**: 72-hour renewal acceptance, multi-account load validation, per-key quotas/rate limits and Prometheus metrics. Distributed scheduling is outside the single-worker contract.
+- **Protocol**: official SDK acceptance for the implemented subset and mask-based inpainting. Streaming heartbeats are available via `MUSE_CONSOLE_STREAM_HEARTBEAT_INTERVAL` (off by default). Tool calling is not currently supported.
+- **Accounts, admin and operations**: 72-hour renewal acceptance, multi-account load validation, per-key quotas/rate limits. Process-local Prometheus metrics are served at `/admin/metrics` (admin key). Distributed scheduling is outside the single-worker contract.
 
 Each task lists its location, approach and definition of done. Places marked `TODO(contributors)` in the code are the reserved extension points.
 

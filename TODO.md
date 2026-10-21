@@ -26,14 +26,14 @@ Priorities: **P0** must be done first · **P1** core feature · **P2** better ex
 | C1 | `/v1/responses` endpoint | P1 | `api/routes/responses.py` | | Done: streamed Responses events; official SDK run pending |
 | C2 | `/v1/images/edits` endpoint | P1 | `api/routes/images.py` | | Done: multipart references, `mask` rejected |
 | C3 | Emulated tool calling | P2 | `core/prompt.py` | | Not started |
-| C4 | Streaming heartbeats to avoid client timeouts | P2 | `api/routes/chat.py` | | Not started |
+| C4 | Streaming heartbeats to avoid client timeouts | P2 | `api/heartbeat.py` | | Done in 0.3.5: opt-in `MUSE_CONSOLE_STREAM_HEARTBEAT_INTERVAL` |
 | D1 | Support more cookie import formats | P1 | `services/account_manager.py` | | Done: JSON, browser export, Netscape, header lines |
 | D2 | Cookie import browser extension | P2 | `extension/` | | Implemented; previous independent-browser transfer/sync passed; HTTPS re-pair and 72h observation pending |
 | D3 | Web admin console | P2 | `frontend/` / `web/` | | Implemented; previous rendered acceptance passed; style unchanged |
 | D4 | SQLite / Redis storage backends | P3 | `accounts/store.py` | | Encrypted SQLite done; Redis out of scope |
 | E1 | Automatic media cleanup | P2 | `core/media.py` | | Done: optional retention cleanup |
 | E2 | Multiple API keys and rate limiting | P3 | `api/deps.py` | | Multiple keys and task/media ownership implemented; per-key quota/rate limiting pending |
-| E3 | Observability (metrics, logs) | P3 | `observability/` (new) | | Not started |
+| E3 | Observability (metrics, logs) | P3 | `core/metrics.py` | | Metrics done in 0.3.5 (`/admin/metrics`); per-request IDs pending |
 
 ---
 
@@ -120,7 +120,8 @@ Done. A follow-up whose `messages` continue the conversation already on the page
 - muse.ai has no native function calling. The idea is to describe the available tools and an output format in the prompt, parse tool calls out of the reply, and convert them to OpenAI's `tool_calls` format.
 - muse.ai may refuse to follow the requested format, so verify feasibility first and ship it behind a config flag that is off by default.
 
-### C4 Streaming heartbeats to avoid client timeouts · P2
+### C4 Streaming heartbeats to avoid client timeouts · P2 · Done (0.3.5)
+- Set `MUSE_CONSOLE_STREAM_HEARTBEAT_INTERVAL` (seconds, `0` = off) to answer 200 at once on `/v1/chat/completions` and `/v1/responses` streams and send `: keepalive` comments until the first token. Errors are then reported in-stream.
 - Streaming requests wait for the first chunk before responding, which can take up to 45 seconds (`first_token_timeout`). Some clients and reverse proxies time out in the meantime.
 - Approach: optionally return 200 immediately and send SSE comment lines (`: keepalive`) as heartbeats while waiting. The trade-off is that errors can then no longer be reported as HTTP status codes.
 
@@ -161,6 +162,7 @@ Done. A follow-up whose `messages` continue the conversation already on the page
 - Client keys already support create/revoke/rename and usage statistics; tasks and media are key-owned.
 - Remaining: per-key rate/queue/usage quotas. Global process-local safety budgets are not per-key billing.
 
-### E3 Observability · P3
+### E3 Observability · P3 · Metrics done (0.3.5)
+- `/admin/metrics` (admin key) exposes `muse_chat_first_token_seconds`, `muse_generation_seconds`, `muse_upstream_requests_total` (per account/result), `muse_media_outcomes_total` (attachment_requested / retry_text_only / media_missing / timeout / succeeded…) and `muse_pool_accounts`. Process-local; resets on restart.
 - Expose Prometheus metrics: request count, latency, first-token latency, per-account success/failure counts, queue wait time.
 - Structured request logs with a unique ID per request for troubleshooting.
