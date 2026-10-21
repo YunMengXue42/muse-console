@@ -3,9 +3,9 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from muse2api.app import create_app
-from muse2api.config import Settings
-from muse2api.drivers.mock import MockDriver
+from muse_console.app import create_app
+from muse_console.config import Settings
+from muse_console.drivers.mock import MockDriver
 
 API_KEY = "test-key"
 ADMIN_KEY = "admin-key"

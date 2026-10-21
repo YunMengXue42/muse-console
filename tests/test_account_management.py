@@ -6,9 +6,9 @@ import stat
 
 import pytest
 
-from muse2api.accounts import Account, AccountPool, JsonAccountStore, SQLiteAccountStore
-from muse2api.services.account_manager import AccountManager
-from muse2api.upstream.muse import SESSION_COOKIES
+from muse_console.accounts import Account, AccountPool, JsonAccountStore, SQLiteAccountStore
+from muse_console.services.account_manager import AccountManager
+from muse_console.upstream.muse import SESSION_COOKIES
 
 
 def cookies(value="private-session"):
@@ -123,7 +123,7 @@ async def test_update_validates_without_mutating_original(tmp_path):
     account = Account(cookies=cookies())
     await pool.upsert(account)
     with pytest.raises(ValueError):
-        await manager.update(account.id, cookies={"hatch_sess": "bad"})
+        await manager.update(account.id, cookies={"hatch_vml": "bad"})
     with pytest.raises(ValueError):
         await manager.update(account.id, max_concurrency=17)
     assert pool.get(account.id).cookies == cookies()
@@ -146,8 +146,8 @@ async def test_pool_routes_auth_preview_strategy(tmp_path):
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
-    from muse2api.api.routes.account_pool import router
-    from muse2api.errors import Unauthorized
+    from muse_console.api.routes.account_pool import router
+    from muse_console.errors import Unauthorized
 
     pool = AccountPool(store(tmp_path))
     app = FastAPI()
@@ -229,8 +229,8 @@ def test_public_quota_is_strict_allowlist():
 
 @pytest.mark.parametrize("error", [None, "auth"])
 async def test_old_lease_cannot_change_new_credentials(tmp_path, error):
-    from muse2api.accounts import AccountStatus
-    from muse2api.errors import UpstreamAuthError
+    from muse_console.accounts import AccountStatus
+    from muse_console.errors import UpstreamAuthError
 
     pool = AccountPool(store(tmp_path))
     manager = AccountManager(pool)
@@ -259,16 +259,17 @@ async def test_patch_null_and_empty_validation(tmp_path):
 
 async def test_pool_rejects_complete_duplicates_but_keeps_legacy(tmp_path):
     pool = AccountPool(store(tmp_path))
-    await pool.upsert(Account(cookies={"hatch_sess": "legacy"}))
-    await pool.upsert(Account(cookies={"hatch_sess": "legacy"}))
+    legacy = {"hatch_vml": "legacy"}
+    await pool.upsert(Account(cookies=legacy))
+    await pool.upsert(Account(cookies=legacy))
     await pool.upsert(Account(cookies=cookies()))
     with pytest.raises(ValueError, match="duplicate"):
         await pool.upsert(Account(cookies=cookies()))
 
 
 async def test_renew_does_not_overwrite_concurrent_update(tmp_path):
-    from muse2api.accounts.keepalive import renew_account
-    from muse2api.drivers.base import SessionInfo
+    from muse_console.accounts.keepalive import renew_account
+    from muse_console.drivers.base import SessionInfo
 
     pool = AccountPool(store(tmp_path))
     manager = AccountManager(pool)

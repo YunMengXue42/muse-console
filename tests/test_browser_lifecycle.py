@@ -9,12 +9,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from muse2api.accounts.model import Account
-from muse2api.config import Settings
-from muse2api.drivers.browser.cdp import CDPError, CDPSession
-from muse2api.drivers.browser.chromium import ChromiumProcess, find_chromium
-from muse2api.drivers.browser.driver import BrowserDriver
-from muse2api.upstream import muse
+from muse_console.accounts.model import Account
+from muse_console.config import Settings
+from muse_console.drivers.browser.cdp import CDPError, CDPSession
+from muse_console.drivers.browser.chromium import ChromiumProcess, find_chromium
+from muse_console.drivers.browser.driver import BrowserDriver
+from muse_console.upstream import muse
 
 
 class FakeBrowser:
@@ -222,9 +222,9 @@ def test_find_windows_browser_in_program_files(monkeypatch, tmp_path):
     expected = root / "Google/Chrome/Application/chrome.exe"
     monkeypatch.setenv("PROGRAMFILES", str(root))
     monkeypatch.setattr(
-        "muse2api.drivers.browser.chromium.os.path.isfile", lambda path: path == str(expected)
+        "muse_console.drivers.browser.chromium.os.path.isfile", lambda path: path == str(expected)
     )
-    monkeypatch.setattr("muse2api.drivers.browser.chromium.shutil.which", lambda _: None)
+    monkeypatch.setattr("muse_console.drivers.browser.chromium.shutil.which", lambda _: None)
     assert find_chromium() == str(expected)
 
 
@@ -384,7 +384,222 @@ async def test_no_sandbox_flag_follows_explicit_setting(
     async def no_wait(_seconds):
         return None
 
+    async def no_endpoint():
+        # A Windows launcher exiting 0 is still considered alive. This flag-only
+        # test must never probe a real local endpoint while waiting for startup.
+        return None
+
+    monkeypatch.setattr(process, "browser_ws_url", no_endpoint)
     monkeypatch.setattr(asyncio, "sleep", no_wait)
     with pytest.raises(RuntimeError):
         await process.start()
     assert ("--no-sandbox" in args) is expected
+
+
+@pytest.mark.parametrize("main_tree", [True, False])
+async def test_unsafe_profile_rejected_before_mkdir_or_launch(tmp_path, monkeypatch, main_tree):
+    from muse_console.drivers.browser import profile_safety
+
+    root = tmp_path / "main/User Data"
+    monkeypatch.setattr(profile_safety, "_known_profile_roots", lambda: (root,))
+    profile = root / "Default" if main_tree else tmp_path / "redirect/profile"
+    if not main_tree:
+        import stat
+        from pathlib import Path
+
+        original = Path.lstat
+
+        def lstat(path, *args, **kwargs):
+            if path == tmp_path / "redirect":
+                return SimpleNamespace(
+                    st_mode=stat.S_IFDIR, st_file_attributes=stat.FILE_ATTRIBUTE_REPARSE_POINT
+                )
+            return original(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "lstat", lstat)
+    process = ChromiumProcess("not-a-browser", 0, profile)
+
+    async def forbidden(*args, **kwargs):
+        pytest.fail("unsafe profile must not launch or inspect an endpoint")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", forbidden)
+    monkeypatch.setattr(process, "browser_ws_url", forbidden)
+    with pytest.raises(ValueError):
+        await process.start()
+    assert not profile.exists()
+
+
+@pytest.mark.parametrize("lock", ["SingletonLock", "SingletonSocket", "SingletonCookie"])
+async def test_profile_locks_are_never_removed(tmp_path, monkeypatch, lock):
+    profile = tmp_path / "owned"
+    profile.mkdir()
+    marker = profile / lock
+    marker.write_text("untouched", encoding="utf-8")
+    process = ChromiumProcess("not-a-browser", 0, profile)
+
+    async def forbidden(*args, **kwargs):
+        pytest.fail("locked profiles must not launch or inspect an endpoint")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", forbidden)
+    monkeypatch.setattr(process, "browser_ws_url", forbidden)
+    with pytest.raises(RuntimeError, match="refusing to remove"):
+        await process.start()
+    assert marker.read_text(encoding="utf-8") == "untouched"
+
+
+async def test_unowned_or_exited_process_never_probes_port(tmp_path, monkeypatch):
+    import httpx
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("must not inspect an unowned or exited process endpoint")
+
+    monkeypatch.setattr(httpx, "AsyncClient", forbidden)
+    process = ChromiumProcess("not-a-browser", 19210, tmp_path / "owned")
+    assert await process.browser_ws_url() is None
+    await process.stop()
+    # A POSIX Chromium is the browser itself, so its exit is final.
+    monkeypatch.setattr("muse_console.drivers.browser.chromium.sys.platform", "linux")
+    process.proc = SimpleNamespace(returncode=0)
+    assert await process.browser_ws_url() is None
+    await process.stop()
+    assert process.proc is None
+
+
+async def test_windows_launcher_exit_keeps_the_browser_alive(tmp_path, monkeypatch):
+    monkeypatch.setattr("muse_console.drivers.browser.chromium.sys.platform", "win32")
+    process = ChromiumProcess("chrome.exe", 19210, tmp_path / "owned")
+    process.proc = SimpleNamespace(returncode=0)
+    # chrome.exe detaches the real browser and exits 0: not evidence of death.
+    assert process.exited is False
+    process.proc = SimpleNamespace(returncode=3)
+    assert process.exited is True
+    process.proc = SimpleNamespace(returncode=None)
+    assert process.exited is False
+    process.proc = None
+    assert process.exited is True
+
+
+async def test_timeout_kills_only_owned_process_handle(tmp_path):
+    calls = []
+
+    class OwnedProcess:
+        pid = 12345
+        returncode = None
+
+        def terminate(self):
+            calls.append(("terminate", self.pid))
+
+        def kill(self):
+            calls.append(("kill", self.pid))
+            self.returncode = -9
+
+        async def wait(self):
+            if self.returncode is None:
+                raise asyncio.TimeoutError
+            return self.returncode
+
+    process = ChromiumProcess("not-a-browser", 19210, tmp_path / "owned")
+    process.proc = OwnedProcess()
+    await process.stop()
+    await process.stop()
+    assert calls == [("terminate", 12345), ("kill", 12345)]
+    assert process.proc is None
+
+
+@pytest.mark.parametrize("contents", ["browser", "legacy", "invalid-marker", "marker-directory"])
+async def test_nonempty_unknown_profile_never_claimed(tmp_path, monkeypatch, contents):
+    from muse_console.drivers.browser.profile_safety import PROFILE_MARKER
+
+    profile = tmp_path / "data/browser-profile"
+    profile.mkdir(parents=True)
+    if contents == "browser":
+        (profile / "Local State").write_bytes(b"fake state")
+        (profile / "Default").mkdir()
+    elif contents == "legacy":
+        (profile / "Preferences").write_bytes(b"legacy project profile")
+    elif contents == "marker-directory":
+        (profile / PROFILE_MARKER).mkdir()
+    else:
+        (profile / PROFILE_MARKER).write_bytes(b"not a valid marker")
+    before = {p.name: p.read_bytes() if p.is_file() else None for p in profile.iterdir()}
+
+    async def forbidden(*args, **kwargs):
+        pytest.fail("must not launch or probe an unknown profile")
+
+    process = ChromiumProcess("fake-browser", 0, profile)
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", forbidden)
+    monkeypatch.setattr(process, "browser_ws_url", forbidden)
+    with pytest.raises(ValueError, match="manually"):
+        await process.start()
+    assert {p.name: p.read_bytes() if p.is_file() else None for p in profile.iterdir()} == before
+    assert process.proc is None
+
+
+@pytest.mark.parametrize("preexisting", [False, True])
+async def test_empty_profile_claim_and_owned_restarts(tmp_path, monkeypatch, preexisting):
+    from muse_console.drivers.browser.profile_safety import PROFILE_MARKER, validate_owned_paths
+
+    profile = tmp_path / "owned"
+    if preexisting:
+        profile.mkdir()
+    calls = []
+
+    class Owned:
+        pid = 45678
+        returncode = None
+
+        def terminate(self):
+            calls.append(("terminate", self.pid))
+            self.returncode = 0
+
+        async def wait(self):
+            return self.returncode
+
+    async def launch(*args, **kwargs):
+        assert (profile / PROFILE_MARKER).is_file()
+        calls.append(("launch", 45678))
+        return Owned()
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", launch)
+    process = ChromiumProcess("fake-browser", 0, profile)
+
+    async def endpoint():
+        return f"ws://127.0.0.1:{process.port}/devtools/browser/owned"
+
+    monkeypatch.setattr(process, "browser_ws_url", endpoint)
+    await process.start()
+    marker_bytes = (profile / PROFILE_MARKER).read_bytes()
+    assert marker_bytes
+    await process.stop()
+    # A service-owned browser can populate the directory and reuse its marker.
+    (profile / "Local State").write_bytes(b"fake service state")
+    (profile / "Default").mkdir()
+    validate_owned_paths(profile, profile)
+    await process.start()
+    await process.stop()
+    await process.stop()
+    assert (profile / PROFILE_MARKER).read_bytes() == marker_bytes
+    assert calls == [("launch", 45678), ("terminate", 45678)] * 2
+
+
+async def test_marker_exclusive_creation_race_fails_closed(tmp_path, monkeypatch):
+    from muse_console.drivers.browser import profile_safety
+
+    profile = tmp_path / "owned"
+    original = profile_safety.os.open
+
+    def racing_open(path, flags, mode=0o777):
+        if str(path).endswith(profile_safety.PROFILE_MARKER):
+            assert flags & profile_safety.os.O_EXCL
+            path.write_bytes(b"other writer")
+        return original(path, flags, mode)
+
+    async def forbidden(*args, **kwargs):
+        pytest.fail("failed marker claim must not launch")
+
+    monkeypatch.setattr(profile_safety.os, "open", racing_open)
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", forbidden)
+    process = ChromiumProcess("fake-browser", 0, profile)
+    with pytest.raises(ValueError, match="exclusively claim"):
+        await process.start()
+    assert (profile / profile_safety.PROFILE_MARKER).read_bytes() == b"other writer"

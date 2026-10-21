@@ -7,9 +7,9 @@ import itertools
 
 import pytest
 
-from muse2api.accounts import Account
-from muse2api.config import Settings
-from muse2api.drivers.browser.driver import BrowserDriver, _Tab
+from muse_console.accounts import Account
+from muse_console.config import Settings
+from muse_console.drivers.browser.driver import BrowserDriver, _Tab
 
 
 class _FakeSession:
@@ -142,7 +142,7 @@ class _ScriptedSession(_FakeSession):
         self.states = states
 
     async def evaluate(self, expr, **_):
-        from muse2api.drivers.browser import dom
+        from muse_console.drivers.browser import dom
 
         if expr == dom.CHAT_STATE:
             return self.states.pop(0) if len(self.states) > 1 else self.states[0]
@@ -151,7 +151,7 @@ class _ScriptedSession(_FakeSession):
 
 @pytest.fixture
 def fast(monkeypatch):
-    import muse2api.drivers.browser.driver as mod
+    import muse_console.drivers.browser.driver as mod
 
     real_sleep = asyncio.sleep
     monkeypatch.setattr(mod.asyncio, "sleep", lambda s: real_sleep(0))
@@ -188,7 +188,7 @@ async def test_text_only_reply_asks_for_the_file_once(driver, fast, monkeypatch)
 
 
 async def test_still_text_only_after_asking_is_refused(driver, fast, monkeypatch):
-    from muse2api.errors import UpstreamRefused
+    from muse_console.errors import UpstreamRefused
 
     sent = []
 
@@ -216,7 +216,7 @@ async def test_timeout_is_soft_while_still_generating(driver, fast):
 
 
 async def test_quota_hint_only_counts_in_the_finished_reply(driver):
-    from muse2api.errors import UpstreamQuotaError
+    from muse_console.errors import UpstreamQuotaError
 
     sidebar = {
         "tail": "Earlier: Fixed token limit in the sheet script 2:21 pm",

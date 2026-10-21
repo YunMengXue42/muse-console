@@ -6,15 +6,15 @@ import asyncio
 
 import pytest
 
-from muse2api.accounts.model import Account
-from muse2api.accounts.pool import AccountPool
-from muse2api.accounts.store import JsonAccountStore
-from muse2api.config import Settings
-from muse2api.drivers.base import ChatRequest, ImageRequest, MediaResult, VideoRequest
-from muse2api.drivers.browser.driver import BrowserDriver, _Tab
-from muse2api.drivers.mock import MockDriver
-from muse2api.errors import UpstreamError, UpstreamTimeout
-from muse2api.services.gateway import Gateway
+from muse_console.accounts.model import Account
+from muse_console.accounts.pool import AccountPool
+from muse_console.accounts.store import JsonAccountStore
+from muse_console.config import Settings
+from muse_console.drivers.base import ChatRequest, ImageRequest, MediaResult, VideoRequest
+from muse_console.drivers.browser.driver import BrowserDriver, _Tab
+from muse_console.drivers.mock import MockDriver
+from muse_console.errors import UpstreamError, UpstreamTimeout
+from muse_console.services.gateway import Gateway
 
 
 @pytest.fixture
@@ -187,7 +187,7 @@ async def test_successful_chat_keeps_hot_tab_for_followup(accounts, browser, mon
         sent.append(prompt)
 
     async def state(tab):
-        return {"agentCount": len(sent), "lastText": "answer" if sent else ""}
+        return {"agentCount": len(sent), "lastText": "answer" if sent else "", "generating": False}
 
     async def href(tab):
         return "https://muse.ai/thread/offline"

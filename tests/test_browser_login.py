@@ -8,22 +8,22 @@ import pytest
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from muse2api.accounts.model import Account
-from muse2api.api.routes.browser_login import router
-from muse2api.config import Settings
-from muse2api.drivers.base import SessionInfo
-from muse2api.drivers.browser.cdp import CDPSession
-from muse2api.drivers.browser.driver import BrowserDriver
-from muse2api.drivers.mock import MockDriver
-from muse2api.errors import (
+from muse_console.accounts.model import Account
+from muse_console.api.routes.browser_login import router
+from muse_console.config import Settings
+from muse_console.drivers.base import SessionInfo
+from muse_console.drivers.browser.cdp import CDPSession
+from muse_console.drivers.browser.driver import BrowserDriver
+from muse_console.drivers.mock import MockDriver
+from muse_console.errors import (
     FeatureNotImplemented,
     InvalidRequest,
-    Muse2APIError,
+    MuseConsoleError,
     NotFound,
     UpstreamError,
 )
-from muse2api.services.browser_login import LoginConflict, SessionManager
-from muse2api.upstream.muse import SESSION_COOKIES
+from muse_console.services.browser_login import LoginConflict, SessionManager
+from muse_console.upstream.muse import SESSION_COOKIES
 
 
 class FakeCDP:
@@ -63,7 +63,8 @@ class Importer:
         self.accounts = {}
         self.calls = 0
 
-    async def import_account(self, cookies, label="", cookie_expires=None):
+    async def import_account(self, cookies, label="", cookie_expires=None, credential_records=None):
+        self.records = credential_records
         self.calls += 1
         identity = cookies["hatch_sess"]
         if identity not in self.accounts:
@@ -204,6 +205,21 @@ async def test_complete_validation_failure_retains_and_success_closes(setup):
     assert len(importer.accounts) == 1
 
 
+async def test_complete_accepts_login_without_hatch_gw(setup):
+    """muse.ai stopped issuing hatch_gw (2026-10-20); its absence must not block import."""
+    manager, browser, pages, importer = setup
+    browser.cookies = [
+        {"name": name, "value": name + "-value", "domain": ".muse.ai", "expires": -1}
+        for name in SESSION_COOKIES
+        if name != "hatch_gw"
+    ]
+    session = await manager.create("no-gw")
+    result = await manager.complete(session["id"])
+    assert result["account"]["label"] == "no-gw"
+    assert importer.calls == 1
+    assert not browser.contexts and pages[0].closed
+
+
 async def test_missing_and_ambiguous_cookies(setup):
     manager, browser, _, importer = setup
     session = await manager.create()
@@ -272,8 +288,8 @@ async def test_all_routes_admin_and_contract(setup):
     app.state.services = SimpleNamespace(settings=manager.settings, browser_login=manager)
     app.include_router(router)
 
-    @app.exception_handler(Muse2APIError)
-    async def handler(request: Request, exc: Muse2APIError):
+    @app.exception_handler(MuseConsoleError)
+    async def handler(request: Request, exc: MuseConsoleError):
         return JSONResponse(exc.to_body(), status_code=exc.status_code)
 
     async with httpx.AsyncClient(
@@ -391,3 +407,206 @@ async def test_closed_page_is_upstream_error(setup):
     pages[0].closed = True
     with pytest.raises(UpstreamError):
         await manager.frame(session["id"])
+
+
+async def test_auto_completed_retained_and_idempotent(setup):
+    manager, browser, pages, importer = setup
+    manager.settings.login_auto_complete_enabled = True
+    session = await manager.create("automatic")
+    sid = session["id"]
+    result = await manager.get(sid)
+    assert result["status"] == "completed"
+    assert "account" not in result and "value" not in str(result)
+    assert not browser.contexts and pages[0].closed
+    assert importer.records and importer.records[0].expires is None
+    assert await manager.get(sid) == result
+    assert (await manager.complete(sid))["account"]["label"] == "automatic"
+    assert importer.calls == 1
+    manager._sessions[sid].deadline = 0
+    await manager.reap()
+    with pytest.raises(NotFound):
+        await manager.get(sid)
+
+
+async def test_auto_waits_backoff_bounded_and_reaper_completes(setup):
+    manager, browser, _, importer = setup
+    manager.settings.login_auto_complete_enabled = True
+    session = await manager.create()
+    sid = session["id"]
+    saved = browser.cookies
+    browser.cookies = []
+    assert (await manager.get(sid))["status"] == "awaiting_login"
+    count = len(browser.calls)
+    await manager.get(sid)
+    assert not any(m == "Storage.getCookies" for m, _ in browser.calls[count:])
+    browser.cookies = saved
+    state = manager._sessions[sid]
+    state.next_attempt = 0
+    await manager.reap()
+    assert (await manager.get(sid))["status"] == "completed"
+    assert importer.calls == 1
+
+
+async def test_auto_unassigned_errors_and_retry_limit(setup):
+    manager, browser, _, importer = setup
+    manager.settings.login_auto_complete_enabled = True
+    sid = (await manager.create())["id"]
+
+    async def unassigned(*args, **kwargs):
+        return SessionInfo(ok=True, cookies={}, meta={"session_status": "pending"})
+
+    manager._validate = unassigned
+    assert (await manager.get(sid))["status"] == "awaiting_login"
+
+    async def failure(*args, **kwargs):
+        raise RuntimeError("secret-cookie-value")
+
+    manager._validate = failure
+    state = manager._sessions[sid]
+    state.next_attempt = 0
+    assert (await manager.get(sid))["status"] == "retry_wait"
+    state.attempts, state.next_attempt = 59, 0
+    assert (await manager.get(sid))["status"] == "manual_required"
+    count = len(browser.calls)
+    await manager.get(sid)
+    assert not any(m == "Storage.getCookies" for m, _ in browser.calls[count:])
+    assert importer.calls == 0
+    await manager.cancel(sid)
+    assert not browser.contexts
+
+
+async def test_popup_only_same_context_and_return_to_main(setup):
+    manager, browser, pages, _ = setup
+    manager.settings.login_auto_complete_enabled = True
+    sid = (await manager.create())["id"]
+    state = manager._sessions[sid]
+    original = browser.send
+    targets = [
+        {"targetId": state.target_id, "type": "page", "browserContextId": state.context_id},
+        {"targetId": "target-popup", "type": "page", "browserContextId": state.context_id},
+        {"targetId": "target-foreign", "type": "page", "browserContextId": "foreign"},
+    ]
+
+    async def send(method, params=None):
+        if method == "Target.getTargets":
+            return {"targetInfos": targets}
+        return await original(method, params)
+
+    browser.send = send
+    await manager.frame(sid)
+    assert state.target_id == "target-popup" and pages[0].closed
+    targets[:] = targets[:1]
+    await manager.frame(sid)
+    assert state.target_id == "target-1" and pages[1].closed
+    assert "target-foreign" not in state.seen_targets
+
+
+@pytest.mark.parametrize("assigned", [True, False])
+async def test_auto_real_probe_context_fetch_and_rotation(setup, monkeypatch, assigned):
+    manager, browser, _, importer = setup
+    manager.settings.login_auto_complete_enabled = True
+    manager._injected_validator = False
+    expressions = []
+
+    async def evaluate(self, expression, **kwargs):
+        expressions.append(expression)
+        if expression == "location.origin":
+            return "https://muse.ai"
+        browser.cookies[0].update(path="/", httpOnly=False, sameSite="Lax", expires=2000000000)
+        return {"http": 200, "assigned": assigned}
+
+    monkeypatch.setattr(FakeCDP, "evaluate", evaluate, raising=False)
+    sid = (await manager.create())["id"]
+    state = await manager.get(sid)
+    assert state["status"] == ("completed" if assigned else "awaiting_login")
+    assert any("https://muse.ai/api/session" in e and "redirect:'error'" in e for e in expressions)
+    assert all(
+        p.get("browserContextId") == "context-1"
+        for m, p in browser.calls
+        if m == "Storage.getCookies"
+    )
+    assert any(m == "Target.closeTarget" for m, _ in browser.calls)
+    if assigned:
+        assert importer.records[0].expires == 2000000000
+        assert importer.records[0].httpOnly is False
+        assert importer.records[0].sameSite == "lax"
+    else:
+        assert importer.calls == 0
+
+
+async def test_auto_cancel_task_and_shutdown_cleanup(setup):
+    manager, browser, _, importer = setup
+    manager.settings.login_auto_complete_enabled = True
+    sid = (await manager.create())["id"]
+    entered = asyncio.Event()
+
+    async def blocking(*args, **kwargs):
+        entered.set()
+        await asyncio.Event().wait()
+
+    manager._validate = blocking
+    task = asyncio.create_task(manager.get(sid))
+    await entered.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert not browser.contexts and importer.calls == 0
+    await manager.create()
+    await manager.shutdown()
+    assert not browser.contexts
+
+
+async def test_auto_rejects_ambiguous_scope_and_preserves_partition(setup):
+    manager, browser, _, importer = setup
+    manager.settings.login_auto_complete_enabled = True
+    sid = (await manager.create())["id"]
+    browser.cookies.append({**browser.cookies[0], "path": "/other"})
+    assert (await manager.get(sid))["status"] == "awaiting_login"
+    assert importer.calls == 0
+    browser.cookies.pop()
+    partition = {"topLevelSite": "https://muse.ai", "hasCrossSiteAncestor": True}
+    browser.cookies[0]["partitionKey"] = partition
+    manager._sessions[sid].next_attempt = 0
+    assert (await manager.get(sid))["status"] == "completed"
+    assert importer.records[0].partitionKey.model_dump() == partition
+
+
+async def test_auto_serializes_concurrent_polls(setup):
+    manager, _, _, importer = setup
+    manager.settings.login_auto_complete_enabled = True
+    sid = (await manager.create())["id"]
+    states = await asyncio.gather(*(manager.get(sid) for _ in range(10)))
+    assert all(s["status"] == "completed" for s in states)
+    assert importer.calls == 1
+
+
+@pytest.mark.parametrize(
+    "http,status",
+    [(401, "awaiting_login"), (403, "awaiting_login"), (429, "retry_wait"), (503, "retry_wait")],
+)
+async def test_auto_probe_http_failures_never_import(setup, monkeypatch, http, status):
+    manager, browser, _, importer = setup
+    manager.settings.login_auto_complete_enabled = True
+    manager._injected_validator = False
+
+    async def evaluate(self, expression, **kwargs):
+        if expression == "location.origin":
+            return "https://muse.ai"
+        return {"http": http}
+
+    monkeypatch.setattr(FakeCDP, "evaluate", evaluate, raising=False)
+    sid = (await manager.create())["id"]
+    assert (await manager.get(sid))["status"] == status
+    assert importer.calls == 0
+    assert browser.contexts
+    assert any(m == "Target.closeTarget" for m, _ in browser.calls)
+
+
+async def test_auto_disabled_does_not_collect_or_validate(setup):
+    manager, browser, _, importer = setup
+    assert manager.settings.login_auto_complete_enabled is False
+    sid = (await manager.create())["id"]
+    await manager.get(sid)
+    await manager.reap()
+    assert not any(m in ("Storage.getCookies", "Target.getTargets") for m, _ in browser.calls)
+    assert importer.calls == 0

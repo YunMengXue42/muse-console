@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from muse2api.accounts.model import Account
-from muse2api.accounts.pool import AccountPool
-from muse2api.accounts.store import JsonAccountStore
-from muse2api.drivers.base import ChatRequest
-from muse2api.drivers.mock import MockDriver
-from muse2api.errors import UpstreamError
-from muse2api.services.gateway import Gateway
+from muse_console.accounts.model import Account
+from muse_console.accounts.pool import AccountPool
+from muse_console.accounts.store import JsonAccountStore
+from muse_console.drivers.base import ChatRequest
+from muse_console.drivers.mock import MockDriver
+from muse_console.errors import UpstreamError
+from muse_console.services.gateway import Gateway
 
 
 class StreamingDriver(MockDriver):

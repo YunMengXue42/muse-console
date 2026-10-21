@@ -7,8 +7,8 @@ import re
 
 from fastapi.testclient import TestClient
 
-from muse2api.app import create_app
-from muse2api.drivers.mock import MockDriver
+from muse_console.app import create_app
+from muse_console.drivers.mock import MockDriver
 
 
 def credentials(name: str) -> dict[str, str]:
@@ -110,6 +110,10 @@ def test_console_shell_and_assets(client):
         result = client.get(asset)
         assert result.status_code == 200, asset
         assert result.content
+    font = client.get("/assets/fonts/muse-console-sans.woff2")
+    assert font.status_code == 200
+    assert font.content.startswith(b"wOF2")
+    assert "SIL OPEN FONT LICENSE" in client.get("/assets/fonts/OFL.txt").text
     assert client.get("/assets/../../.env").status_code == 404
     assert client.get("/credentials.key").status_code == 404
 

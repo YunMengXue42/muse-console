@@ -5,17 +5,17 @@ import time
 
 import pytest
 
-from muse2api.accounts import Account, AccountPool, AccountStatus, JsonAccountStore
-from muse2api.drivers.base import ChatRequest
-from muse2api.drivers.mock import MockDriver
-from muse2api.errors import NoAccountAvailable, UpstreamAuthError, UpstreamError
-from muse2api.services.gateway import Gateway
+from muse_console.accounts import Account, AccountPool, AccountStatus, JsonAccountStore
+from muse_console.drivers.base import ChatRequest
+from muse_console.drivers.mock import MockDriver
+from muse_console.errors import NoAccountAvailable, UpstreamAuthError, UpstreamError
+from muse_console.services.gateway import Gateway
 
 
 async def _pool(tmp_path, n=2, **kw) -> AccountPool:
     pool = AccountPool(JsonAccountStore(tmp_path / "acc.json"), acquire_timeout=0.2, **kw)
     for i in range(n):
-        await pool.upsert(Account(id=f"a{i}", cookies={"hatch_sess": "x"}))
+        await pool.upsert(Account(id=f"a{i}", cookies={"hatch_sess": f"session-{i}"}))
     return pool
 
 
@@ -113,7 +113,7 @@ async def test_acquire_fails_fast_when_cooldown_outlasts_timeout(tmp_path):
 
 
 async def test_timeout_does_not_cool_the_account(tmp_path):
-    from muse2api.errors import UpstreamTimeout
+    from muse_console.errors import UpstreamTimeout
 
     pool = await _pool(tmp_path, n=1)
     with pytest.raises(UpstreamTimeout):
@@ -193,7 +193,8 @@ async def test_parallel_success_cannot_clear_auth_failure(tmp_path):
 
 async def test_duplicate_session_and_strategy_update(tmp_path):
     pool = await _pool(tmp_path, n=1)
-    await pool.upsert(Account(cookies={"hatch_sess": "x"}))
+    # An incomplete session carries no hatch_sess, so it cannot be a duplicate.
+    await pool.upsert(Account(cookies={"hatch_vml": "legacy"}))
     assert pool.stats()["total"] == 2
     await pool.set_strategy("round_robin")
     assert pool.strategy_name == "round_robin"
@@ -223,8 +224,10 @@ async def test_cancelled_mutation_finishes_disk_memory_commit(tmp_path):
     store.resume.set()
     with pytest.raises(asyncio.CancelledError):
         await task
-    assert pool.get(account.id) == account
-    assert (await store.load())[0] == account
+    persisted = pool.get(account.id)
+    assert persisted.credential_version == 1
+    assert persisted.cookies == account.cookies
+    assert (await store.load())[0] == persisted
 
 
 async def test_driver_hot_page_merge_preserves_current_config_and_meta(tmp_path):

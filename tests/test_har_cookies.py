@@ -60,9 +60,9 @@ def test_extract_ignores_other_hosts():
 
 def test_cli_returns_three_when_session_cookie_missing(tmp_path, capsys, monkeypatch):
     path = tmp_path / "muse.har"
-    path.write_text(json.dumps(_har("hatch_sess=s1; theme=dark")), encoding="utf-8")
+    path.write_text(json.dumps(_har("hatch_vml=v1; theme=dark")), encoding="utf-8")
     monkeypatch.setattr("sys.argv", ["har_cookies.py", str(path)])
     assert har_cookies.main() == 3
     out = capsys.readouterr()
-    assert "hatch_sess=s1" in out.out
+    assert "hatch_vml=v1" in out.out
     assert "theme" not in out.out

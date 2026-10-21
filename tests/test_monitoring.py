@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from muse2api.auth.keys import hash_key
+from muse_console.auth.keys import hash_key
 
 
 def _bearer(key: str) -> dict:
@@ -193,7 +193,7 @@ def test_key_usage(client, auth, admin):
 async def test_key_usage_windows(settings):
     import time
 
-    from muse2api.services.request_log import RequestLog
+    from muse_console.services.request_log import RequestLog
 
     log = RequestLog(settings.requests_db)
     base = {"method": "GET", "path": "/v1/models", "latency_ms": 1, "key_id": "k1"}
@@ -212,7 +212,7 @@ async def test_key_usage_windows(settings):
 
 
 async def test_prune(settings):
-    from muse2api.services.request_log import RequestLog
+    from muse_console.services.request_log import RequestLog
 
     log = RequestLog(settings.requests_db)
     base = {"method": "GET", "path": "/v1/models", "status_code": 200, "latency_ms": 1}
@@ -243,8 +243,8 @@ def _wait_task(client, auth, task_id: str) -> dict:
 
 
 def test_failed_task_counts_as_error(client, auth, admin, monkeypatch):
-    from muse2api.drivers.mock import MockDriver
-    from muse2api.errors import UpstreamTimeout
+    from muse_console.drivers.mock import MockDriver
+    from muse_console.errors import UpstreamTimeout
 
     ok = client.post("/v1/videos", headers=auth, json={"prompt": "a wave"}).json()
     _wait_task(client, auth, ok["id"])
@@ -284,8 +284,8 @@ async def test_task_outcome_before_row_and_backfill(settings):
     import time
     from types import SimpleNamespace
 
-    from muse2api.services.request_log import RequestLog
-    from muse2api.services.tasks import TaskStatus
+    from muse_console.services.request_log import RequestLog
+    from muse_console.services.tasks import TaskStatus
 
     log = RequestLog(settings.requests_db)
     now = time.time()

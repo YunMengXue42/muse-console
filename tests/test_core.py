@@ -2,10 +2,10 @@ import os
 
 import pytest
 
-from muse2api.core.media import MediaStore
-from muse2api.core.models import resolve_model
-from muse2api.core.prompt import flatten_messages, followup_text, message_turns
-from muse2api.errors import InvalidRequest
+from muse_console.core.media import MediaStore
+from muse_console.core.models import resolve_model
+from muse_console.core.prompt import flatten_messages, followup_text, message_turns
+from muse_console.errors import InvalidRequest
 
 
 def test_single_user_message_verbatim():
@@ -58,7 +58,7 @@ def test_followup_rejects_a_different_history():
 
 
 def test_thread_url_ignores_the_new_thread_page():
-    from muse2api.drivers.browser.driver import is_thread_url
+    from muse_console.drivers.browser.driver import is_thread_url
 
     assert is_thread_url("https://muse.ai/thread/abc")
     assert not is_thread_url("https://muse.ai/thread/new")
@@ -66,10 +66,41 @@ def test_thread_url_ignores_the_new_thread_page():
     assert not is_thread_url("https://muse.ai/")
 
 
+def test_stream_delta_never_resends_the_reply():
+    from muse_console.drivers.browser.driver import stream_delta
+
+    emitted = ""
+    sent = []
+    # The page re-renders "-" into a bullet and inserts a zero-width space.
+    for text in ["Name: Xi\n", "Name: Xi\n-", "Name: Xi\n-\u200bEmail", "Name: Xi\n• Email: a"]:
+        delta, emitted = stream_delta(emitted, text)
+        sent.append(delta)
+    delta, emitted = stream_delta(emitted, "Name: Xi\n• Email: a@b", final=True)
+    sent.append(delta)
+    joined = "".join(sent)
+    assert joined.count("Name: Xi") == 1
+    assert "\u200b" not in joined
+    assert joined.startswith("Name: Xi\n")
+
+
+def test_stream_delta_holds_short_line_until_final():
+    from muse_console.drivers.browser.driver import stream_delta
+
+    delta, emitted = stream_delta("", "Hello\n-")
+    assert delta == "Hello\n"
+    delta, emitted = stream_delta(emitted, "Hello\n-", final=True)
+    assert delta == "-" and emitted == "Hello\n-"
+
+
 def test_resolve_model():
+    from muse_console.errors import ModelNotFound
+
     assert resolve_model("gpt-4o", "chat").id == "muse-chat"
-    assert resolve_model("unknown", "image").id == "muse-image"
     assert resolve_model(None, "video").id == "muse-video"
+    assert resolve_model("", "image").id == "muse-image"
+    with pytest.raises(ModelNotFound) as exc:
+        resolve_model("unknown", "image")
+    assert exc.value.status_code == 404 and exc.value.code == "model_not_found"
     with pytest.raises(InvalidRequest):
         resolve_model("muse-image", "chat")
 

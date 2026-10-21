@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from muse2api.errors import Muse2APIError
-from muse2api.services.tasks import Task, TaskManager, TaskStatus
+from muse_console.errors import MuseConsoleError
+from muse_console.services.tasks import Task, TaskManager, TaskStatus
 
 
 def persisted(manager):
@@ -164,7 +164,7 @@ async def test_outcomes_and_finish_hook(tmp_path, outcome):
         progress(150)
         assert task.progress == 99
         if outcome == "domain":
-            raise Muse2APIError("offline failure")
+            raise MuseConsoleError("offline failure")
         if outcome == "internal":
             raise RuntimeError("offline crash")
         return {"value": 1}
@@ -179,8 +179,10 @@ async def test_outcomes_and_finish_hook(tmp_path, outcome):
     if outcome == "success":
         assert task.result == {"value": 1}
         assert task.progress == 100
-    else:
+    elif outcome == "domain":
         assert task.error["message"].startswith("offline")
+    else:
+        assert task.error == {"message": "internal task error", "code": "internal_error"}
 
 
 async def test_persist_failure_is_visible_and_still_finishes_hook(tmp_path, monkeypatch, caplog):

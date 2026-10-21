@@ -3,6 +3,9 @@ from __future__ import annotations
 import base64
 import json
 import time
+from urllib.parse import urlsplit
+
+import pytest
 
 
 def test_health(client):
@@ -61,6 +64,24 @@ def test_chat_wrong_model_kind(client, auth):
         json={"model": "muse-video", "messages": [{"role": "user", "content": "x"}]},
     )
     assert r.status_code == 400
+
+
+@pytest.mark.parametrize(
+    "path,body",
+    [
+        ("/v1/chat/completions", {"messages": [{"role": "user", "content": "x"}]}),
+        ("/v1/chat/completions", {"stream": True, "messages": [{"role": "user", "content": "x"}]}),
+        ("/v1/responses", {"input": "x"}),
+        ("/v1/images/generations", {"prompt": "x"}),
+        ("/v1/images/generations", {"prompt": "x", "async": True}),
+        ("/v1/videos", {"prompt": "x"}),
+    ],
+)
+def test_unknown_model_is_rejected_like_openai(client, auth, path, body):
+    r = client.post(path, headers=auth, json={"model": "no-such-model", **body})
+    assert r.status_code == 404
+    error = r.json()["error"]
+    assert error["code"] == "model_not_found" and "no-such-model" in error["message"]
 
 
 def test_image_url_and_media(client, auth):
@@ -124,7 +145,7 @@ def test_image_transparent_saved_as_png(client, auth, monkeypatch):
         headers=auth,
         json={"prompt": "a fox", "background": "transparent"},
     )
-    assert r.json()["data"][0]["url"].endswith(".png")
+    assert urlsplit(r.json()["data"][0]["url"]).path.endswith(".png")
 
 
 def test_image_opaque_background_skips_matting(client, auth, monkeypatch):
@@ -230,7 +251,7 @@ def test_video_task(client, auth):
             break
         time.sleep(0.02)
     assert task["status"] == "succeeded", task
-    assert task["result"]["url"].endswith(".mp4")
+    assert urlsplit(task["result"]["url"]).path.endswith(".mp4")
 
 
 def _responses_events(response) -> list[dict]:
@@ -448,7 +469,7 @@ def test_admin_accounts_crud(client, auth, admin):
     assert r.status_code == 200
     acc = r.json()["account"]
     assert acc["cookies"]["hatch_sess"] != "secretvalue123"
-    assert "hatch_vml" in r.json()["missing_cookies"]
+    assert r.json()["missing_cookies"] == []
 
     r = client.patch(f"/admin/accounts/{acc['id']}", headers=admin, json={"enabled": False})
     assert r.json()["account"]["enabled"] is False
