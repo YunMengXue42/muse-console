@@ -1,5 +1,6 @@
 .git
 .venv
+.venv-*
 .pytest_cache
 .ruff_cache
 __pycache__
@@ -12,3 +13,8 @@ frontend/coverage
 data
 data-preview
 *.log
+extension/node_modules
+extension/dist
+tasks
+dist
+build

@@ -1,4 +1,6 @@
-# TODO
+# Muse Console TODO
+
+Paths below are relative to `src/muse_console/` unless they explicitly name a repository-root directory/file. The distribution/CLI is `muse-console`; module execution uses `python -m muse_console`. New configuration uses `MUSE_CONSOLE_`; core retains `MUSE2API_` aliases with new-name precedence.
 
 This file lists every reserved module and all outstanding work. It is the single source of truth for task assignment.
 
@@ -13,8 +15,8 @@ Priorities: **P0** must be done first · **P1** core feature · **P2** better ex
 | ID | Task | Priority | Location | Owner | Status |
 |---|---|---|---|---|---|
 | A1 | Install dependencies, get tests and lint passing | P0 | `tests/` | | Done locally in v0.3 |
-| A2 | Test the browser driver with real accounts | P0 | `drivers/browser/` | | Not started |
-| A3 | Verify how image/video generation is triggered | P0 | `drivers/browser/driver.py` | | Not started |
+| A2 | Test the browser driver with real accounts | P0 | `drivers/browser/` | | Previous single-account sample passed; hardening revision and multi-account load pending |
+| A3 | Verify how image/video generation is triggered | P0 | `drivers/browser/driver.py` | | Previous image/video sample passed; bounded downloader live regression pending |
 | A4 | Verify session renewal | P0 | `upstream/muse.py` | | Not started |
 | A5 | Verify the Docker image builds and runs | P1 | `Dockerfile` | | Not started |
 | A6 | Enable GitHub Actions CI | P1 | `.github/workflows/ci.yml` | | Not started |
@@ -26,32 +28,32 @@ Priorities: **P0** must be done first · **P1** core feature · **P2** better ex
 | C3 | Emulated tool calling | P2 | `core/prompt.py` | | Not started |
 | C4 | Streaming heartbeats to avoid client timeouts | P2 | `api/routes/chat.py` | | Not started |
 | D1 | Support more cookie import formats | P1 | `services/account_manager.py` | | Done: JSON, browser export, Netscape, header lines |
-| D2 | Cookie import browser extension | P2 | `extension/` (new) | | Not started |
-| D3 | Web admin console | P2 | `frontend/` / `web/` | | Done: React console, live browser acceptance pending |
+| D2 | Cookie import browser extension | P2 | `extension/` | | Implemented; previous independent-browser transfer/sync passed; HTTPS re-pair and 72h observation pending |
+| D3 | Web admin console | P2 | `frontend/` / `web/` | | Implemented; previous rendered acceptance passed; style unchanged |
 | D4 | SQLite / Redis storage backends | P3 | `accounts/store.py` | | Encrypted SQLite done; Redis out of scope |
 | E1 | Automatic media cleanup | P2 | `core/media.py` | | Done: optional retention cleanup |
-| E2 | Multiple API keys and rate limiting | P3 | `api/deps.py` | | Not started |
+| E2 | Multiple API keys and rate limiting | P3 | `api/deps.py` | | Multiple keys and task/media ownership implemented; per-key quota/rate limiting pending |
 | E3 | Observability (metrics, logs) | P3 | `observability/` (new) | | Not started |
 
 ---
 
 ## A. Verification and live testing
 
-The v0.3 rebuild has passing local offline regressions, frontend checks and an HTTP mock-driver smoke test. Live Muse account acceptance and Docker runtime verification remain separate, unfinished gates.
+Earlier rebuild notes record local offline regressions, frontend checks and a mock-driver smoke test. These are not acceptance evidence for the renamed revision. Re-run offline checks for the exact revision; live Muse account acceptance and Docker runtime verification remain separate, unfinished gates.
 
 ### A1 Install dependencies, get tests and lint passing · P0
-- Run `pip install -e '.[dev]'`, `pytest` and `ruff check .`, and fix every failure.
-- All tests use the mock driver and make no network calls.
+- Run `uv sync --locked --extra dev`, `uv run --no-sync ruff format .`, `uv run --no-sync ruff check .` and `uv run --no-sync pytest`.
+- Tests use fake upstreams; HTTP integration tests may bind ephemeral loopback listeners, never real Muse or production services.
 - **Done when**: `pytest` and `ruff check .` both pass locally.
 
 ### A2 Test the browser driver with real accounts · P0
-- Import cookies from a real muse.ai account, set `MUSE2API_DRIVER=browser`, and verify each of the following:
+- Import cookies from a real muse.ai account, set `MUSE_CONSOLE_DRIVER=browser`, and verify each of the following:
   - the page reaches the "ready" state (`dom.PAGE_STATE`);
   - writing into the input box and clicking the send button work (`dom.fill_input`, `dom.CLICK_SEND`);
   - assistant replies are read correctly, with no duplicated or missing characters in the stream (`dom.CHAT_STATE`);
   - end-of-reply detection is accurate: it neither cuts replies short nor waits too long;
   - an expired cookie raises `UpstreamAuthError`, and running out of quota raises `UpstreamQuotaError`.
-- The DOM selectors have not been checked against the real page yet and may be wrong or outdated; update `drivers/browser/dom.py` to match the actual page.
+- Earlier real-page samples passed; recheck `drivers/browser/dom.py` for the exact hardening revision, particularly completion and bounded blob/media download.
 - Verify that multi-account isolation via `Target.createBrowserContext` works.
 - **Done when**: two or more accounts reliably complete streaming and non-streaming chats, and the findings are written up under `docs/`.
 
@@ -65,11 +67,12 @@ The v0.3 rebuild has passing local offline regressions, frontend checks and an H
 ### A4 Verify session renewal · P0
 - Verify that calling `/api/session` really returns fresh cookies and extends the lifetime of `hatch_vml`.
 - Verify the parameters and effect of `/api/hatch/vm/wake`.
-- Determine a sensible renewal interval and update the default of `MUSE2API_KEEPALIVE_INTERVAL`.
+- Determine a sensible renewal interval and update the default of `MUSE_CONSOLE_KEEPALIVE_INTERVAL`.
 - **Done when**: with keepalive enabled, an account stays usable for three days or more.
 
 ### A5 Verify the Docker image builds and runs · P1
-- `docker compose up -d --build` succeeds, and the browser driver can start Chromium inside the container.
+- In a separately authorized test environment, verify `docker compose up -d --build` builds the local `muse-console:local` image and starts the `muse-console` CLI, and the browser driver can start Chromium inside the container. This migration does not run Docker or production services.
+- Inspect the image and wheel for the retained MIT LICENSE/copyright and `muse_console/web` assets; no published registry/PyPI identity is assumed.
 - Check whether Chromium's sandbox flags need adjusting when the container runs as a non-root user.
 
 ### A6 Enable GitHub Actions CI · P1
@@ -89,7 +92,7 @@ Talk to muse.ai's backend directly, without a browser. This removes Chromium and
 4. Implement image and video generation and attachment download.
 5. Use recorded real responses as test fixtures; CI must not contact the real service.
 - A more detailed step-by-step breakdown is in the docstring at the top of `drivers/http/driver.py`.
-- **Done when**: chat works with `MUSE2API_DRIVER=http` and passes the same API tests as the browser driver.
+- **Done when**: chat works with `MUSE_CONSOLE_DRIVER=http` and passes the same API tests as the browser driver.
 
 ### B2 Reuse conversation threads to cut first-token latency · P2
 Done. A follow-up whose `messages` continue the conversation already on the page stays on that tab and only the new user text is sent. Pass `user` to keep one person on one account (`affinity`, the default). A different history, a different `user`, a stuck page, or a long thread opens a fresh page.
@@ -130,10 +133,11 @@ Done. A follow-up whose `messages` continue the conversation already on the page
 - Add support for a raw `Cookie: a=1; b=2` request header string and for JSON arrays exported by extensions such as EditThisCookie (which include expiry times).
 - Support importing multiple accounts in one request.
 
-### D2 Cookie import browser extension · P2
-- Create an `extension/` directory with a Chrome / Edge extension.
-- With one click in a browser that is logged in to muse.ai, it reads all cookies (including HttpOnly cookies that page scripts cannot see, with their expiry times) and pushes them to `/admin/accounts`.
-- Requires handling CORS on the server side.
+### D2 Cookie import browser extension · P2 · Implemented; HTTPS re-pair and renewal pending
+- MV3 TypeScript extension automatically reads only Muse session cookies after normal user login, through the official API. Preserves HttpOnly, original lifetime, store and partition identity; never edits main-browser data.
+- Uses one-use administrator pairing and a limited device token, not an admin key. Candidates go through `/credential-ingestions`, bounded owned-context validation, CAS versions and encrypted storage; no global CORS exception.
+- Console supports pairing/list/revoke and capture-specific identity/version confirmation. Isolated login can optionally detect completion automatically; switches are off by default.
+- Earlier independent-browser collection, pairing, transfer, automatic sync and post-import generation passed for one real Muse identity; duplicate records were merged. This is not proof of two-account or partitioned-cookie acceptance. Remaining: HTTPS re-pairing, live regression for this hardening revision, distinct-account/partition cases, ≤10-second import measurement and 72-hour renewal observation. See README's automatic-import section for setup and boundaries.
 
 ### D3 Web admin console · P2
 - Create a `web/` directory, built on the existing `/admin/*` endpoints.
@@ -149,13 +153,13 @@ Done. A follow-up whose `messages` continue the conversation already on the page
 ## E. Operations
 
 ### E1 Automatic media cleanup · P2 · Done
-- `MUSE2API_MEDIA_RETENTION_DAYS` enables mtime-based cleanup of generated `img_` and `vid_` files.
+- `MUSE_CONSOLE_MEDIA_RETENTION_DAYS` enables mtime-based cleanup of generated `img_` and `vid_` files.
 - Cleanup runs once at startup and hourly in the existing housekeeping loop; `0` keeps the previous no-cleanup behavior.
 - Files that do not match the generated media naming contract are preserved.
 
 ### E2 Multiple API keys and rate limiting · P3
-- There is currently a single API key and a single admin key.
-- Support multiple keys (each with its own rate limit and usage statistics), managed through the admin API.
+- Client keys already support create/revoke/rename and usage statistics; tasks and media are key-owned.
+- Remaining: per-key rate/queue/usage quotas. Global process-local safety budgets are not per-key billing.
 
 ### E3 Observability · P3
 - Expose Prometheus metrics: request count, latency, first-token latency, per-account success/failure counts, queue wait time.

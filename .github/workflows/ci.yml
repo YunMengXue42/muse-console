@@ -1,4 +1,11 @@
-name: CI
+name: Muse Console CI
+
+permissions:
+  contents: read
+
+env:
+  MUSE_CONSOLE_DRIVER: mock
+  MUSE_CONSOLE_KEEPALIVE_ENABLED: "false"
 
 on:
   push:
@@ -7,19 +14,72 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest]
         python-version: ["3.10", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install -e '.[dev]'
-      - run: ruff format --check .
-      - run: ruff check .
-      - run: pytest -q
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.11"
+      - run: uv lock --check
+      - run: uv sync --locked --extra dev
+      - run: uv run --no-sync ruff format --check .
+      - run: uv run --no-sync ruff check .
+      - run: uv run --no-sync pytest -q
+  extension:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extension
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - run: npm ci
+      # Use the already-locked frontend Prettier, without changing extension deps.
+      - name: Install locked formatting tool
+        run: npm ci --prefix ../frontend --ignore-scripts
+      - name: Check extension formatting
+        run: node ../frontend/node_modules/prettier/bin/prettier.cjs --check "src/**/*.ts" "tests/**/*.ts" "*.json" "*.mjs" "*.html" "*.css"
+      - name: Type-check extension
+        run: node node_modules/typescript/bin/tsc --noEmit
+      - run: npm test
+      - run: npm run build
+  docker-mock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t muse-console:ci .
+      - name: Isolated mock smoke (no network, no host data, no accounts)
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'docker rm -f muse-console-smoke >/dev/null 2>&1 || true' EXIT
+          docker run -d --name muse-console-smoke --network none --read-only \
+            --tmpfs /app/data:rw,noexec,nosuid,uid=1000,gid=1000,mode=0700 \
+            --tmpfs /tmp:rw,noexec,nosuid \
+            -e MUSE_CONSOLE_DRIVER=mock \
+            -e MUSE_CONSOLE_KEEPALIVE_ENABLED=false \
+            -e MUSE_CONSOLE_API_KEY=ci-synthetic-only \
+            -e MUSE_CONSOLE_ADMIN_KEY=ci-synthetic-only muse-console:ci
+          for attempt in $(seq 1 30); do
+            if docker exec muse-console-smoke python -c 'import json,urllib.request; assert json.load(urllib.request.urlopen("http://127.0.0.1:18610/readyz", timeout=2))["ready"] is True'; then
+              break
+            fi
+            sleep 1
+          done
+          docker exec muse-console-smoke python -c 'import json,urllib.request; base="http://127.0.0.1:18610"; assert json.load(urllib.request.urlopen(base+"/healthz"))["ok"] is True; assert json.load(urllib.request.urlopen(base+"/readyz"))["ready"] is True; req=urllib.request.Request(base+"/admin/status", headers={"Authorization":"Bearer ci-synthetic-only"}); assert urllib.request.urlopen(req).status == 200'
   frontend:
     runs-on: ubuntu-latest
     defaults:
@@ -36,3 +96,29 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build local Muse Console wheel
+        working-directory: .
+        run: python -m pip wheel . --no-deps -w dist
+      - name: Verify package identity, console assets and license
+        working-directory: .
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          wheels = list(Path("dist").glob("*.whl"))
+          assert len(wheels) == 1, wheels
+          with ZipFile(wheels[0]) as wheel:
+              names = wheel.namelist()
+              metadata = next(n for n in names if n.endswith(".dist-info/METADATA"))
+              assert "Name: muse-console\n" in wheel.read(metadata).decode()
+              entry_points = next(n for n in names if n.endswith(".dist-info/entry_points.txt"))
+              assert "muse-console = muse_console.__main__:main" in wheel.read(entry_points).decode()
+              assert "muse_console/web/dashboard.html" in names
+              assert any(n.startswith("muse_console/web/assets/") for n in names)
+              licenses = [n for n in names if n.rsplit("/", 1)[-1] == "LICENSE"]
+              assert any(b"Copyright (c) 2026 www222fff" in wheel.read(n) for n in licenses)
+          PY

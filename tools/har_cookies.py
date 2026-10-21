@@ -23,6 +23,8 @@ import sys
 from pathlib import Path
 
 SESSION_COOKIES = ("hatch_sess", "hatch_gw", "hatch_vml", "hatch_native_auth_device")
+# hatch_gw is no longer issued by the site (observed 2026-10-20); only hatch_sess is required.
+REQUIRED_COOKIES = ("hatch_sess",)
 HOST_SUFFIX = "muse.ai"
 
 
@@ -72,7 +74,7 @@ def main() -> int:
         print("no muse.ai Cookie header found; reload the page with DevTools open", file=sys.stderr)
         return 1
 
-    missing = [name for name in SESSION_COOKIES if not cookies.get(name)]
+    missing = [name for name in REQUIRED_COOKIES if not cookies.get(name)]
     if not args.all:
         cookies = {k: v for k, v in cookies.items() if k in SESSION_COOKIES}
 

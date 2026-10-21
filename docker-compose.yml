@@ -1,15 +1,19 @@
 services:
-  muse2api:
+  muse-console:
     build: .
-    image: muse2api:latest
+    # Local build tag only; no published registry image is assumed.
+    image: muse-console:local
     restart: unless-stopped
     env_file:
       - path: .env
         required: false
     environment:
-      MUSE2API_HOST: 0.0.0.0
-      MUSE2API_DATA_DIR: /app/data
-      MUSE2API_CHROMIUM_PATH: /usr/bin/chromium
+      MUSE_CONSOLE_HOST: 0.0.0.0
+      MUSE_CONSOLE_DATA_DIR: /app/data
+      MUSE_CONSOLE_CHROMIUM_PATH: /usr/bin/chromium
+      # Explicit opt-in via shell environment for real drivers/renewal.
+      MUSE_CONSOLE_DRIVER: ${MUSE_CONSOLE_DRIVER:-mock}
+      MUSE_CONSOLE_KEEPALIVE_ENABLED: ${MUSE_CONSOLE_KEEPALIVE_ENABLED:-false}
     ports:
       - "127.0.0.1:18610:18610"
     volumes:

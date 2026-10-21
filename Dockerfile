@@ -14,17 +14,20 @@ RUN apt-get update \
 RUN useradd --create-home --uid 1000 muse
 WORKDIR /app
 
-COPY pyproject.toml README.md ./
+# Pin the lockfile consumer; no install-time dependency re-resolution.
+COPY --from=ghcr.io/astral-sh/uv:0.12.11 /uv /uvx /bin/
+COPY pyproject.toml uv.lock README.md LICENSE ./
 COPY src ./src
-COPY --from=console /src/muse2api/web/ ./src/muse2api/web/
-RUN pip install --no-cache-dir .
+COPY --from=console /src/muse_console/web/ ./src/muse_console/web/
+RUN uv sync --locked --no-dev --no-editable --no-cache
+ENV PATH="/app/.venv/bin:$PATH"
 
-ENV MUSE2API_HOST=0.0.0.0 \
-    MUSE2API_DATA_DIR=/app/data \
-    MUSE2API_CHROMIUM_PATH=/usr/bin/chromium
+ENV MUSE_CONSOLE_HOST=0.0.0.0 \
+    MUSE_CONSOLE_DATA_DIR=/app/data \
+    MUSE_CONSOLE_CHROMIUM_PATH=/usr/bin/chromium
 
 RUN mkdir -p /app/data && chown -R muse:muse /app
 USER muse
 
 EXPOSE 18610
-CMD ["muse2api"]
+CMD ["muse-console"]

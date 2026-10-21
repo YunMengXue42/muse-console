@@ -2,6 +2,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
+.venv-*/
 venv/
 build/
 dist/
@@ -20,3 +21,7 @@ data-preview/
 .idea/
 .vscode/
 .DS_Store
+
+# local release artifacts / QA notes
+dist*/
+tasks/
