@@ -287,7 +287,10 @@ def test_locks_of_a_dead_owner_are_moved_aside(tmp_path):
     moved = safety.clear_proven_stale_locks(tmp_path)
     assert set(moved) == {"SingletonLock", "SingletonCookie", "SingletonSocket"}
     assert not any((tmp_path / name).is_symlink() for name in moved)
-    assert len(list((tmp_path / "stale-locks").rglob("SingletonLock"))) == 1
+    # Not rglob("SingletonLock"): before 3.12 an exact-name pattern calls exists(),
+    # which follows the (dangling) symlink and skips it.
+    archived = [p for p in (tmp_path / "stale-locks").rglob("*") if p.name == "SingletonLock"]
+    assert len(archived) == 1 and archived[0].is_symlink()
 
 
 @POSIX
