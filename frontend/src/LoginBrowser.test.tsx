@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Api } from "./api";
 import { LoginBrowser } from "./LoginBrowser";
@@ -59,7 +65,14 @@ describe("远程网页登录", () => {
         notify={vi.fn()}
       />,
     );
-    await screen.findByAltText(/实时截图/);
+    const frame = await screen.findByAltText(/实时截图/);
+    expect(screen.getByText("等待操作")).toBeTruthy();
+    fireEvent.wheel(frame, { deltaY: 120 });
+    await waitFor(() =>
+      expect(
+        calls.some((c) => (c.body as { delta_y?: number })?.delta_y === 500),
+      ).toBe(true),
+    );
     const textInput = screen.getByLabelText(
       "发送到上游页面的文本",
     ) as HTMLInputElement;
@@ -129,6 +142,10 @@ describe("远程网页登录", () => {
       />,
     );
     expect(screen.getByText(/登录会话已过期/)).toBeTruthy();
+    expect(
+      (screen.getByLabelText("发送到上游页面的文本") as HTMLInputElement)
+        .disabled,
+    ).toBe(true);
     expect(
       (
         screen.getByRole("button", {

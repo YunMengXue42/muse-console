@@ -1,0 +1,141 @@
+/* 网页登录窗口：一屏布局，左侧实时截图，右侧操作栏；整窗不滚动。 */
+.veil .modal.login-browser {
+  width: min(1320px, 96vw);
+  height: min(860px, 94dvh);
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 18px 20px 20px;
+}
+.veil .modal.login-browser > header {
+  margin-bottom: 12px;
+  flex: none;
+}
+.lb-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 288px;
+  gap: 18px;
+}
+.lb-stage {
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--soft);
+  border-radius: 12px;
+  overflow: hidden;
+}
+/* 元素盒与图像等比一致，点击坐标换算不受留白影响。 */
+.lb-stage .browser-frame {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  margin: 0;
+  border-radius: 8px;
+  box-shadow: 0 1px 6px #0001;
+}
+.lb-stage .empty,
+.lb-stage .error {
+  margin: 0 24px;
+}
+.lb-panel {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: auto;
+}
+.lb-session {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.lb-chip {
+  font-size: var(--text-caption);
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+.lb-chip.bad {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+.lb-timer {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-lg, 18px);
+  font-weight: 600;
+  cursor: default;
+}
+.lb-timer.low {
+  color: var(--danger);
+}
+.veil .modal .lb-steps {
+  margin: 0;
+  padding-left: 1.3em;
+  font-size: var(--text-caption);
+  color: var(--muted);
+  line-height: 1.7;
+}
+.veil .modal.login-browser .error {
+  margin: 0;
+}
+.lb-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lb-text input {
+  width: 100%;
+}
+.lb-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+}
+.lb-keys {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.lb-keys button {
+  min-height: 34px;
+  padding: 0 4px;
+  font-size: var(--text-caption);
+}
+.veil .modal .lb-note {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--muted);
+}
+.veil .modal.login-browser footer {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+}
+@media (max-width: 860px) {
+  .veil .modal.login-browser {
+    height: auto;
+    max-height: 94dvh;
+    overflow: auto;
+  }
+  .lb-body {
+    grid-template-columns: 1fr;
+  }
+  .lb-stage {
+    max-height: 60dvh;
+  }
+  .lb-stage .browser-frame {
+    max-height: 60dvh;
+  }
+  .lb-keys button {
+    min-height: 44px;
+  }
+}

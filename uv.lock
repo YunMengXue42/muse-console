@@ -847,7 +847,7 @@ wheels = [
 
 [[package]]
 name = "muse-console"
-version = "0.4.1"
+version = "0.4.2"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },

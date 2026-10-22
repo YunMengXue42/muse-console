@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Api, ApiError, framePoint, time, type LoginSession } from "./api";
 import { Modal } from "./ui";
+import "./login-browser.css";
 /** 登录截图仅通过带 Bearer 的 API 获取；顺序轮询避免截图请求重叠。 */
 export function LoginBrowser({
   api,
@@ -161,30 +162,24 @@ export function LoginBrowser({
       setBusy(false);
     }
   }
+  const statusText = expired
+    ? "已过期"
+    : (STATUS_LABEL[current.status] ?? current.status);
+  const low = !expired && remainingSec <= 60;
   return (
-    <Modal title="上游真实网页登录" wide onClose={onClose}>
-      <p className="muted">
-        在 muse.ai 网页逐号登录，手动完成验证码；输入不在本地保存。
-      </p>
-      <div className="session-meta">
-        <span>会话 {current.status}</span>
-        <span>
-          到期 {time(current.expires_at)}
-          {!expired ? `（剩余 ${remainingSec}s）` : ""}
-        </span>
-      </div>
-      {error && (
-        <p role="alert" className="error">
-          {error}
-        </p>
-      )}
-      {expired ? (
-        <p role="alert" className="error">
-          登录会话已过期，请关闭并重新发起登录。
-        </p>
-      ) : (
-        <>
-          {image ? (
+    <Modal
+      title="上游真实网页登录"
+      wide
+      className="login-browser"
+      onClose={onClose}
+    >
+      <div className="lb-body">
+        <div className="lb-stage">
+          {expired ? (
+            <p role="alert" className="error">
+              登录会话已过期，请关闭并重新发起登录。
+            </p>
+          ) : image ? (
             <img
               className="browser-frame"
               src={image}
@@ -202,12 +197,42 @@ export function LoginBrowser({
                   ),
                 })
               }
+              onWheel={(e) => {
+                if (Math.abs(e.deltaY) >= 1)
+                  void input({
+                    type: "scroll",
+                    delta_y: e.deltaY > 0 ? 500 : -500,
+                  });
+              }}
             />
           ) : (
             <div className="empty">正在获取上游页面截图…</div>
           )}
+        </div>
+        <aside className="lb-panel">
+          <div className="lb-session">
+            <span className={`lb-chip ${expired ? "bad" : ""}`}>
+              {statusText}
+            </span>
+            <span
+              className={`lb-timer ${low ? "low" : ""}`}
+              title={`到期 ${time(current.expires_at)}`}
+            >
+              {expired ? "--:--" : clock(remainingSec)}
+            </span>
+          </div>
+          <ol className="lb-steps">
+            <li>点截图里的输入框</li>
+            <li>在下方输入并发送</li>
+            <li>登录成功后点「完成验证并入池」</li>
+          </ol>
+          {error && (
+            <p role="alert" className="error">
+              {error}
+            </p>
+          )}
           <form
-            className="toolbar"
+            className="lb-text"
             onSubmit={(e) => {
               e.preventDefault();
               const value = text;
@@ -220,35 +245,29 @@ export function LoginBrowser({
               type={masked ? "password" : "text"}
               autoComplete="off"
               value={text}
+              disabled={expired}
               onChange={(e) => setText(e.target.value)}
-              placeholder="先点击页面中的输入框，再输入文本"
+              placeholder="邮箱、手机号或验证码"
             />
-            <button
-              type="button"
-              onClick={() => setMasked((v) => !v)}
-              aria-pressed={!masked}
-            >
-              {masked ? "显示文本" : "隐藏文本"}
-            </button>
-            <button disabled={busy || !text}>发送到页面</button>
+            <div className="lb-row">
+              <button
+                type="button"
+                onClick={() => setMasked((v) => !v)}
+                aria-pressed={!masked}
+              >
+                {masked ? "显示文本" : "隐藏文本"}
+              </button>
+              <button className="primary" disabled={busy || !text || expired}>
+                发送到页面
+              </button>
+            </div>
           </form>
-          <div className="toolbar">
-            {(
-              [
-                ["Enter", "Enter"],
-                ["Tab", "Tab"],
-                ["Backspace", "退格"],
-                ["Escape", "Esc"],
-                ["ArrowUp", "↑"],
-                ["ArrowDown", "↓"],
-                ["ArrowLeft", "←"],
-                ["ArrowRight", "→"],
-              ] as const
-            ).map(([key, label]) => (
+          <div className="lb-keys" aria-label="按键">
+            {KEYS.map(([key, label]) => (
               <button
                 key={key}
                 type="button"
-                disabled={busy}
+                disabled={busy || expired}
                 onClick={() => void input({ type: "key", key })}
               >
                 {label}
@@ -256,31 +275,60 @@ export function LoginBrowser({
             ))}
             <button
               type="button"
-              disabled={busy}
+              aria-label="向上滚动"
+              title="向上滚动"
+              disabled={busy || expired}
               onClick={() => void input({ type: "scroll", delta_y: -500 })}
             >
-              向上滚动
+              上翻
             </button>
             <button
               type="button"
-              disabled={busy}
+              aria-label="向下滚动"
+              title="向下滚动"
+              disabled={busy || expired}
               onClick={() => void input({ type: "scroll", delta_y: 500 })}
             >
-              向下滚动
+              下翻
             </button>
           </div>
-        </>
-      )}
-      <footer>
-        <button onClick={onClose}>取消登录</button>
-        <button
-          className="primary"
-          disabled={busy || expired || current.status === "completed"}
-          onClick={() => void complete()}
-        >
-          {busy ? "处理中…" : "完成验证并入池"}
-        </button>
-      </footer>
+          <p className="lb-note">
+            输入只转发、不在本地保存。截图上可滚轮翻页。
+          </p>
+          <footer>
+            <button onClick={onClose}>取消登录</button>
+            <button
+              className="primary"
+              disabled={busy || expired || current.status === "completed"}
+              onClick={() => void complete()}
+            >
+              {busy ? "处理中…" : "完成验证并入池"}
+            </button>
+          </footer>
+        </aside>
+      </div>
     </Modal>
   );
+}
+const KEYS = [
+  ["Enter", "Enter"],
+  ["Tab", "Tab"],
+  ["Backspace", "退格"],
+  ["Escape", "Esc"],
+  ["ArrowUp", "↑"],
+  ["ArrowDown", "↓"],
+  ["ArrowLeft", "←"],
+  ["ArrowRight", "→"],
+] as const;
+const STATUS_LABEL: Record<string, string> = {
+  pending: "等待操作",
+  awaiting_login: "等待登录",
+  retry_wait: "正在重试",
+  manual_required: "需手动完成",
+  completed: "已完成",
+  cancelled: "已取消",
+  expired: "已过期",
+};
+function clock(sec: number) {
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
 }

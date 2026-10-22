@@ -2,6 +2,12 @@
 
 All notable changes to Muse Console are listed here. Versions follow [Semantic Versioning](https://semver.org/) while the project is pre-1.0: minor versions may change behavior.
 
+## [0.4.2] - 2026-10-22
+
+### Changed
+- Web login dialog fits one screen: the live page keeps its aspect ratio on the left; session state (Chinese label, countdown that turns red in the last minute), three steps, text input, keys and actions sit in a right column. Narrow screens stack vertically.
+- Mouse wheel over the live page scrolls the upstream page. Input and keys are disabled once the session expires.
+
 ## [0.4.1] - 2026-10-22
 
 ### Changed
