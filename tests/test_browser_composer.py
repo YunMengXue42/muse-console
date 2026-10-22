@@ -34,7 +34,7 @@ class Element {
 }
 class HTMLTextAreaElement extends Element {
   get value() { return this._value || ''; }
-  set value(v) { this._value = v; }
+  set value(v) { this._value = String(v).replace(/\r\n?/g, '\n'); }
 }
 globalThis.HTMLTextAreaElement = HTMLTextAreaElement;
 let ta = new HTMLTextAreaElement();
@@ -80,6 +80,7 @@ def javascript(body):
         input=FIXTURE + "\n" + body,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         check=True,
         timeout=10,
     )
@@ -109,6 +110,63 @@ def test_stable_fill_and_single_click():
     assert value["d"] == "clicked"
     assert value["e"] == "already-clicked"
     assert value["clicks"] == 1
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        pytest.param("first\r\nsecond", "first\nsecond", id="crlf"),
+        pytest.param("first\rsecond", "first\nsecond", id="cr"),
+        pytest.param("first\nsecond", "first\nsecond", id="lf"),
+        pytest.param("a\r\nb\rc\nd", "a\nb\nc\nd", id="mixed"),
+        pytest.param(
+            " \t中文\r\n\r\n第二行\r\n尾行\n \t",
+            " \t中文\n\n第二行\n尾行\n \t",
+            id="chinese-blank-lines-surrounding-whitespace",
+        ),
+    ],
+)
+def test_newlines_fill_and_single_click(text, expected):
+    value = javascript(
+        f"{execute(dom.composer_probe(reset=True))};"
+        f"{execute(dom.composer_probe())};"
+        f"const fill={execute(dom.fill_input(text))};"
+        f"const sent={execute(dom.click_send(text))};"
+        f"const replay={execute(dom.click_send(text))};"
+        "console.log(JSON.stringify({fill,sent,replay,clicks,"
+        "text:ta.value,committed:ta.__reactProps$fixture.value}));"
+    )
+    assert value == {
+        "fill": {"ok": True},
+        "sent": "clicked",
+        "replay": "already-clicked",
+        "clicks": 1,
+        "text": expected,
+        "committed": expected,
+    }
+
+
+@pytest.mark.parametrize(
+    "changed",
+    [
+        pytest.param(" \t中文\n\n已修改\n \t", id="changed-text"),
+        pytest.param("中文\n\n尾行\n \t", id="removed-leading-whitespace"),
+        pytest.param(" \t中文\n\n尾行", id="removed-trailing-whitespace"),
+        pytest.param(" \t中文\n尾行\n \t", id="removed-blank-line"),
+        pytest.param("  中文\n\n尾行\n \t", id="tab-to-spaces"),
+    ],
+)
+def test_newlines_changed_content_refuses_send(changed):
+    text = " \t中文\r\n\r尾行\n \t"
+    value = javascript(
+        f"{execute(dom.composer_probe(reset=True))};"
+        f"{execute(dom.composer_probe())};"
+        f"const fill={execute(dom.fill_input(text))};"
+        f"ta.value={json.dumps(changed)}; ta.dispatchEvent();"
+        f"const result={execute(dom.click_send(text))};"
+        "console.log(JSON.stringify({fill,result,clicks}));"
+    )
+    assert value == {"fill": {"ok": True}, "result": "refill", "clicks": 0}
 
 
 @pytest.mark.parametrize(

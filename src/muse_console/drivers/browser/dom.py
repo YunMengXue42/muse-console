@@ -218,8 +218,14 @@ def composer_probe(*, reset: bool = False) -> str:
     return "(() => {" + _COMPOSER + reset_script + "return sample();})()"
 
 
+def _textarea_text(text: str) -> str:
+    # native textarea values normalize line endings; preserve all other whitespace.
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
 def fill_input(text: str) -> str:
     """Fill only the same stable, ready composer using React's native setter path."""
+    text = _textarea_text(text)
     return (
         "(() => {"
         + _COMPOSER
@@ -243,6 +249,7 @@ def fill_input(text: str) -> str:
 
 def click_send(text: str) -> str:
     """Recheck readiness, binding, value and button immediately before one click."""
+    text = _textarea_text(text)
     return (
         "(() => {"
         + _COMPOSER

@@ -2,6 +2,12 @@
 
 All notable changes to Muse Console are listed here. Versions follow [Semantic Versioning](https://semver.org/) while the project is pre-1.0: minor versions may change behavior.
 
+## [0.3.10] - 2026-10-22
+
+### Fixed
+- Normalize CRLF and CR line endings to LF before filling and checking browser prompts, so Windows multiline prompts no longer loop until composer readiness times out. All other text and whitespace checks remain exact.
+- Composer test fixtures now model native textarea newline normalization, with regression coverage for multiline prompts and content mismatch protection.
+
 ## [0.3.9] - 2026-10-22
 
 ### Changed
