@@ -54,6 +54,61 @@ export function OverviewPage({
   const retrySuccesses = mediaOutcomes
     .filter((m) => m.outcome === "succeeded_after_retry")
     .reduce((acc, m) => acc + m.count, 0);
+  // 按账号聚合上游调用，避免「账号 × 操作 × 结果」逐行铺开。
+  const upstreamByAccount = (() => {
+    const map = new Map<
+      string,
+      {
+        account: string;
+        total: number;
+        failed: number;
+        ops: Map<string, number>;
+      }
+    >();
+    for (const item of upstreamRequests) {
+      const row = map.get(item.account) ?? {
+        account: item.account,
+        total: 0,
+        failed: 0,
+        ops: new Map<string, number>(),
+      };
+      row.total += item.count;
+      if (item.result !== "ok") row.failed += item.count;
+      row.ops.set(item.op, (row.ops.get(item.op) ?? 0) + item.count);
+      map.set(item.account, row);
+    }
+    return [...map.values()].sort((a, b) => b.total - a.total);
+  })();
+  const liveMetrics: [string, string | number, string][] = hasPromData
+    ? [
+        [
+          "Chat 平均首字耗时",
+          firstToken?.avgSeconds != null
+            ? `${firstToken.avgSeconds.toFixed(2)} s`
+            : "—",
+          firstToken?.totalCount
+            ? `累计 ${firstToken.totalCount} 次流式首字采样`
+            : "进程启动后尚无采样",
+        ],
+        [
+          "图像生成均耗",
+          imageOkGen ? `${imageOkGen.avgSeconds.toFixed(1)} s` : "—",
+          imageOkGen ? `成功 ${imageOkGen.count} 次` : "进程启动后尚无采样",
+        ],
+        [
+          "视频生成均耗",
+          videoOkGen ? `${videoOkGen.avgSeconds.toFixed(1)} s` : "—",
+          videoOkGen ? `成功 ${videoOkGen.count} 次` : "进程启动后尚无采样",
+        ],
+        [
+          "只回文本自动重投",
+          textOnlyRetries,
+          retrySuccesses > 0
+            ? `重投后成功 ${retrySuccesses} 次`
+            : "MediaWait 状态机累计触发",
+        ],
+      ]
+    : [];
 
   return (
     <div className="console-page overview-page">
@@ -88,7 +143,9 @@ export function OverviewPage({
           </button>
         )}
       </div>
-      <div className="metrics">
+      <div
+        className={`metrics overview-metrics${liveMetrics.length ? " has-live" : ""}`}
+      >
         {[
           ["总请求", stats?.total, "不含任务轮询请求"],
           [
@@ -108,6 +165,7 @@ export function OverviewPage({
             stats?.latency_ms.p95 == null ? "—" : `${stats.latency_ms.p95} ms`,
             `P50 ${stats?.latency_ms.p50 ?? "—"} ms`,
           ],
+          ...liveMetrics,
         ].map(([t, v, sub]) => (
           <section key={String(t)}>
             <span>{t}</span>
@@ -116,7 +174,7 @@ export function OverviewPage({
           </section>
         ))}
       </div>
-      <section className="panel">
+      <section className="panel overview-trend">
         <header>
           <h2>调用趋势</h2>
         </header>
@@ -126,13 +184,13 @@ export function OverviewPage({
           <Empty text="当前窗口暂无调用" />
         )}
       </section>
-      <div className="overview-grid spaced">
+      <div className="overview-grid">
         <section className="panel">
           <header>
             <h2>模型使用分布</h2>
           </header>
           {stats?.by_model.length ? (
-            <div className="table-wrap">
+            <div className="table-wrap overview-scroll">
               <table>
                 <thead>
                   <tr>
@@ -162,58 +220,37 @@ export function OverviewPage({
         </section>
         <section className="panel">
           <header>
-            <h2>账号调度分布</h2>
+            <h2>状态码分布</h2>
           </header>
-          {byAccount.length ? (
-            <div className="table-wrap">
+          {byStatus.length ? (
+            <div className="table-wrap overview-scroll">
               <table>
                 <thead>
                   <tr>
-                    <th>上游账号</th>
+                    <th>HTTP 状态</th>
                     <th className="console-number">请求数</th>
-                    <th className="console-number">错误数</th>
+                    <th className="console-number">失败计入</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {byAccount.map((item) => {
-                    const id = item.account_id;
-                    const label = id ? accountLabels.get(id) : undefined;
-                    return (
-                      <tr key={id ?? "unassigned"}>
-                        <td data-label="上游账号">
-                          <div className="console-identity">
-                            {id && onFilterRequests ? (
-                              <button
-                                type="button"
-                                className="link-button"
-                                onClick={() =>
-                                  onFilterRequests({ accountId: id })
-                                }
-                              >
-                                {label || id}
-                              </button>
-                            ) : (
-                              <strong>{label || id || "未分配账号"}</strong>
-                            )}
-                            {label && id && (
-                              <small className="mono">{id}</small>
-                            )}
-                          </div>
-                        </td>
-                        <td data-label="请求数" className="console-number">
-                          {item.count}
-                        </td>
-                        <td data-label="错误数" className="console-number">
-                          {item.errors}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {byStatus.map((item) => (
+                    <tr key={item.status_code}>
+                      <td data-label="HTTP 状态">
+                        {badge(String(item.status_code))}
+                      </td>
+                      <td data-label="请求数" className="console-number">
+                        {item.count}
+                      </td>
+                      <td data-label="失败计入" className="console-number">
+                        {item.errors}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           ) : (
-            <Empty text="暂无账号调用记录" />
+            <Empty text="暂无状态码记录" />
           )}
         </section>
         <section className="panel">
@@ -221,7 +258,7 @@ export function OverviewPage({
             <h2>密钥调用排行</h2>
           </header>
           {byKey.length ? (
-            <div className="table-wrap">
+            <div className="table-wrap overview-scroll">
               <table>
                 <thead>
                   <tr>
@@ -276,90 +313,113 @@ export function OverviewPage({
         </section>
         <section className="panel">
           <header>
-            <h2>状态码分布</h2>
+            <h2>账号调度分布</h2>
+            <span className="muted">{byAccount.length} 个</span>
           </header>
-          {byStatus.length ? (
-            <div className="table-wrap">
+          {byAccount.length ? (
+            <div className="table-wrap overview-scroll">
               <table>
                 <thead>
                   <tr>
-                    <th>HTTP 状态</th>
+                    <th>上游账号</th>
                     <th className="console-number">请求数</th>
-                    <th className="console-number">失败计入</th>
+                    <th className="console-number">错误数</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {byStatus.map((item) => (
-                    <tr key={item.status_code}>
-                      <td data-label="HTTP 状态">
-                        {badge(String(item.status_code))}
-                      </td>
-                      <td data-label="请求数" className="console-number">
-                        {item.count}
-                      </td>
-                      <td data-label="失败计入" className="console-number">
-                        {item.errors}
-                      </td>
-                    </tr>
-                  ))}
+                  {byAccount.map((item) => {
+                    const id = item.account_id;
+                    const label = id ? accountLabels.get(id) : undefined;
+                    return (
+                      <tr key={id ?? "unassigned"}>
+                        <td data-label="上游账号">
+                          <div className="console-identity">
+                            {id && onFilterRequests ? (
+                              <button
+                                type="button"
+                                className="link-button"
+                                title={id}
+                                onClick={() =>
+                                  onFilterRequests({ accountId: id })
+                                }
+                              >
+                                {label || id}
+                              </button>
+                            ) : (
+                              <strong>{label || id || "未分配账号"}</strong>
+                            )}
+                          </div>
+                        </td>
+                        <td data-label="请求数" className="console-number">
+                          {item.count}
+                        </td>
+                        <td data-label="错误数" className="console-number">
+                          {item.errors}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           ) : (
-            <Empty text="暂无状态码记录" />
+            <Empty text="暂无账号调用记录" />
           )}
         </section>
-      </div>
-      {hasPromData && (
-        <>
-          <div className="metrics spaced" aria-label="进程内实时指标">
-            {[
-              [
-                "Chat 平均首字耗时",
-                firstToken?.avgSeconds != null
-                  ? `${firstToken.avgSeconds.toFixed(2)} s`
-                  : "—",
-                firstToken?.totalCount
-                  ? `累计 ${firstToken.totalCount} 次流式首字采样`
-                  : "进程启动后尚无采样",
-              ],
-              [
-                "图像生成均耗",
-                imageOkGen ? `${imageOkGen.avgSeconds.toFixed(1)} s` : "—",
-                imageOkGen
-                  ? `成功 ${imageOkGen.count} 次`
-                  : "进程启动后尚无采样",
-              ],
-              [
-                "视频生成均耗",
-                videoOkGen ? `${videoOkGen.avgSeconds.toFixed(1)} s` : "—",
-                videoOkGen
-                  ? `成功 ${videoOkGen.count} 次`
-                  : "进程启动后尚无采样",
-              ],
-              [
-                "只回文本自动重投",
-                textOnlyRetries,
-                retrySuccesses > 0
-                  ? `重投后成功 ${retrySuccesses} 次`
-                  : "MediaWait 状态机累计触发",
-              ],
-            ].map(([t, v, sub]) => (
-              <section key={String(t)}>
-                <span>{t}</span>
-                <strong>{v}</strong>
-                <small>{sub}</small>
-              </section>
-            ))}
-          </div>
-          <div className="overview-grid spaced">
+        {hasPromData && (
+          <>
             <section className="panel">
               <header>
-                <h2>媒体等待状态机（MediaWait）</h2>
-                <span className="muted">进程内累计</span>
+                <h2>网关上游调用</h2>
+                <span className="muted">进程内累计 · 按账号</span>
+              </header>
+              {upstreamByAccount.length ? (
+                <div className="table-wrap overview-scroll">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>账号 / 操作</th>
+                        <th className="console-number">次数</th>
+                        <th className="console-number">失败</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {upstreamByAccount.map((row) => (
+                        <tr key={row.account}>
+                          <td data-label="账号 / 操作">
+                            <div className="console-identity">
+                              <strong title={row.account}>
+                                {accountLabels.get(row.account) || row.account}
+                              </strong>
+                              <small className="mono">
+                                {[...row.ops.entries()]
+                                  .map(([op, n]) => `${op} ${n}`)
+                                  .join(" · ")}
+                              </small>
+                            </div>
+                          </td>
+                          <td data-label="次数" className="console-number">
+                            {row.total}
+                          </td>
+                          <td data-label="失败" className="console-number">
+                            {row.failed}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <Empty text="暂无网关上游记录" />
+              )}
+            </section>
+            <section className="panel">
+              <header>
+                <h2>媒体等待状态机</h2>
+                <span className="muted">MediaWait · 进程内累计</span>
               </header>
               {mediaOutcomes.length ? (
-                <div className="table-wrap">
+                <div className="table-wrap overview-scroll">
                   <table>
                     <thead>
                       <tr>
@@ -373,10 +433,9 @@ export function OverviewPage({
                         <tr key={`${item.kind}-${item.outcome}`}>
                           <td data-label="类型">{item.kind}</td>
                           <td data-label="状态机结果">
-                            <div className="console-identity">
+                            <span title={item.outcome}>
                               {badge(item.outcome)}
-                              <small className="mono">{item.outcome}</small>
-                            </div>
+                            </span>
                           </td>
                           <td data-label="次数" className="console-number">
                             {item.count}
@@ -390,51 +449,9 @@ export function OverviewPage({
                 <Empty text="暂无媒体状态机事件" />
               )}
             </section>
-            <section className="panel">
-              <header>
-                <h2>网关上游调用细分</h2>
-                <span className="muted">按操作与错误码</span>
-              </header>
-              {upstreamRequests.length ? (
-                <div className="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>账号 / 操作</th>
-                        <th>结果码</th>
-                        <th className="console-number">次数</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {upstreamRequests.map((item, idx) => {
-                        const label = accountLabels.get(item.account);
-                        return (
-                          <tr
-                            key={`${item.account}-${item.op}-${item.result}-${idx}`}
-                          >
-                            <td data-label="账号 / 操作">
-                              <div className="console-identity">
-                                <strong>{label || item.account}</strong>
-                                <small className="mono">{item.op}</small>
-                              </div>
-                            </td>
-                            <td data-label="结果码">{badge(item.result)}</td>
-                            <td data-label="次数" className="console-number">
-                              {item.count}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <Empty text="暂无网关上游记录" />
-              )}
-            </section>
-          </div>
-        </>
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

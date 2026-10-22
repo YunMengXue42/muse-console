@@ -2,6 +2,13 @@
 
 All notable changes to Muse Console are listed here. Versions follow [Semantic Versioning](https://semver.org/) while the project is pre-1.0: minor versions may change behavior.
 
+## [0.3.7] - 2026-10-22
+
+### Changed
+- Console layout fits one screen: account pool, tasks and request log fill the window; only the table body scrolls, with sticky headers, filters and pagination always visible.
+- Overview is a dense grid: metrics and live metrics in one block, shorter trend chart, breakdown cards scroll internally; upstream calls are grouped per account.
+- Tighter page header, table rows and toolbars; account pool filters, search and strategy share one row. Mobile keeps the natural page flow.
+
 ## [0.3.6] - 2026-10-22
 
 ### Added
@@ -51,6 +58,7 @@ Dashboard, per-client API keys, request log, async image tasks, reference images
 
 Initial layered OpenAI-compatible gateway with pluggable drivers.
 
+[0.3.7]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.3.7
 [0.3.6]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.3.6
 [0.3.5]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.3.5
 [0.3.4]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.3.4

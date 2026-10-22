@@ -136,43 +136,49 @@ export function PoolPage({
             </div>
             <span className="badge">{accounts.length} 个账号</span>
           </header>
-          <div className="pool-filters" role="group" aria-label="账号状态筛选">
-            {filters.map((item) => (
-              <button
-                key={item.value}
-                aria-pressed={filter === item.value}
-                onClick={() => setFilter(item.value)}
-              >
-                {item.label} <span>{item.count}</span>
-              </button>
-            ))}
-          </div>
-          <div className="table-tools">
-            <input
-              aria-label="搜索账号"
-              placeholder="搜索名称或账号 ID"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <label className="inline">
-              调度策略
-              <select
-                aria-label="调度策略"
-                value={pool?.strategy ?? "round_robin"}
-                disabled={busy || !pool}
-                onChange={(e) =>
-                  void act(async () => {
-                    await api.request("/pool", "PATCH", {
-                      strategy: e.target.value,
-                    });
-                  }, "调度策略已更新")
-                }
-              >
-                <option value="round_robin">轮询</option>
-                <option value="lru">最少最近使用</option>
-                <option value="affinity">会话亲和</option>
-              </select>
-            </label>
+          <div className="pool-toolbar">
+            <div
+              className="pool-filters"
+              role="group"
+              aria-label="账号状态筛选"
+            >
+              {filters.map((item) => (
+                <button
+                  key={item.value}
+                  aria-pressed={filter === item.value}
+                  onClick={() => setFilter(item.value)}
+                >
+                  {item.label} <span>{item.count}</span>
+                </button>
+              ))}
+            </div>
+            <div className="table-tools">
+              <input
+                aria-label="搜索账号"
+                placeholder="搜索名称或账号 ID"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <label className="inline">
+                调度策略
+                <select
+                  aria-label="调度策略"
+                  value={pool?.strategy ?? "round_robin"}
+                  disabled={busy || !pool}
+                  onChange={(e) =>
+                    void act(async () => {
+                      await api.request("/pool", "PATCH", {
+                        strategy: e.target.value,
+                      });
+                    }, "调度策略已更新")
+                  }
+                >
+                  <option value="round_robin">轮询</option>
+                  <option value="lru">最少最近使用</option>
+                  <option value="affinity">会话亲和</option>
+                </select>
+              </label>
+            </div>
           </div>
           {accounts.length ? (
             <div

@@ -551,19 +551,24 @@ export default function App() {
           </div>
         </div>
       </aside>
-      <main className={page === 0 ? "pool-workspace" : undefined}>
-        {status?.driver.driver === "mock" && (
-          <div className="workspace-context">
-            <span className="environment-label">演示环境 · 模拟数据</span>
-          </div>
-        )}
+      <main
+        className={[
+          page === 0 ? "pool-workspace" : "",
+          [0, 2, 3].includes(page) ? "fill-workspace" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
         <header className="page-header">
-          <div>
+          <div className="page-title">
             <div className="eyebrow">
               {page === 0 ? "ACCOUNT MANAGEMENT" : "MUSE CONSOLE"}
             </div>
             <h1>{pages[page]}</h1>
             <p className="muted">{descriptions[page]}</p>
+            {status?.driver.driver === "mock" && (
+              <span className="environment-label">演示环境 · 模拟数据</span>
+            )}
           </div>
           <div className="toolbar">
             <button onClick={() => setRefresh((v) => v + 1)} disabled={loading}>
