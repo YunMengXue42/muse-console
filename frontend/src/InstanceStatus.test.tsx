@@ -11,7 +11,7 @@ const base: Status = {
 };
 
 describe("InstanceStatus", () => {
-  it("区分在线、需关注、异常、无响应与连接中", () => {
+  it("区分在线、无可用账号、异常、断开与连接中", () => {
     expect(instanceTone(base, false)).toBe("online");
     expect(
       instanceTone({ ...base, accounts: { total: 2, available: 0 } }, false),
@@ -26,23 +26,24 @@ describe("InstanceStatus", () => {
     expect(instanceTone(undefined, false)).toBe("pending");
   });
 
-  it("在线时显示可调度比例、运行任务和同步时间", () => {
-    render(
+  it("一行显示状态与可用账号，细节放悬停", () => {
+    const { container } = render(
       <InstanceStatus
         status={base}
         unreachable={false}
         lastSyncAt={Date.now()}
       />,
     );
-    expect(screen.getByText("驱动在线")).toBeTruthy();
-    expect(screen.getByText("2 个任务运行中")).toBeTruthy();
-    expect(screen.getByText("刚刚同步")).toBeTruthy();
+    expect(screen.getByText("在线")).toBeTruthy();
+    expect(container.querySelector(".instance-count")?.textContent).toBe("3/4");
+    const card = container.querySelector(".instance-card");
+    expect(card?.getAttribute("title")).toContain("browser · v1.0.0");
+    expect(card?.getAttribute("title")).toContain("刚刚同步");
     const bar = screen.getByRole("progressbar", { name: "可调度账号比例" });
-    expect(bar.getAttribute("aria-valuenow")).toBe("3");
     expect(bar.querySelector("i")?.getAttribute("style")).toContain("75%");
   });
 
-  it("无可调度账号与服务无响应给出明确提示", () => {
+  it("无可用账号与连接断开有明确状态，切换时闪烁", () => {
     const { rerender, container } = render(
       <InstanceStatus
         status={{ ...base, accounts: { total: 2, available: 0 } }}
@@ -50,10 +51,10 @@ describe("InstanceStatus", () => {
         lastSyncAt={null}
       />,
     );
-    expect(screen.getByText("需要关注")).toBeTruthy();
-    expect(screen.getByText("没有可调度账号，新请求会排队")).toBeTruthy();
+    expect(screen.getByText("无可用账号")).toBeTruthy();
     rerender(<InstanceStatus status={base} unreachable lastSyncAt={null} />);
-    expect(screen.getByText("服务无响应")).toBeTruthy();
+    expect(screen.getByText("连接断开")).toBeTruthy();
+    expect(container.querySelector(".instance-count")).toBeNull();
     expect(container.querySelector(".instance-card.is-flash")).toBeTruthy();
     expect(container.querySelector(".dot.online")).toBeNull();
   });

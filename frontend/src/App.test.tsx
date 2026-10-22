@@ -160,10 +160,10 @@ describe("控制台完整交互", () => {
   });
   it("实例状态保持可读，主题切换不影响登录", async () => {
     const user = await signIn();
-    expect(screen.getByText("驱动在线")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toContain("在线");
     const indicator = screen.getByRole("status").querySelector(".dot.online");
     expect(indicator?.getAttribute("aria-hidden")).toBe("true");
-    expect(screen.getByText("vtest")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toContain("vtest");
     const originalTheme = document.documentElement.dataset.theme;
     await user.click(screen.getByRole("button", { name: "切换主题" }));
     expect(document.documentElement.dataset.theme).not.toBe(originalTheme);

@@ -5,12 +5,20 @@ import "./instance-status.css";
 export type InstanceTone =
   "online" | "warn" | "offline" | "unreachable" | "pending";
 
-const COPY: Record<InstanceTone, string> = {
-  online: "驱动在线",
-  warn: "需要关注",
+const LABEL: Record<InstanceTone, string> = {
+  online: "在线",
+  warn: "无可用账号",
   offline: "驱动异常",
-  unreachable: "服务无响应",
+  unreachable: "连接断开",
   pending: "连接中",
+};
+
+const HINT: Record<InstanceTone, string> = {
+  online: "驱动正常",
+  warn: "新请求会排队",
+  offline: "请求会失败",
+  unreachable: "管理接口无响应，自动重试中",
+  pending: "等待服务响应",
 };
 
 export function instanceTone(
@@ -34,7 +42,7 @@ function ago(ms: number) {
   return m < 60 ? `${m} 分钟前同步` : `${Math.floor(m / 60)} 小时前同步`;
 }
 
-/** 侧栏实例状态卡：状态色 + 动效 + 账号可用度 + 同步时间；状态切换时闪烁一次。 */
+/** 侧栏实例状态：一行状态词 + 可用账号数 + 细进度条；细节放悬停提示。 */
 export function InstanceStatus({
   status,
   unreachable,
@@ -63,71 +71,55 @@ export function InstanceStatus({
 
   const total = status?.accounts.total ?? 0;
   const available = status?.accounts.available ?? 0;
+  const showCount = !!status && !unreachable && total > 0;
   const ratio = total > 0 ? Math.min(1, available / total) : 0;
-  const running = status?.tasks?.running ?? 0;
-  const hint =
-    tone === "unreachable"
-      ? "无法连接管理接口，自动重试中"
-      : tone === "offline"
-        ? "浏览器驱动未就绪，请求会失败"
-        : tone === "warn"
-          ? "没有可调度账号，新请求会排队"
-          : tone === "pending"
-            ? "等待服务响应"
-            : total === 0
-              ? "尚未接入账号"
-              : running > 0
-                ? `${running} 个任务运行中`
-                : "一切正常";
+  const details = [
+    HINT[tone],
+    status && !unreachable
+      ? `${status.driver.driver} · v${status.version}`
+      : null,
+    lastSyncAt != null ? ago(now - lastSyncAt) : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const dot =
+    tone === "online"
+      ? "online"
+      : tone === "warn"
+        ? "warn"
+        : tone === "pending"
+          ? "pending"
+          : "down";
 
   return (
     <div
       className={`instance-card tone-${tone}${flash ? " is-flash" : ""}`}
       data-tone={tone}
+      title={details}
     >
       <div className="instance-status" role="status">
         <span className="instance-signal" aria-hidden="true">
-          <span
-            aria-hidden="true"
-            className={`dot ${tone === "online" ? "online" : tone === "warn" ? "warn" : tone === "pending" ? "pending" : "down"}`}
-          />
+          <span aria-hidden="true" className={`dot ${dot}`} />
         </span>
-        <div className="instance-copy">
-          <span className="instance-state">{COPY[tone]}</span>
-          {status && !unreachable && (
-            <span className="instance-meta">
-              <span>{status.driver.driver}</span>
-              <span className="instance-version">v{status.version}</span>
-            </span>
-          )}
-        </div>
+        <span className="instance-state">{LABEL[tone]}</span>
+        {showCount && (
+          <span className="instance-count">
+            <strong>{available}</strong>/{total}
+          </span>
+        )}
+        <span className="sr-only">{details}</span>
       </div>
-      <p className="instance-hint">{hint}</p>
-      {status && total > 0 && (
-        <div className="instance-capacity">
-          <div className="instance-capacity-row">
-            <span>可调度账号</span>
-            <strong>
-              {available}
-              <span> / {total}</span>
-            </strong>
-          </div>
-          <div
-            className="instance-bar"
-            role="progressbar"
-            aria-label="可调度账号比例"
-            aria-valuemin={0}
-            aria-valuemax={total}
-            aria-valuenow={available}
-          >
-            <i style={{ width: `${Math.round(ratio * 100)}%` }} />
-          </div>
+      {showCount && (
+        <div
+          className="instance-bar"
+          role="progressbar"
+          aria-label="可调度账号比例"
+          aria-valuemin={0}
+          aria-valuemax={total}
+          aria-valuenow={available}
+        >
+          <i style={{ width: `${Math.round(ratio * 100)}%` }} />
         </div>
-      )}
-      {lastSyncAt != null && (
-        <span className="instance-sync" aria-hidden="true">
-          {ago(now - lastSyncAt)}
-        </span>
       )}
     </div>
   );

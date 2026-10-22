@@ -2,6 +2,11 @@
 
 All notable changes to Muse Console are listed here. Versions follow [Semantic Versioning](https://semver.org/) while the project is pre-1.0: minor versions may change behavior.
 
+## [0.3.9] - 2026-10-22
+
+### Changed
+- Sidebar instance status trimmed to one line (state word + available/total accounts) and a thin capacity bar. Driver, version, hint and last sync moved to the hover tooltip and screen-reader text. Labels: 在线 / 无可用账号 / 驱动异常 / 连接断开.
+
 ## [0.3.8] - 2026-10-22
 
 ### Changed
@@ -64,6 +69,7 @@ Dashboard, per-client API keys, request log, async image tasks, reference images
 
 Initial layered OpenAI-compatible gateway with pluggable drivers.
 
+[0.3.9]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.3.9
 [0.3.8]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.3.8
 [0.3.7]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.3.7
 [0.3.6]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.3.6
