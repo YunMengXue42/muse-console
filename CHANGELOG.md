@@ -2,6 +2,22 @@
 
 All notable changes to Muse Console are listed here. Versions follow [Semantic Versioning](https://semver.org/) while the project is pre-1.0: minor versions may change behavior.
 
+## [0.4.0] - 2026-10-22
+
+### Added
+- Theme switch is a ceiling pull-cord (`pullcord`, MIT; brings in `motion`): pull the knob, click it or press Enter.
+- Sidebar instance card shows the account split (available / busy / cooling / invalid) as a segmented bar with a legend, plus running and queued task counts.
+
+### Changed
+- Light theme background is a warm off-white (`#f4f4f2`).
+- Overview fits one screen: metrics strip, trend beside the model breakdown, then account / key / status cards (plus process counters when metrics exist). Breakdown tables became bar lists with a soft blue/coral palette, staggered entry, growing bars and hover states.
+- API keys page fits one screen: base URL and built-in identities share a row; the key table fills the rest with a sticky header.
+- Instance card uses the Muse blue when online; the signal is a single soft halo instead of hard rings.
+- Extension pairing dialog copy shortened; safety checks unchanged.
+
+### Removed
+- Sidebar theme and logout buttons. Closing the tab ends the session (the admin key lives in sessionStorage only).
+
 ## [0.3.10] - 2026-10-22
 
 ### Fixed
@@ -75,6 +91,8 @@ Dashboard, per-client API keys, request log, async image tasks, reference images
 
 Initial layered OpenAI-compatible gateway with pluggable drivers.
 
+[0.4.0]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.4.0
+[0.3.10]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.3.10
 [0.3.9]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.3.9
 [0.3.8]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.3.8
 [0.3.7]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.3.7

@@ -109,7 +109,7 @@ describe("扩展设备配对", () => {
   });
   it("404 友好说明，不影响关闭或生成动作", async () => {
     const { user, close } = setup({ disabled: true });
-    await screen.findByText(/请管理员开启凭据导入配置/);
+    await screen.findByText(/需管理员开启/);
     await user.click(screen.getByRole("button", { name: "生成配对挑战" }));
     await screen.findByText(/账号池其他功能不受影响/);
     await user.click(screen.getByRole("button", { name: "关闭配对窗口" }));
@@ -155,26 +155,12 @@ describe("扩展设备配对", () => {
       fetcher.mock.calls.filter(([, init]) => init.method !== "GET"),
     ).toHaveLength(0);
     expect(
-      screen.getByRole("heading", { name: "确认本次候选身份或版本冲突？" }),
+      screen.getByRole("heading", { name: "确认本次身份冲突？" }),
     ).toBeTruthy();
-    expect(
-      screen.getByText(/核对浏览器当前账号身份与目标账号当前凭据版本/),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(
-        /仅原 capture 和服务端记录确认时的目标版本；不永久授权身份不明更新/,
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText(/只对本次候选生效/)).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "仅确认本次候选" }));
-    const result = await screen.findByText(/本次确认已提交/);
-    expect(result.textContent).toContain(
-      "仅适用于原 capture 和服务端记录确认时的目标当前版本",
-    );
+    const result = await screen.findByText(/已确认，尚未入池/);
     expect(result.textContent).toContain("在扩展重传同一候选");
-    expect(result.textContent).toContain(
-      "重新验证并进行 CAS，扩展 base 版本不变",
-    );
-    expect(result.textContent).toContain("版本变化或后续身份不明更新需重确认");
     const request = fetcher.mock.calls.find(([path]) =>
       path.endsWith("/confirm"),
     );

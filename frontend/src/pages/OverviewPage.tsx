@@ -1,3 +1,4 @@
+import type { CSSProperties, ReactNode } from "react";
 import type { Account, Stats } from "../api";
 import { TrendChart } from "./TrendChart";
 import type { Detail, Setter } from "../types";
@@ -174,284 +175,200 @@ export function OverviewPage({
           </section>
         ))}
       </div>
-      <section className="panel overview-trend">
-        <header>
-          <h2>调用趋势</h2>
-        </header>
-        {stats?.series.length && stats.total > 0 ? (
-          <TrendChart series={stats.series} windowValue={windowValue} />
-        ) : (
-          <Empty text="当前窗口暂无调用" />
-        )}
-      </section>
-      <div className="overview-grid">
-        <section className="panel">
+      <div className="overview-main">
+        <section className="panel overview-trend">
           <header>
-            <h2>模型使用分布</h2>
+            <h2>调用趋势</h2>
           </header>
-          {stats?.by_model.length ? (
-            <div className="table-wrap overview-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>模型</th>
-                    <th className="console-number">请求数</th>
-                    <th className="console-number">错误数</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.by_model.map((m) => (
-                    <tr key={m.model ?? "unknown"}>
-                      <td data-label="模型">{m.model ?? "未指定模型"}</td>
-                      <td data-label="请求数" className="console-number">
-                        {m.count}
-                      </td>
-                      <td data-label="错误数" className="console-number">
-                        {m.errors}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          {stats?.series.length && stats.total > 0 ? (
+            <TrendChart series={stats.series} windowValue={windowValue} />
           ) : (
-            <Empty text="暂无模型记录" />
+            <Empty text="当前窗口暂无调用" />
           )}
         </section>
         <section className="panel">
           <header>
-            <h2>状态码分布</h2>
+            <h2>模型</h2>
+            <span className="muted">{stats?.by_model.length ?? 0} 个</span>
           </header>
-          {byStatus.length ? (
-            <div className="table-wrap overview-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>HTTP 状态</th>
-                    <th className="console-number">请求数</th>
-                    <th className="console-number">失败计入</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {byStatus.map((item) => (
-                    <tr key={item.status_code}>
-                      <td data-label="HTTP 状态">
-                        {badge(String(item.status_code))}
-                      </td>
-                      <td data-label="请求数" className="console-number">
-                        {item.count}
-                      </td>
-                      <td data-label="失败计入" className="console-number">
-                        {item.errors}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <Empty text="暂无状态码记录" />
-          )}
+          <BarList
+            empty="暂无模型记录"
+            rows={(stats?.by_model ?? []).map((m) => ({
+              key: m.model ?? "unknown",
+              label: m.model ?? "未指定模型",
+              count: m.count,
+              errors: m.errors,
+            }))}
+          />
         </section>
+      </div>
+      <div className={`overview-grid${hasPromData ? " has-live" : ""}`}>
         <section className="panel">
           <header>
-            <h2>密钥调用排行</h2>
-          </header>
-          {byKey.length ? (
-            <div className="table-wrap overview-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>应用密钥</th>
-                    <th className="console-number">请求数</th>
-                    <th className="console-number">错误数</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {byKey.map((item, idx) => (
-                    <tr key={`${item.key_id ?? "anon"}-${idx}`}>
-                      <td data-label="应用密钥">
-                        <div className="console-identity">
-                          {item.key_id && onFilterRequests ? (
-                            <button
-                              type="button"
-                              className="link-button"
-                              onClick={() =>
-                                onFilterRequests({
-                                  keyId: item.key_id ?? undefined,
-                                })
-                              }
-                            >
-                              {item.key_name || item.key_id}
-                            </button>
-                          ) : (
-                            <strong>
-                              {item.key_name || item.key_id || "未记录身份"}
-                            </strong>
-                          )}
-                          {item.key_name &&
-                            item.key_id &&
-                            item.key_name !== item.key_id && (
-                              <small className="mono">{item.key_id}</small>
-                            )}
-                        </div>
-                      </td>
-                      <td data-label="请求数" className="console-number">
-                        {item.count}
-                      </td>
-                      <td data-label="错误数" className="console-number">
-                        {item.errors}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <Empty text="暂无密钥调用记录" />
-          )}
-        </section>
-        <section className="panel">
-          <header>
-            <h2>账号调度分布</h2>
+            <h2>账号调度</h2>
             <span className="muted">{byAccount.length} 个</span>
           </header>
-          {byAccount.length ? (
-            <div className="table-wrap overview-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>上游账号</th>
-                    <th className="console-number">请求数</th>
-                    <th className="console-number">错误数</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {byAccount.map((item) => {
-                    const id = item.account_id;
-                    const label = id ? accountLabels.get(id) : undefined;
-                    return (
-                      <tr key={id ?? "unassigned"}>
-                        <td data-label="上游账号">
-                          <div className="console-identity">
-                            {id && onFilterRequests ? (
-                              <button
-                                type="button"
-                                className="link-button"
-                                title={id}
-                                onClick={() =>
-                                  onFilterRequests({ accountId: id })
-                                }
-                              >
-                                {label || id}
-                              </button>
-                            ) : (
-                              <strong>{label || id || "未分配账号"}</strong>
-                            )}
-                          </div>
-                        </td>
-                        <td data-label="请求数" className="console-number">
-                          {item.count}
-                        </td>
-                        <td data-label="错误数" className="console-number">
-                          {item.errors}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <Empty text="暂无账号调用记录" />
-          )}
+          <BarList
+            empty="暂无账号调用记录"
+            rows={byAccount.map((item) => {
+              const id = item.account_id;
+              const label = (id && accountLabels.get(id)) || id;
+              return {
+                key: id ?? "unassigned",
+                label:
+                  id && onFilterRequests ? (
+                    <button
+                      type="button"
+                      className="link-button"
+                      title={id}
+                      onClick={() => onFilterRequests({ accountId: id })}
+                    >
+                      {label}
+                    </button>
+                  ) : (
+                    (label ?? "未分配账号")
+                  ),
+                count: item.count,
+                errors: item.errors,
+              };
+            })}
+          />
+        </section>
+        <section className="panel">
+          <header>
+            <h2>密钥排行</h2>
+            <span className="muted">{byKey.length} 个</span>
+          </header>
+          <BarList
+            empty="暂无密钥调用记录"
+            rows={byKey.map((item, idx) => {
+              const name = item.key_name || item.key_id || "未记录身份";
+              return {
+                key: `${item.key_id ?? "anon"}-${idx}`,
+                label:
+                  item.key_id && onFilterRequests ? (
+                    <button
+                      type="button"
+                      className="link-button"
+                      title={item.key_id}
+                      onClick={() =>
+                        onFilterRequests({ keyId: item.key_id ?? undefined })
+                      }
+                    >
+                      {name}
+                    </button>
+                  ) : (
+                    name
+                  ),
+                count: item.count,
+                errors: item.errors,
+              };
+            })}
+          />
+        </section>
+        <section className="panel">
+          <header>
+            <h2>状态码</h2>
+          </header>
+          <BarList
+            empty="暂无状态码记录"
+            rows={byStatus.map((item) => ({
+              key: String(item.status_code),
+              label: badge(String(item.status_code)),
+              count: item.count,
+              errors: item.errors,
+            }))}
+          />
         </section>
         {hasPromData && (
-          <>
-            <section className="panel">
-              <header>
-                <h2>网关上游调用</h2>
-                <span className="muted">进程内累计 · 按账号</span>
-              </header>
-              {upstreamByAccount.length ? (
-                <div className="table-wrap overview-scroll">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>账号 / 操作</th>
-                        <th className="console-number">次数</th>
-                        <th className="console-number">失败</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {upstreamByAccount.map((row) => (
-                        <tr key={row.account}>
-                          <td data-label="账号 / 操作">
-                            <div className="console-identity">
-                              <strong title={row.account}>
-                                {accountLabels.get(row.account) || row.account}
-                              </strong>
-                              <small className="mono">
-                                {[...row.ops.entries()]
-                                  .map(([op, n]) => `${op} ${n}`)
-                                  .join(" · ")}
-                              </small>
-                            </div>
-                          </td>
-                          <td data-label="次数" className="console-number">
-                            {row.total}
-                          </td>
-                          <td data-label="失败" className="console-number">
-                            {row.failed}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <Empty text="暂无网关上游记录" />
-              )}
-            </section>
-            <section className="panel">
-              <header>
-                <h2>媒体等待状态机</h2>
-                <span className="muted">MediaWait · 进程内累计</span>
-              </header>
-              {mediaOutcomes.length ? (
-                <div className="table-wrap overview-scroll">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>类型</th>
-                        <th>状态机结果</th>
-                        <th className="console-number">次数</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {mediaOutcomes.map((item) => (
-                        <tr key={`${item.kind}-${item.outcome}`}>
-                          <td data-label="类型">{item.kind}</td>
-                          <td data-label="状态机结果">
-                            <span title={item.outcome}>
-                              {badge(item.outcome)}
-                            </span>
-                          </td>
-                          <td data-label="次数" className="console-number">
-                            {item.count}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <Empty text="暂无媒体状态机事件" />
-              )}
-            </section>
-          </>
+          <section className="panel">
+            <header>
+              <h2>进程内累计</h2>
+              <span className="muted">自启动起</span>
+            </header>
+            <div className="bar-scroll">
+              <h3 className="bar-group">上游调用</h3>
+              <BarList
+                bare
+                empty="暂无网关上游记录"
+                rows={upstreamByAccount.map((row) => ({
+                  key: row.account,
+                  label: accountLabels.get(row.account) || row.account,
+                  title: [...row.ops.entries()]
+                    .map(([op, n]) => `${op} ${n}`)
+                    .join(" · "),
+                  count: row.total,
+                  errors: row.failed,
+                }))}
+              />
+              <h3 className="bar-group">媒体等待</h3>
+              <BarList
+                bare
+                empty="暂无媒体状态机事件"
+                rows={mediaOutcomes.map((item) => ({
+                  key: `${item.kind}-${item.outcome}`,
+                  label: (
+                    <>
+                      <span className="bar-kind">{item.kind}</span>
+                      <span title={item.outcome}>{badge(item.outcome)}</span>
+                    </>
+                  ),
+                  count: item.count,
+                }))}
+              />
+            </div>
+          </section>
         )}
       </div>
     </div>
   );
+}
+
+type BarRow = {
+  key: string;
+  label: ReactNode;
+  title?: string;
+  count: number;
+  errors?: number;
+};
+
+/** 紧凑条形列表：名称 + 数量 + 错误数，条长按最大值归一。 */
+function BarList({
+  rows,
+  empty,
+  bare = false,
+}: {
+  rows: BarRow[];
+  empty: string;
+  bare?: boolean;
+}) {
+  if (!rows.length)
+    return bare ? <p className="bar-empty">{empty}</p> : <Empty text={empty} />;
+  const max = Math.max(...rows.map((r) => r.count), 1);
+  const list = (
+    <ul className="bar-list">
+      {rows.map((r, i) => (
+        <li
+          key={r.key}
+          title={r.title}
+          style={{ "--i": Math.min(i, 12) } as CSSProperties}
+        >
+          <div className="bar-line">
+            <span className="bar-label">{r.label}</span>
+            <span className="bar-count">
+              {r.count}
+              {r.errors ? <em className="bar-errors">{r.errors} 错</em> : null}
+            </span>
+          </div>
+          <div className="bar-track" aria-hidden="true">
+            <i style={{ width: `${(r.count / max) * 100}%` }} />
+            {r.errors ? (
+              <b style={{ width: `${(r.errors / max) * 100}%` }} />
+            ) : null}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+  return bare ? list : <div className="bar-scroll">{list}</div>;
 }

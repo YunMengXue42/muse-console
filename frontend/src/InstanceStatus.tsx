@@ -91,6 +91,24 @@ export function InstanceStatus({
           ? "pending"
           : "down";
 
+  const acc = status?.accounts ?? {};
+  const busy = (acc.inflight ?? 0) + (acc.waiting ?? 0);
+  const cooling = acc.cooling ?? 0;
+  const broken = (acc.invalid ?? 0) + (acc.disabled ?? 0);
+  const segments = [
+    { k: "ok", label: "可用", n: available },
+    { k: "busy", label: "占用", n: busy },
+    { k: "cool", label: "冷却", n: cooling },
+    { k: "bad", label: "失效", n: broken },
+  ];
+  const segTotal = Math.max(
+    total,
+    segments.reduce((a, b) => a + b.n, 0),
+    1,
+  );
+  const running = status?.tasks?.running ?? 0;
+  const pending = status?.tasks?.pending ?? 0;
+
   return (
     <div
       className={`instance-card tone-${tone}${flash ? " is-flash" : ""}`}
@@ -110,15 +128,46 @@ export function InstanceStatus({
         <span className="sr-only">{details}</span>
       </div>
       {showCount && (
-        <div
-          className="instance-bar"
-          role="progressbar"
-          aria-label="可调度账号比例"
-          aria-valuemin={0}
-          aria-valuemax={total}
-          aria-valuenow={available}
-        >
-          <i style={{ width: `${Math.round(ratio * 100)}%` }} />
+        <>
+          <div
+            className="instance-bar"
+            role="progressbar"
+            aria-label="可调度账号比例"
+            aria-valuemin={0}
+            aria-valuemax={total}
+            aria-valuenow={available}
+            data-ratio={Math.round(ratio * 100)}
+          >
+            {segments.map((seg) =>
+              seg.n ? (
+                <i
+                  key={seg.k}
+                  className={`seg-${seg.k}`}
+                  style={{ flexGrow: seg.n / segTotal }}
+                />
+              ) : null,
+            )}
+          </div>
+          <ul className="instance-legend" aria-label="账号分布">
+            {segments.map((seg) => (
+              <li key={seg.k} className={seg.n ? "" : "is-zero"}>
+                <i className={`seg-${seg.k}`} aria-hidden="true" />
+                <span>{seg.label}</span>
+                <strong>{seg.n}</strong>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {status && !unreachable && (
+        <div className="instance-tasks">
+          <span className={running ? "is-active" : ""}>
+            <em aria-hidden="true" />
+            运行 <strong>{running}</strong>
+          </span>
+          <span>
+            排队 <strong>{pending}</strong>
+          </span>
         </div>
       )}
     </div>

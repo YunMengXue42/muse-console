@@ -1,7 +1,7 @@
 {
   "name": "muse-console",
   "private": true,
-  "version": "0.3.9",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -11,6 +11,7 @@
     "build": "tsc --noEmit && vite build"
   },
   "dependencies": {
+    "pullcord": "^0.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

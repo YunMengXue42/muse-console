@@ -16,6 +16,8 @@ import {
 import { Icon } from "./ui";
 import { ConsoleModals } from "./ConsoleModals";
 import { InstanceStatus } from "./InstanceStatus";
+import { PullCord } from "pullcord";
+import "pullcord/pullcord.css";
 import {
   formatConsoleHash,
   parseConsoleHash,
@@ -417,40 +419,18 @@ export default function App() {
       notify("复制失败，请手动选中并复制。");
     }
   }
-  const themeButton = (
-    <button
-      className="theme-toggle"
-      onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-      aria-label="切换主题"
-      title={theme === "light" ? "切换深色模式" : "切换浅色模式"}
-    >
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        {theme === "light" ? (
-          <path d="M20.5 13a8.5 8.5 0 0 1-9.5-9.5A8.5 8.5 0 1 0 20.5 13Z" />
-        ) : (
-          <>
-            <circle cx="12" cy="12" r="4" />
-            <path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" />
-          </>
-        )}
-      </svg>
-      <span>{theme === "light" ? "深色模式" : "浅色模式"}</span>
-    </button>
+  const themeCord = (
+    <PullCord
+      className={key ? "console-pullcord" : "console-pullcord is-login"}
+      onPull={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
+      pulled={theme === "light"}
+      ariaLabel="切换主题"
+    />
   );
   if (!key)
     return (
       <div className="login-page">
-        <div className="login-theme">{themeButton}</div>
+        {themeCord}
         <form
           className="login-card"
           onSubmit={(e) => {
@@ -488,6 +468,7 @@ export default function App() {
   const metrics = status?.accounts;
   return (
     <div className="shell">
+      {themeCord}
       <aside className="sidebar">
         <a className="brand" href="/dashboard" aria-label="Muse Console 首页">
           <span className="brand-wordmark">
@@ -522,36 +503,12 @@ export default function App() {
             unreachable={statusFailed}
             lastSyncAt={lastSyncAt}
           />
-          <div className="instance-actions">
-            {themeButton}
-            <button
-              className="console-logout"
-              onClick={logout}
-              aria-label="退出控制台"
-              title="退出控制台"
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M10 4H5v16h5m4-12 4 4-4 4m-5-4h13" />
-              </svg>
-              <span>退出</span>
-            </button>
-          </div>
         </div>
       </aside>
       <main
         className={[
           page === 0 ? "pool-workspace" : "",
-          [0, 2, 3].includes(page) ? "fill-workspace" : "",
+          [0, 1, 2, 3, 4].includes(page) ? "fill-workspace" : "",
         ]
           .filter(Boolean)
           .join(" ")}

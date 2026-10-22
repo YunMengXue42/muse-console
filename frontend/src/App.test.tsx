@@ -168,7 +168,7 @@ describe("控制台完整交互", () => {
     await user.click(screen.getByRole("button", { name: "切换主题" }));
     expect(document.documentElement.dataset.theme).not.toBe(originalTheme);
     expect(sessionStorage.getItem("muse.console.key")).toBe("admin-test");
-    expect(screen.getByRole("button", { name: "退出控制台" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "退出控制台" })).toBeNull();
   });
   it("驱动异常时不显示在线动效标记", async () => {
     const api = mockApi();
@@ -192,13 +192,10 @@ describe("控制台完整交互", () => {
     expect(screen.getByText("驱动异常")).toBeTruthy();
     expect(screen.getByRole("status").querySelector(".online")).toBeNull();
   });
-  it("登录会话仅保存在 sessionStorage，退出清理", async () => {
-    const user = await signIn();
+  it("登录会话仅保存在 sessionStorage", async () => {
+    await signIn();
     expect(sessionStorage.getItem("muse.console.key")).toBe("admin-test");
     expect(localStorage.getItem("muse.console.key")).toBeNull();
-    await user.click(screen.getByRole("button", { name: "退出控制台" }));
-    expect(sessionStorage.getItem("muse.console.key")).toBeNull();
-    expect(screen.getByLabelText("管理员 Key")).toBeTruthy();
   });
   it("导入必须预览再确认，并保留逐条错误", async () => {
     const user = await signIn();
@@ -458,7 +455,5 @@ describe("控制台完整交互", () => {
         (fetch as ReturnType<typeof vi.fn>).mock.calls.length,
       ).toBeGreaterThan(callCountBeforeVisible),
     );
-    await user.click(screen.getByRole("button", { name: "退出控制台" }));
-    expect(window.location.hash).toBe("");
   });
 });

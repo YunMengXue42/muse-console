@@ -39,31 +39,66 @@ export function KeysPage({
   }
   return (
     <div className="console-page keys-page">
-      <section
-        className="panel api-endpoint"
-        aria-labelledby="api-endpoint-title"
-      >
-        <div className="api-endpoint-copy">
-          <h2 id="api-endpoint-title">调用地址</h2>
-          <span className="muted">Base URL</span>
-        </div>
-        <div className="api-endpoint-field">
-          <input
-            aria-label="调用地址"
-            value={baseUrl}
-            readOnly
-            spellCheck={false}
-            onFocus={(event) => event.currentTarget.select()}
-          />
-          <button className="console-action" onClick={copyAddress}>
-            {copyState === "copied" ? "已复制" : "复制地址"}
-          </button>
-        </div>
-        <span className="api-endpoint-feedback" role="status">
-          {copyState === "failed" ? "复制失败，请选中地址复制" : ""}
-        </span>
-      </section>
-      <section className="panel">
+      <div className="keys-top">
+        <section
+          className="panel api-endpoint"
+          aria-labelledby="api-endpoint-title"
+        >
+          <div className="api-endpoint-copy">
+            <h2 id="api-endpoint-title">调用地址</h2>
+            <span className="muted">Base URL</span>
+          </div>
+          <div className="api-endpoint-field">
+            <input
+              aria-label="调用地址"
+              value={baseUrl}
+              readOnly
+              spellCheck={false}
+              onFocus={(event) => event.currentTarget.select()}
+            />
+            <button className="console-action" onClick={copyAddress}>
+              {copyState === "copied" ? "已复制" : "复制地址"}
+            </button>
+          </div>
+          <span className="api-endpoint-feedback" role="status">
+            {copyState === "failed" ? "复制失败，请选中地址复制" : ""}
+          </span>
+        </section>
+        <section
+          className="panel keys-builtin"
+          aria-labelledby="keys-builtin-title"
+        >
+          <h2 id="keys-builtin-title" title="由服务配置管理，此处不可修改">
+            内置身份
+          </h2>
+          {builtin.length ? (
+            <ul>
+              {builtin.map((k) => (
+                <li
+                  key={k.id}
+                  title={
+                    k.usage.last_request_at
+                      ? `最近 ${time(k.usage.last_request_at)}`
+                      : "暂无调用"
+                  }
+                >
+                  <strong>{k.name}</strong>
+                  <span>
+                    24h {k.usage.requests_24h}
+                    {k.usage.errors_24h ? (
+                      <em> / {k.usage.errors_24h} 错</em>
+                    ) : null}
+                  </span>
+                  <small>共 {k.usage.total}</small>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <span className="muted">无</span>
+          )}
+        </section>
+      </div>
+      <section className="panel keys-list">
         <header>
           <h2>应用密钥</h2>
           <span className="muted console-key-hint">明文仅在创建时显示一次</span>
@@ -177,30 +212,6 @@ export function KeysPage({
               创建首个密钥
             </button>
           </Empty>
-        )}
-      </section>
-      <section className="panel spaced">
-        <header>
-          <h2>内置身份</h2>
-          <span className="muted">由服务配置管理，此处不可修改</span>
-        </header>
-        {builtin.length ? (
-          <div className="builtin">
-            {builtin.map((k) => (
-              <div key={k.id}>
-                <strong>{k.name}</strong>
-                <span>{k.usage.total} 次总调用</span>
-                <small>
-                  24h 请求 {k.usage.requests_24h} / 错误 {k.usage.errors_24h}
-                  {k.usage.last_request_at
-                    ? ` · 最近 ${time(k.usage.last_request_at)}`
-                    : ""}
-                </small>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <Empty text="无内置身份记录" />
         )}
       </section>
     </div>

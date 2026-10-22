@@ -19,7 +19,7 @@ type Challenge = {
   expires_at: number | string;
 };
 const disabledMessage =
-  "设备凭据导入尚未启用或当前服务不支持此功能（404）。请管理员开启凭据导入配置后重试；账号池其他功能不受影响。";
+  "服务未开启凭据导入（404），需管理员开启。账号池其他功能不受影响。";
 function expires(value: number | string) {
   return typeof value === "number" ? value * 1000 : Date.parse(value);
 }
@@ -120,7 +120,7 @@ export function CredentialDevices({
       setError(
         e instanceof ApiError && e.status === 404
           ? disabledMessage
-          : "操作失败，请检查设备、候选与账号是否有效，然后重试。",
+          : "操作失败，请检查设备、候选和账号后重试。",
       );
     } finally {
       setBusy(false);
@@ -135,26 +135,22 @@ export function CredentialDevices({
       }}
     >
       <p className="muted">
-        扩展仅向固定服务器提交 Muse 会话候选。请核对精确服务地址、服务器 ID
-        和应用指纹，再单独授权发送：这会将 Muse
-        会话授权交给该服务器。扩展不接收管理员 Key。
+        扩展会把浏览器里的 Muse
+        登录交给本服务器。授权前核对下面三项与扩展一致；扩展拿不到管理员 Key。
       </p>
       <dl>
-        <dt>服务地址（服务端配置 origin）</dt>
+        <dt>服务地址</dt>
         <dd className="mono">
           {challenge?.server_origin ?? "生成配对挑战后显示"}
         </dd>
         <dt>服务器 ID</dt>
         <dd className="mono">{challenge?.server_id ?? "生成配对挑战后显示"}</dd>
-        <dt>应用指纹 fingerprint（非 TLS 证书指纹）</dt>
+        <dt>应用指纹（非 TLS 证书指纹）</dt>
         <dd className="mono">
           {challenge?.fingerprint ?? "生成配对挑战后显示"}
         </dd>
       </dl>
-      <p className="fine">
-        应用指纹不能替代 TLS 证书验证。生产环境必须使用可信
-        HTTPS；仅本机开发可显式允许 loopback。
-      </p>
+      <p className="fine">指纹不能代替 HTTPS 证书校验。</p>
       {error && (
         <p role="alert" className="error">
           {error}
@@ -163,9 +159,7 @@ export function CredentialDevices({
       {message && <p role="status">{message}</p>}
       <h3>一次性配对</h3>
       <p className="fine">
-        点击生成，短时有效，仅可兑换一次；到期时间见下方。设备有效期由服务端配置，默认允许自动新增
-        1
-        个账号，仍受服务端权限限制。挑战仅存于弹窗内存，关闭即隐藏，不自动复制。兑换后刷新设备列表。
+        配对码短时有效、只能用一次，关窗即隐藏。额度＝该设备最多自动新增的账号数。
       </p>
       <div className="pairing-controls">
         <label>
@@ -235,12 +229,12 @@ export function CredentialDevices({
               />
             </label>
             <p className="fine">
-              到期时间：{time(challenge.expires_at)}（剩余{" "}
+              剩余{" "}
               {Math.max(
                 0,
                 Math.ceil((expires(challenge.expires_at) - now) / 1000),
               )}
-              s）。请在已核对的扩展中手动输入；不要分享或记录此挑战。
+              s（{time(challenge.expires_at)} 到期）。手动填入扩展，勿外传。
             </p>
           </>
         ) : (
@@ -302,13 +296,10 @@ export function CredentialDevices({
           </tbody>
         </table>
       </div>
-      <h3>本次候选身份或版本冲突确认</h3>
+      <h3>身份冲突确认</h3>
       <p className="fine">
-        填写扩展提示的原 capture_id，核对 device / capture / account
-        及浏览器当前账号身份；勿凭标签或猜测邮箱判断。 仅确认原 capture
-        和服务端记录确认时的目标当前凭据版本，不永久授权身份不明更新；版本变化需重确认。
-        确认后在扩展重传同一候选，服务端重新验证并进行版本条件提交（CAS），扩展
-        base 版本不变。
+        扩展提示冲突时使用：填它给的
+        capture_id，选设备和目标账号。只对这一次生效。
       </p>
       <form
         onSubmit={(event) => {
@@ -396,7 +387,7 @@ export function CredentialDevices({
           <h3>
             {pending.kind === "revoke"
               ? "确认撤销设备？"
-              : "确认本次候选身份或版本冲突？"}
+              : "确认本次身份冲突？"}
           </h3>
           {pending.kind === "revoke" ? (
             <p>设备 {pending.id} 将不能继续提交凭据；不会删除已入池账号。</p>
@@ -408,8 +399,7 @@ export function CredentialDevices({
               <br />
               account_id: {pending.account_id}
               <br />
-              核对浏览器当前账号身份与目标账号当前凭据版本。 仅原 capture
-              和服务端记录确认时的目标版本；不永久授权身份不明更新，版本变化需重确认。
+              请确认浏览器当前登录的就是该账号。只对本次候选生效，账号版本再变需重新确认。
             </p>
           )}
           <button disabled={busy} onClick={() => setPending(undefined)}>
@@ -440,7 +430,7 @@ export function CredentialDevices({
                   );
                   setCaptureId("");
                   setMessage(
-                    "本次确认已提交，尚未入池。仅适用于原 capture 和服务端记录确认时的目标当前版本，非永久授权。在扩展重传同一候选；服务端重新验证并进行 CAS，扩展 base 版本不变。版本变化或后续身份不明更新需重确认。",
+                    "已确认，尚未入池。请在扩展重传同一候选，服务端验证后写入。",
                   );
                 }
                 setPending(undefined);

@@ -40,7 +40,11 @@ describe("InstanceStatus", () => {
     expect(card?.getAttribute("title")).toContain("browser · v1.0.0");
     expect(card?.getAttribute("title")).toContain("刚刚同步");
     const bar = screen.getByRole("progressbar", { name: "可调度账号比例" });
-    expect(bar.querySelector("i")?.getAttribute("style")).toContain("75%");
+    expect(bar.getAttribute("data-ratio")).toBe("75");
+    expect(screen.getByLabelText("账号分布").textContent).toContain("可用3");
+    expect(container.querySelector(".instance-tasks")?.textContent).toContain(
+      "运行 2",
+    );
   });
 
   it("无可用账号与连接断开有明确状态，切换时闪烁", () => {

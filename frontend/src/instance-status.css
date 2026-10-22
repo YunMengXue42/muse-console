@@ -2,14 +2,14 @@
 :root {
   --warn: #8a5a00;
   --warn-bg: #fff6e5;
-  --signal-good: #1f9d5c;
+  --signal-good: #0064d4;
   --signal-warn: #d98a00;
   --signal-bad: #d93a44;
 }
 :root[data-theme="dark"] {
   --warn: #ffd18a;
   --warn-bg: #3a2f1c;
-  --signal-good: #4fd18b;
+  --signal-good: #80b7ff;
   --signal-warn: #ffb547;
   --signal-bad: #ff6b74;
 }
@@ -36,8 +36,8 @@
     border-color 400ms ease;
 }
 .instance-card.tone-online {
-  --tone: var(--good);
-  --tone-bg: var(--good-bg);
+  --tone: var(--primary);
+  --tone-bg: var(--tint);
   --signal: var(--signal-good);
 }
 .instance-card.tone-warn {
@@ -102,43 +102,44 @@
 }
 .instance-card .instance-signal .dot {
   position: relative;
-  width: 10px;
-  height: 10px;
-  min-width: 10px;
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
   aspect-ratio: 1;
-  flex: 0 0 10px;
+  flex: 0 0 8px;
   border-radius: 50%;
   background: var(--signal);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 22%, transparent);
+  box-shadow: none;
 }
 .instance-card .instance-signal .dot.pending {
   background: var(--muted);
   animation: instance-blink 1.2s ease-in-out infinite;
 }
-/* Online: two staggered expanding rings (radar pulse). */
-.instance-card .instance-signal .dot.online::before,
+/* Online: one soft halo spreads out and fades (no hard rings). */
+.instance-card .instance-signal .dot.online::before {
+  content: none;
+}
 .instance-card .instance-signal .dot.online::after {
   content: "";
   position: absolute;
   inset: 0;
-  margin: auto;
-  width: 10px;
-  height: 10px;
+  width: auto;
+  height: auto;
+  margin: 0;
+  border: 0;
   border-radius: 50%;
-  border: 2px solid var(--signal);
+  background: var(--signal);
   opacity: 0;
-  animation: instance-ring 2.4s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+  animation: instance-halo 2.6s ease-out infinite;
 }
-.instance-card .instance-signal .dot.online::after {
-  animation-delay: 1.2s;
-}
-@keyframes instance-ring {
+@keyframes instance-halo {
   0% {
     transform: scale(1);
-    opacity: 0.7;
+    opacity: 0.45;
   }
+  70%,
   100% {
-    transform: scale(2.8);
+    transform: scale(3);
     opacity: 0;
   }
 }
@@ -193,18 +194,98 @@
   color: var(--ink);
 }
 .instance-bar {
-  height: 4px;
+  display: flex;
+  gap: 2px;
+  height: 6px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--signal) 16%, var(--panel));
+  background: color-mix(in srgb, var(--signal) 12%, var(--panel));
   overflow: hidden;
 }
 .instance-bar i {
   display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--signal);
-  transition: width 600ms cubic-bezier(0.2, 0.7, 0.3, 1);
+  min-width: 4px;
+  border-radius: 999px;
+  transition: flex-grow 700ms cubic-bezier(0.2, 0.7, 0.3, 1);
+  animation: seg-in 900ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  transform-origin: left;
 }
+@keyframes seg-in {
+  from {
+    transform: scaleX(0);
+  }
+}
+.seg-ok {
+  background: var(--signal-good);
+}
+.seg-busy {
+  background: color-mix(in srgb, var(--signal-good) 35%, var(--panel));
+}
+.seg-cool {
+  background: var(--signal-warn);
+}
+.seg-bad {
+  background: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+.instance-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.instance-legend li {
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.instance-legend li i {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  flex: 0 0 7px;
+}
+.instance-legend strong {
+  margin-left: auto;
+  color: var(--ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.instance-legend li.is-zero {
+  opacity: 0.45;
+}
+.instance-tasks {
+  display: flex;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed color-mix(in srgb, var(--signal) 25%, var(--line));
+  font-size: 12px;
+  color: var(--muted);
+}
+.instance-tasks span {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.instance-tasks strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.instance-tasks em {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--muted) 50%, transparent);
+}
+.instance-tasks .is-active em {
+  background: var(--signal-good);
+  animation: instance-blink 1.4s ease-in-out infinite;
+}
+
 .instance-card .sr-only {
   position: absolute;
   width: 1px;
@@ -219,6 +300,10 @@
     flex: 1 1 100%;
     padding: 8px 12px;
   }
+  .instance-legend,
+  .instance-tasks {
+    display: none;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .instance-card,
@@ -227,5 +312,23 @@
   .instance-card .instance-signal .dot::before,
   .instance-card .instance-signal .dot::after {
     animation: none !important;
+  }
+}
+
+/* Theme switch: ceiling pull-cord (pullcord), hung near the top-right corner. */
+.console-pullcord {
+  /* hang on the sidebar/content divider (sidebar 224px, wrapper 64px wide) */
+  --pullcord-right: calc(100vw - 224px - 32px);
+  --pullcord-z: 30;
+  --pullcord-ink: color-mix(in srgb, var(--ink) 45%, transparent);
+}
+.console-pullcord.is-login {
+  --pullcord-right: 3rem;
+}
+@media (max-width: 800px) {
+  .console-pullcord,
+  .console-pullcord.is-login {
+    --pullcord-right: 4px;
+    --pullcord-top: -64px;
   }
 }
