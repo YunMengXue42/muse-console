@@ -1,5 +1,7 @@
 # Muse Console Architecture
 
+[English](ARCHITECTURE.md) | [简体中文](ARCHITECTURE.zh-CN.md)
+
 The distribution and CLI are `muse-console`; the Python module/package is `muse_console` (`python -m muse_console`). Source paths in this document are relative to `src/muse_console/` unless stated otherwise. Configuration uses `MUSE_CONSOLE_`; the core configuration layer retains legacy `MUSE2API_` aliases and gives the new name precedence when both are supplied.
 
 ## Layers
@@ -37,7 +39,7 @@ flowchart TB
         core_media["media.py · matting.py<br/>storage · inputs"]
     end
 
-    subgraph drivers["drivers/ — the only layer that talks to muse.ai"]
+    subgraph drivers["drivers/ — upstream adapters"]
         direction LR
         drv_base["base.py<br/>MuseDriver interface"]
         drv_mock["mock.py<br/>offline driver"]
@@ -49,24 +51,27 @@ flowchart TB
     upstream["upstream/muse.py<br/>upstream constants · session renewal"]
 
     api --> services
-    services --> accounts & auth & core
-    accounts & auth & core --> drivers
-    drivers --> upstream
+    services --> accounts & auth & core & drivers
+    acc_keepalive --> drv_base
+    drivers --> acc_pool & core & upstream
 ```
 
 This is a single-process modular monolith: React/TypeScript calls same-origin admin APIs; FastAPI routes delegate scheduling/import/login workflows to services. `Gateway` owns failover, `AccountManager` owns parsing and administrative updates, and `BrowserLoginManager` owns temporary authentication contexts. `AccountPool` owns leases and scheduling; driver adapters own upstream behavior. Status/quota routes query the driver through the injected service container. Drivers never depend on HTTP response schemas. No Redis or separate orchestration service is required.
 
+The diagram shows major collaboration paths, not a strict package-import DAG. Drivers consume account/credential types and core helpers; only account keepalive calls the driver contract, while `auth/` and `core/` do not depend on drivers. `upstream/muse.py` centralizes Muse constants and the direct-HTTP renewal helper invoked by adapters. API routes also use core normalization and driver request types. `drivers/http/` reserves direct generation transport: chat/image/video generation is not implemented; session renewal is implemented. The default `mock` driver is for offline behavior, not proof of live upstream capability.
+
 ## Lifecycle of a chat request
 
-1. `routes/chat.py` validates the request, `resolve_model` resolves aliases, and `flatten_messages` merges the conversation into a single prompt and extracts images.
+1. `api/routes/chat.py` validates the request, `resolve_model` resolves aliases, and `flatten_messages` merges the conversation into a single prompt and extracts images.
 2. `Gateway.chat_stream` leases an account through `AccountPool.lease()` (chosen by the configured strategy and subject to the per-account concurrency limit).
 3. It calls `driver.chat_stream(account, ChatRequest)` and receives text deltas.
 4. On failure:
    - `UpstreamAuthError`: the account is marked `invalid`;
    - `UpstreamQuotaError`: the account cools down for at least one hour;
-   - any other retryable error: the account cools down for `account_cooldown` seconds;
-   - if nothing has been sent to the client yet, the request is retried on another account (up to `max_failover` times).
-5. For streaming, the route pulls the first delta before returning 200, so errors such as "no account available" or "upstream authentication failed" come back with the right HTTP status code.
+   - `UpstreamTimeout`: the failure is recorded without cooling the account;
+   - other retryable errors: the account cools down for `account_cooldown` seconds;
+   - only a retryable upstream error before any nonempty delta, with an alternative enabled/valid account, permits failover (up to `max_failover` times).
+5. With the default `stream_heartbeat_interval=0`, the route pulls the first delta before returning 200, so initial account/upstream errors retain their HTTP status. Enabling heartbeats commits HTTP 200 before the first delta and sends keepalive comments; subsequent errors are SSE error payloads, not a changed HTTP status. Once streaming has started, later errors are also reported in the event stream.
 
 ## Driver contract
 
@@ -87,13 +92,13 @@ class MuseDriver(ABC):
 
 - Unimplemented capabilities raise `FeatureNotImplemented` (HTTP 501) so the upper layers can degrade gracefully.
 - Errors must be mapped to the `Upstream*` types in `errors.py`; the account pool relies on them to decide an account's state.
-- Drivers are not responsible for retries, persistence or building URLs.
+- Gateway owns cross-account failover; drivers do not own application persistence or public media URL construction. Browser-local bounded recovery and the text-only video retry described below are explicit exceptions, not a general replay guarantee.
 
 ## Browser driver notes
 
 - One Chromium process. Each account gets its own isolated browser context via `Target.createBrowserContext` (up to `MUSE_CONSOLE_ACCOUNT_MAX_CONCURRENCY` tabs, one window per tab — Chromium throttles background tabs of a shared window), so switching accounts never requires clearing cookies.
 - Follow-up chat from the same owner can reuse that account's conversation and send only the new user text. A different history or `user` opens a fresh page. The default is fair `round_robin`; select `affinity` when account-sticky conversation reuse is preferred. Round-robin does not guarantee the next turn uses the same account.
-- All DOM selectors and in-page scripts live in `drivers/browser/dom.py`. When muse.ai changes its UI, this is usually the only file that needs updating.
+- Composer selectors, submission adapters and reply snapshots live in `drivers/browser/dom.py`. Browser-specific navigation, media and session-probe scripts also exist in the driver and `session_auth.py`; upstream UI/protocol changes may require coordinated updates.
 - Waiting for a media attachment is decided by the pure state machine `drivers/browser/media_wait.py` (grace → one "please attach" follow-up → short grace → link probe → `media_missing`); the driver only performs the I/O it requests. Tune timings there and in `BrowserDriver._MEDIA_GRACE` / `_ASK_GRACE`.
 - A video whose reply arrives as text only is re-submitted on the same account up to `MUSE_CONSOLE_VIDEO_TEXT_ONLY_RETRIES` times while at least 100s of `MUSE_CONSOLE_VIDEO_DEADLINE_CAP` remain. This is a deliberate, bounded exception to "no media replay": a text-only reply is a completed upstream answer, not an unknown submission.
 - Navigation requires a matching frame/loader/path barrier. If the navigation command times out on a fresh `about:blank` target, one bounded read-only check may confirm a new stable loader at the exact expected origin/path. It never navigates again or replays a submission; ambiguous state still fails.
@@ -104,7 +109,7 @@ class MuseDriver(ABC):
 - Chat completion requires stable text with generating false; a stable pause while generation remains active does not mean completion. New checkouts may reconnect only to the exact CDP endpoint obtained from this process's launch. Existing generations are never replayed by recovery; a dead Chromium process needs an explicit service restart.
 - Generation tabs have a global budget and idle LRU/TTL cleanup. Manual-login and credential-validation contexts have separate bounds; this is not an OS memory limit. Use container/systemd memory and egress limits as additional deployment controls.
 
-## Execution safety (v0.3.1)
+## Execution safety
 
 - Chat reuse is namespaced by a digest of the authenticated API-key id and optional `user`; a client-supplied `user` is not an identity. Identical namespaces serialize while independent namespaces may run concurrently. Sharing a key is sharing that namespace, not a new security boundary.
 - Media operations do not automatically fail over and replay a generation: the existing browser protocol cannot prove whether an upstream submission succeeded before a timeout. Callers must inspect results before manually retrying; exactly-once generation and partial multi-image recovery are not claimed.
@@ -128,6 +133,10 @@ class MuseDriver(ABC):
 - Busy accounts wait until the acquire deadline, cooling accounts re-enter after their deadline, invalid/disabled accounts are excluded. Failover stops once nonempty content has been emitted. Changing a strategy wakes waiters and survives restart.
 - Browser contexts are retired on credential replacement; active tabs finish against their original context before disposal. The driver launches only its own Chromium process and rejects an already occupied CDP port instead of attaching to an unknown browser.
 
+### Stored data boundaries
+
+Account encryption is not whole-data-directory encryption. `tasks.json` stores task requests/results/errors and ownership; media files store generated bytes, with ownership and signing material alongside them. `requests.db` records request metadata (including key/account ids, client IP, user agent and errors), not a full conversation archive. `keys.json` stores client key hashes and metadata; the persisted legacy `api_key`, account encryption key and media signing key are secrets. `credential-devices.db` holds device grant hashes, bindings and redacted receipts, not a raw-cookie archive. Protect the complete data directory and backups with filesystem access controls; do not publish runtime files or browser profiles. Media age-based cleanup is disabled by default (`media_retention_days=0`); capacity limits are not an automatic retention policy.
+
 ## Console and manual login
 
 - `frontend/src` contains separate pages, shared API/types/UI and the login controller. Vite emits `src/muse_console/web/dashboard.html` plus fingerprinted `/assets/*`; FastAPI serves them with a restrictive console CSP and no-store HTML.
@@ -150,7 +159,7 @@ Commits use a single-account credential lock, monotonically increasing `credenti
 
 Renewal uses expiry-aware jitter, bounded timeouts and persisted backoff. Network errors preserve previous credentials; explicit rejection/expiry marks `needs_reauth` / invalid. Both administrative renewal and background renewal serialize per account. Feature switches default off. Optional isolated login auto-completion follows same-context OAuth targets, validates in the owned context, saves scoped records and retains a short completed status after cleanup so the UI can acknowledge it.
 
-Offline tests cover shipped ASGI pairing/import/renewal/restart/revocation, fake-CDP context isolation and cancellation, scope round-trips, encrypted persistence, stale-version protection, read-only extension mocks and console device operations. An earlier authorized independent-browser sample completed installation, transfer, automatic sync and real generation; the hardening revision requires separate live regression. The ≤10s import target, multi-account load and 72-hour renewal observation remain unverified. Offline tests and read-only health monitoring do not establish those gates.
+The repository includes offline tests for ASGI pairing/import/renewal/restart/revocation, fake-CDP context isolation and cancellation, scope round-trips, encrypted persistence, stale-version protection, read-only extension mocks and console device operations. These test contracts do not establish current live upstream compatibility. Any earlier authorized live sample is historical evidence only, not acceptance of the current revision; separate live regression is required. The ≤10s import target, multi-account load and 72-hour renewal observation remain unverified. Offline tests and read-only health monitoring do not establish those gates.
 
 ## Roadmap
 

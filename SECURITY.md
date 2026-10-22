@@ -1,21 +1,31 @@
 # Security Policy
 
+English is canonical. [简体中文](SECURITY.zh-CN.md)
+
 ## Supported versions
 
-Only the latest release receives fixes.
+Security fixes target the latest maintained version. Older versions have no promised backports. This policy does not establish that any package/image is published, audited or production-approved.
 
 ## Reporting a vulnerability
 
-Please do **not** open a public issue for security problems. Use GitHub's private vulnerability reporting: **Security → Report a vulnerability** on this repository.
+- Only when **Security → Report a vulnerability** is available on this repository, use GitHub's private form: <https://github.com/YunMengXue42/muse-console/security/advisories/new>.
+- Otherwise, **do not disclose vulnerability details in a public issue, PR or discussion**. Keep the report private and wait for maintainers to enable private reporting.
+- No response-time SLA is promised.
 
-Include the affected version, steps to reproduce and the impact you observed. You should get a first reply within 7 days.
+Include the affected version/commit, a minimal synthetic reproduction, prerequisites, expected/observed behavior and impact. Redact hosts, identities, cookies, tokens, request data and screenshots. Never upload a real data directory or backup. Test only systems/accounts you own or are explicitly authorized to assess; avoid destructive testing and real upstream generation without separate approval.
 
-## Scope
+## Scope and deployment boundaries
 
-In scope: authentication and key handling, admin/client key separation, media link signing and ownership, cookie encryption at rest, SSRF protection on reference image downloads, the browser extension pairing flow.
+Relevant areas include authentication; master/admin/client key separation; media signing and ownership; encrypted account persistence; reference-download SSRF defenses; dedicated browser profile isolation; and extension pairing, capture-specific confirmation, revocation and credential import.
 
-Out of scope: muse.ai itself, and deployments that ignore the documented settings (for example exposing the CDP port or running Chromium as root without sandbox).
+Muse's upstream service is independently operated; report upstream-only issues through its own channels. Misconfiguration is not evidence of a product defect, but report a reproducible bypass of a documented boundary privately. Never expose CDP, reuse a main browser profile or rely on a root/no-sandbox browser for isolation. See [Deployment](docs/DEPLOYMENT.md).
 
-## Handling secrets
+Offline mock/fake-CDP tests do not prove live authentication, generation, multi-account load, import latency or long-running renewal. Keepalive defaults off; 72-hour renewal remains unverified. Profile ownership markers are accident-prevention guards, not a filesystem sandbox. Sharing an upstream account is not a privacy boundary between untrusted tenants.
 
-Never paste real cookies, API keys, `.env` contents or data directories into issues, pull requests or logs. If you leaked one, rotate it first, then report.
+## Handling secrets and incidents
+
+Never paste real cookies, API/admin/client/device keys, encryption/signing keys, `.env`, profiles, private prompts/media, data directories or backups into public reports, PRs, CI artifacts or logs. Use only synthetic examples and redacted diagnostics.
+
+If exposure occurs, restrict access and revoke/rotate affected credentials first. Revoke extension device grants and upstream sessions as applicable; invalidate leaked signed links as needed. Encryption/signing key replacement requires a planned migration or recovery: do not delete keys and strand encrypted data. Preserve incident evidence privately, review repository history/artifacts/backups, and report through the private path above once available. Removing a file or rewriting history does not revoke a leaked secret. Do not publish the repository or push changes as part of incident handling without explicit authorization.
+
+Muse Console derives from the MIT-licensed [www222fff/muse2api](https://github.com/www222fff/muse2api). Preserve [LICENSE](LICENSE), including `Copyright (c) 2026 www222fff` and its permission notice, when redistributing; this does not imply upstream security endorsement.

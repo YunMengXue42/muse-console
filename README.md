@@ -1,463 +1,298 @@
-<h1 align="center">Muse Console</h1>
+# Muse Console
 
-<p align="center">
-  An async gateway that exposes the <a href="https://muse.ai">muse.ai</a> web app as an <b>OpenAI-compatible API</b>
-</p>
+An independent, unofficial gateway for the [muse.ai](https://muse.ai) web app, with a **subset of OpenAI-style APIs** and a React administration console.
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.10%2B-blue?logo=python" alt="Python" />
-  <img src="https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi" alt="FastAPI" />
-  <img src="https://img.shields.io/badge/API-OpenAI%20Compatible-green" alt="OpenAI Compatible" />
-  <a href="https://github.com/YunMengXue42/muse-console/actions/workflows/ci.yml"><img src="https://github.com/YunMengXue42/muse-console/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <img src="https://img.shields.io/badge/version-v0.4.2-blue" alt="Version" />
-  <img src="https://img.shields.io/badge/License-MIT-lightgrey" alt="License" />
-</p>
+**English (primary)** | [简体中文](README.zh-CN.md)
 
----
+Version **0.4.2** · Python **3.10+** · MIT
 
 ## Contents
 
-- [Overview](#overview)
-- [Status](#status)
-- [Architecture](#architecture)
-- [Project layout](#project-layout)
+- [Overview and status](#overview-and-status)
 - [Quick start](#quick-start)
-- [API examples](#api-examples)
+- [Real accounts and credential import](#real-accounts-and-credential-import)
+- [API reference and examples](#api-reference-and-examples)
+- [Compatibility boundaries](#compatibility-boundaries)
+- [Security and operational boundaries](#security-and-operational-boundaries)
 - [Configuration](#configuration)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [Disclaimer](#disclaimer)
-- [License and upstream attribution](#license-and-upstream-attribution)
+- [Backup, upgrade and verification](#backup-upgrade-and-verification)
+- [Architecture and development](#architecture-and-development)
+- [Before publication](#before-publication)
+- [License, attribution and trademarks](#license-attribution-and-trademarks)
 
-## Overview
+## Overview and status
 
-Muse Console exposes muse.ai chat, image and video generation through a subset of OpenAI-style endpoints. Basic clients can use a custom `base_url`; tool calling, exact token accounting and full OpenAI parameter semantics are not supported. Model aliases select Muse capabilities, not the named vendors' models.
+Muse Console provides text chat, reference-image generation, asynchronous image/video tasks, account scheduling and a management console. Clients can set a custom `/v1` base URL. Models such as `gpt-4o`, `claude-sonnet-4`, `deepseek-chat`, `dall-e-3` and `sora` are **routing aliases for Muse capabilities, not access to those vendors' models**. Prefer `muse-chat`, `muse-image` and `muse-video` in new integrations.
 
-The project focuses on **clean engineering and easy collaboration**:
+| Component | Implemented scope / status |
+|---|---|
+| Protocol | Chat ordinary/SSE output, stateless Responses subset, images, reference-image edits, video tasks, model listing |
+| Account pool | Round-robin (default), LRU and affinity; per-account concurrency, cooldown, invalid-session exclusion and pre-output chat failover |
+| Console | Account CRUD/merge, batch import preview, isolated login, client keys, request logs/statistics, task view and admin Prometheus metrics |
+| Persistence | Encrypted SQLite account payloads; local task history, media ownership, signed download links and optional retention cleanup |
+| Mock driver | Offline synthetic output without an account; mock video bytes are not playable video |
+| Browser driver | Chromium + CDP implementation; prior live samples do not establish acceptance of this revision |
+| Cookie extension | Read-only MV3 import, restricted device pairing and encrypted ingestion; requires explicit installation and permissions |
+| Renewal / quota | Renewal disabled by default and not live-accepted; quota lookup is driver-dependent (unsupported drivers return 501) |
+| Direct HTTP driver | Reserved; returns 501 |
 
-- **Pluggable drivers**: how we reach upstream is abstracted behind a `MuseDriver` interface. There are currently a mock driver and a browser (CDP) driver, plus a reserved slot for a direct-protocol (HTTP) driver. They are fully independent of each other.
-- **Strict layering**: the protocol layer, service layer, account pool and drivers each have a single responsibility and can be developed and tested on their own.
-- **Async execution**: FastAPI + asyncio and a CDP WebSocket client, with explicit request, task and browser budgets. Local metadata persistence still performs bounded synchronous I/O.
-- **Account pool**: fair round-robin by default, per-account concurrency limits, cooldown after failures, invalid-session exclusion and pre-output failover. Accounts are never silently deleted.
-- **Offline development**: the mock driver needs no account and makes no network calls, so front-end and protocol work can move forward independently.
-
-## Status
-
-> **v0.4.2**: web login dialog fits one screen — live page on the left, status, steps and controls on the right; wheel scrolls the upstream page. **v0.4.1**: account request issues use safe Chinese reasons and neutral history notes, separate from invalid login alerts. **v0.4.0**: console refresh — pull-cord theme switch, warm off-white background, one-screen overview and API keys pages with soft bar charts, blue instance card. **v0.3.9**: slimmer instance status — one line plus a capacity bar, details on hover. **v0.3.8**: sidebar instance card shows driver state with colour, animation, plain-language hints and schedulable-account capacity. **v0.3.7**: one-screen console layout — list pages fill the window with a scrolling table body, the overview is a dense grid. **v0.3.6**: console upgrade — URL-hash routes, Prometheus metrics view, request filters by path/key, per-account concurrency and account merge. **v0.3.5**: adds optional streaming heartbeats, Prometheus metrics at `/admin/metrics` and automatic re-submission when a video reply arrives as text only. **v0.3.1, Muse Console rebuild**: account scheduling, encrypted persistence, batch import, isolated manual browser login and a React/TypeScript console are implemented. Offline regression tests exercise the real service boundaries with fake upstreams; successful live Muse authentication and generation are not implied by those tests.
-
-| Module | Status | Notes |
-|---|---|---|
-| OpenAI protocol layer (chat streaming/non-streaming, images, videos, models) | ✅ Implemented | Multi-turn chat, system prompts, image input, model aliases |
-| Account pool (scheduling / cooldown / invalidation / failover) | ✅ Implemented | `lru`, `round_robin` and `affinity` strategies |
-| Background tasks (video) | ✅ Implemented | Create a task, then poll for the result; unfinished tasks are marked interrupted after a restart |
-| Admin API (account CRUD, renewal, reset, status) | ✅ Implemented | |
-| Mock driver | ✅ Implemented | Offline fake data |
-| Browser driver (Chromium + CDP) | Implemented; previous live sample passed | Chat/image/video were exercised before this hardening revision; this revision still needs live regression |
-| Session renewal / keepalive | 🧪 Needs live testing | Scoped browser renewal / legacy HTTP renewal; disabled by default |
-| Direct HTTP protocol driver | 🚧 Reserved | Returns 501 |
-| `/v1/images/edits` (reference images) | ✅ Implemented | Images are references for a new image; `mask` is rejected |
-| `/v1/responses` | Implemented subset | Text/image input, instructions, ordinary and SSE output; no stored response state or tools |
-| React console, batch import, encrypted SQLite account storage | Implemented | Independent frontend source and packaged static assets |
-| Local media retention cleanup | Implemented | Optional mtime-based cleanup on startup and hourly housekeeping |
-| Isolated manual browser login | Implemented; previous live sample passed | Owned contexts, TTL and upstream validation; no access to a daily browser profile |
-| Cookie import extension | Implemented; previous transfer/sync sample passed | Read-only MV3 collection, restricted pairing and encrypted import; 72-hour renewal remains unverified |
-| Quota lookup | Driver-dependent | Unsupported drivers return 501 |
-
-## Architecture
-
-```mermaid
-flowchart TB
-    clients["OpenAI SDK / chat clients<br/>HTTP · Bearer key"]
-
-    subgraph api["api/ — protocol"]
-        api_routes["routes · validation · auth · SSE"]
-    end
-
-    subgraph services["services/"]
-        svc["Gateway (failover) · TaskManager"]
-    end
-
-    subgraph accounts["accounts/"]
-        acc["Account pool<br/>strategies · cooldown · renewal"]
-    end
-
-    subgraph core["core/"]
-        core_inner["Model aliases<br/>prompt conversion · media storage"]
-    end
-
-    subgraph drivers["drivers/ — MuseDriver interface (only layer that talks to upstream)"]
-        direction LR
-        d_mock["mock<br/>offline fake data"]
-        d_browser["browser<br/>Chromium + CDP"]
-        d_http["http<br/>direct protocol (reserved)"]
-    end
-
-    subgraph upstream["upstream/"]
-        u["muse.ai URLs · cookie names · session API"]
-    end
-
-    musedotai["muse.ai"]
-
-    clients --> api --> services
-    services --> accounts & core
-    accounts & core --> drivers
-    drivers --> upstream --> musedotai
-```
-
-**How a chat request is handled**: the route resolves the model alias and merges the multi-turn `messages` into a single prompt, then hands it to the Gateway. The Gateway leases an account from the pool and asks the driver for a text stream. On failure, the account's state is updated according to the error type: accounts with an expired session are taken offline, accounts out of quota cool down, and other errors cause a short cooldown. As long as nothing has been sent to the client yet, the request is retried on another account.
-
-For streaming requests, the first chunk is fetched before returning 200. Errors such as "no account available" or "upstream authentication failed" therefore come back with a proper HTTP status code instead of a stream that breaks halfway.
-
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design.
-
-## Project layout
-
-```
-muse-console/
-├── src/muse_console/
-│   ├── app.py                 # FastAPI app factory and lifespan
-│   ├── config.py              # Settings (environment variables / .env)
-│   ├── errors.py              # Error hierarchy → HTTP status + OpenAI error body
-│   ├── api/
-│   │   ├── deps.py            # Auth and dependency injection
-│   │   ├── schemas.py         # OpenAI request models
-│   │   └── routes/            # chat / images / videos / media / models / admin / responses
-│   ├── services/
-│   │   ├── gateway.py         # Runs driver calls on pooled accounts, retries on another account
-│   │   ├── tasks.py           # Background long-running tasks
-│   │   └── container.py       # Service wiring
-│   ├── accounts/              # Account model, encrypted SQLite store, pool, keepalive
-│   ├── core/                  # Model registry and aliases, prompt conversion, media storage
-│   ├── drivers/
-│   │   ├── base.py            # MuseDriver interface and data types
-│   │   ├── mock.py
-│   │   ├── browser/           # cdp.py / chromium.py / dom.py / driver.py
-│   │   └── http/              # Reserved
-│   ├── upstream/muse.py       # Upstream constants and session renewal
-│   └── web/                   # Packaged console HTML and assets
-├── frontend/                  # React / TypeScript pages, tests and Vite build
-├── tests/                     # Offline service, persistence and fake-CDP regressions
-├── docs/ARCHITECTURE.md
-├── TODO.md                    # Task board for contributors
-├── Dockerfile · docker-compose.yml · .env.example
-└── CONTRIBUTING.md
-```
+Offline tests do not establish successful live authentication/generation, long-term renewal, SDK-wide compatibility, a Docker runtime pass or a successful GitHub Actions run. See [CHANGELOG.md](CHANGELOG.md) for changes and [TODO.md](TODO.md) for outstanding work. No PyPI release or Docker registry image is claimed; installation below uses source.
 
 ## Quick start
 
-### Run locally
+### Prerequisites
+
+- Install **uv 0.12.11**, the version pinned in [CI](.github/workflows/ci.yml), using the [uv installation instructions](https://docs.astral.sh/uv/getting-started/installation/) and select that version. Confirm with `uv --version`.
+- Install **Python 3.12** with `uv python install 3.12`. The package supports Python **3.10+**; CI defines Python 3.10/3.12 jobs on Windows, Linux x64 and Linux ARM.
+- Install **Node.js 24** (recommended for frontend/extension work, matching CI and the Docker build) and npm. A workflow definition is not evidence of a passed run.
+- Git; Chromium/Chrome only for the real browser driver. Initial dependency installation/builds require network access.
+
+### Offline mock service
+
+Run from a fresh checkout; do not overwrite an existing `.env` or reuse private service data:
 
 ```bash
-# Clone from the actual Muse Console repository URL supplied by your distributor.
-# Replace the placeholder; no public repository URL is assumed here.
-git clone <MUSE_CONSOLE_REPOSITORY_URL> muse-console
+git clone https://github.com/YunMengXue42/muse-console.git
 cd muse-console
+uv --version
+uv python install 3.12
 uv sync --locked --extra dev --python 3.12
 (cd frontend && npm ci && npm run build)
-cp .env.example .env      # defaults to mock; no account needed
-uv run --no-sync muse-console  # listens on http://127.0.0.1:18610
+cp .env.example .env
+uv run --no-sync muse-console
 ```
 
-If `MUSE_CONSOLE_API_KEY` is not set, a key is generated on first start and saved to `data/api_key`.
+PowerShell: use `Copy-Item .env.example .env`, and run the frontend commands with `cd frontend` / `cd ..` instead of the subshell. uv commands need no virtualenv activation. Frontend builds write packaged assets to `src/muse_console/web`.
 
-Install uv 0.12.11 as used in CI. On Windows PowerShell use `Copy-Item .env.example .env`; the uv/npm commands are otherwise the same. Build the console assets before packaging or starting from a source checkout; Vite writes them to `src/muse_console/web`.
+The example configuration selects `mock` and disables renewal. Mock generation does not contact Muse; caller-supplied remote image URLs can still trigger downloads, so use plain text/local fixtures for offline checks. Open `http://127.0.0.1:18610/dashboard`; `/admin` is an alias. If no API key is configured, first start saves a generated key in `data/api_key`. The admin key defaults to that key. Keep it private. Check `http://127.0.0.1:18610/healthz` and `/readyz` for liveness/readiness.
 
-### Docker
-
-Compose builds `muse-console:local` from this checkout; this is a local tag, not a published registry identity. The image includes `LICENSE`, installs the local Python package and starts the `muse-console` CLI. Use a separate test data directory for acceptance; the commands below are deployment instructions, not a record of a completed build/run.
+### Docker from source
 
 ```bash
 cp .env.example .env
 docker compose up -d --build
 ```
 
-### Use a real account (browser driver)
+Compose builds the local tag `muse-console:local`, persists `./data` and publishes only `127.0.0.1:18610`. It is not a registry download. Use fresh test data for acceptance. Review [Deployment](docs/DEPLOYMENT.md) before enabling real accounts or remote access; this command is an instruction, not a claim of a completed build/run.
 
-1. Install Chromium or Chrome and set `MUSE_CONSOLE_DRIVER=browser` in `.env`. Use a dedicated project profile inside the data directory, never a daily browser profile. First launch claims only a new/empty directory with `.muse-console-owned-profile` (valid legacy `.muse2api-owned-profile` markers remain recognized); existing nonempty unmarked profiles (including old project profiles) are refused. Use a new empty profile directory or an explicitly authorized manual migration; do not copy or stamp a daily browser profile.
-2. Open `/dashboard` (also available at `/admin`) and authenticate with the admin key.
-3. Choose **网页登录添加** to create a temporary, isolated browser session. Click the displayed page, send text and complete verification manually, then choose **完成验证并入池**. The server checks the upstream session before saving it. No password or CAPTCHA automation is implemented. `mock` and `http` drivers return 501 for browser login instead of pretending it succeeded.
-4. Alternatively choose **批量导入**: paste or upload a JSON account array, browser cookie export, Netscape cookie file, or one Cookie header per line. Preview validates structure and deduplicates `hatch_sess`; it does not contact Muse to prove a live session. Each account requires `hatch_sess`; `hatch_gw`, `hatch_vml` and `hatch_native_auth_device` are forwarded when present.
+## Real accounts and credential import
 
-### Automatic credential import (Chrome / Edge)
+### Isolated browser login or manual import
 
-This is **automatic extraction after normal user authentication**, not unattended password/MFA login. The extension reads only the four Muse session cookies through the official cookies API, including HttpOnly and explicitly queried partitions. It never copies profiles, opens debugging on your main browser, changes/deletes browser cookies, or collects Google/Meta credentials.
+1. Install Chromium/Chrome, set `MUSE_CONSOLE_DRIVER=browser` and optionally `MUSE_CONSOLE_CHROMIUM_PATH`. Use only a project-owned profile, defaulting to `data/browser-profile`, never a daily browser profile. New/empty profiles are claimed with `.muse-console-owned-profile`; valid legacy `.muse2api-owned-profile` markers remain recognized. Nonempty unmarked profiles are refused. Do not copy or stamp a daily profile to bypass this check.
+2. Authenticate to the dashboard with the admin key. Choose **网页登录添加**, interact with the displayed isolated page and complete passwords, MFA and CAPTCHA **manually**, then choose **完成验证并入池**. The server validates the upstream session before saving. Mock/HTTP drivers return 501 for browser login. Login controls never expose a CDP endpoint.
+3. Alternatively choose **批量导入** for a JSON account array, browser cookie export, Netscape cookie file or one Cookie header per line. Preview checks structure/deduplicates `hatch_sess`; it does **not** prove a live login. `hatch_sess` is required; optional `hatch_gw`, `hatch_vml` and `hatch_native_auth_device` are forwarded when present.
 
-1. Use a separate test deployment/data directory with the `browser` driver. Set `MUSE_CONSOLE_CREDENTIAL_INGESTION_ENABLED=true` and `MUSE_CONSOLE_CREDENTIAL_SERVER_ORIGIN=https://your-exact-service-origin` (no trailing slash). Keep the service single-process. TLS must be trusted; remote plain HTTP is refused. For local development only, explicitly set `MUSE_CONSOLE_CREDENTIAL_ALLOW_LOOPBACK_HTTP=true` with an exact loopback HTTP origin.
-2. Build the extension: `cd extension && npm ci && npm run build && npm test`. The loadable directory is `extension/dist/`, containing only the manifest, bundled scripts and UI. Install it yourself in Chrome/Edge's extensions developer UI; installation/permissions require your explicit consent. Nothing in this repository auto-installs it or accesses your current profile.
-3. On the account-pool page choose **扩展设备配对**, then generate a one-use challenge. In extension options enter the same exact server origin, grant permission for that target, query its identity and compare `server_id` and `fingerprint` with the console. The fingerprint is an application identity checksum, **not a TLS certificate pin**. Exchange the challenge; never give the extension your admin key.
-4. Separately enable automatic synchronization, acknowledging that Muse session credentials will be sent to that server. Log in to Muse normally. Once cookies settle, the extension sends one store/partition snapshot and the backend probes `/api/session` in a project-owned temporary context before saving. No generation request is made by the import validator. The popup/options show only redacted states.
-5. A device may initially add one account by default. Cookie rotation is not proof of stable account identity. If identity cannot be established, or a server renewal has advanced the version, the candidate is held for **one-capture administrator confirmation**. Verify the current Muse account, select its target account and exact capture in the console, then use the extension's resubmit-original-candidate action. Confirmation does not authorize all future account switches or blindly raise the extension's base version. A changed server version requires fresh confirmation. Lost session candidates must be recaptured and confirmed again.
-6. Pause/forget stops extension synchronization but does not delete server accounts. Revoke its device grant in the console to stop future uploads. Tokens can be rotated and expire; they cannot read cookie values, list accounts or use admin APIs. Failed validation preserves existing credentials.
+Login contexts default to a 600-second TTL and at most 3 concurrent windows. `MUSE_CONSOLE_LOGIN_AUTO_COMPLETE_ENABLED=true` can complete validation/import after **user authentication**; it is not automated password or CAPTCHA solving.
 
-Extension secrets exist only in the worker's memory / trusted session storage; the limited device token persists in trusted extension local storage. The server stores only token hashes and redacted receipts in `credential-devices.db`; actual account payloads remain encrypted in `accounts.db`. Back up the full stopped data directory, including both databases and `credentials.key`. Receipts retain at most 30 days / 10,000 rows; source binding/quota high-water marks remain durable.
+### Optional Chrome / Edge extension
 
-`MUSE_CONSOLE_LOGIN_AUTO_COMPLETE_ENABLED=true` optionally completes isolated server-side login after the user finishes authentication; it preserves cookie scope and cleans up the context. Manual completion remains available. Automatic renewal remains disabled by default pending live acceptance; scoped credentials renew through an owned browser context, legacy credentials retain the existing HTTP renewal path. Neither path guarantees permanent validity or portability across devices/IPs. Do not enable keepalive against real accounts until its upstream behavior is verified.
+The extension reads the four Muse session cookies through the official cookies API (including HttpOnly and explicitly queried partitions). It does not copy profiles, alter/delete cookies, enable debugging on your daily browser or collect Google/Meta credentials.
 
-For TLS termination, bind the ASGI backend to loopback/a protected socket, make the proxy overwrite Host and forwarded scheme, and configure uvicorn to trust **only that fixed proxy address**, never `forwarded_allow_ips="*"`. The ingestion API checks the resulting ASGI origin against the configured exact origin, not caller-provided forwarding headers. No global CORS exception is enabled. Direct TLS is also supported through uvicorn deployment options.
+1. Use an isolated browser-driver deployment. Enable `MUSE_CONSOLE_CREDENTIAL_INGESTION_ENABLED` and set `MUSE_CONSOLE_CREDENTIAL_SERVER_ORIGIN` to an exact trusted HTTPS origin, such as `https://console.example.com`, without a trailing slash. The explicit `MUSE_CONSOLE_CREDENTIAL_ALLOW_LOOPBACK_HTTP=true` exception permits loopback development only, not LAN/public HTTP.
+2. Build with `cd extension`, `npm ci`, `npm test`, `npm run build`; load `extension/dist` yourself in Chrome/Edge's developer UI. Installation/permissions require your consent.
+3. Generate a one-use challenge under **扩展设备配对** in the console. In extension options enter the same origin, grant permission, query identity and compare `server_id` and `fingerprint`. This fingerprint is an application checksum, **not TLS certificate pinning**. Exchange the challenge; never give the extension the admin key.
+4. Separately consent to automatic synchronization and log in normally. The extension sends a store/partition snapshot after cookies settle; the backend probes `/api/session` in an owned temporary context before saving, without generation. Displays/receipts are redacted.
+5. Devices default to adding one account. Cookie rotation is not stable identity proof: ambiguous identity or an advanced server version requires administrator confirmation of the **exact capture and target account**, then resubmission of the original candidate. This does not authorize future account switches; a changed version needs fresh confirmation. Lost candidates must be recaptured.
+6. Pause/forget stops synchronization, not server account retention. Revoke the device in the console to stop future uploads. Device tokens are limited, expiring/rotatable grants: they cannot read cookies, list accounts or use admin APIs. Failed validation preserves existing credentials.
 
-Browser apps that call `/v1/*` from their own origin (the infinite-canvas workspace among them) need CORS at the proxy, not in the app. List each origin exactly and answer preflights there; do not open `*` or the dashboard:
+Extension secrets stay in worker memory/trusted session storage; its limited device token persists in trusted extension local storage. Server device tokens are hashed in `credential-devices.db`; account payloads are encrypted in `accounts.db`. Redacted receipts are limited to 30 days / 10,000 rows; source-binding/quota high-water marks remain durable. **Automatic session renewal, including 72-hour usability, remains unverified and disabled by default.** Scoped renewal uses owned browser contexts; legacy renewal uses HTTP. Neither guarantees indefinite validity or portability across devices/IPs.
 
-```nginx
-map $http_origin $api_origin {
-    default "";
-    "https://canvas.example.com" $http_origin;
-}
-map $api_origin $api_methods { default ""; "~." "GET, POST, PUT, PATCH, DELETE, OPTIONS"; }
-map $api_origin $api_headers { default ""; "~." "authorization, content-type, accept"; }
+## API reference and examples
 
-location ^~ /v1/ {
-    if ($request_method = OPTIONS) { return 204; }
-    add_header Access-Control-Allow-Origin $api_origin always;
-    add_header Access-Control-Allow-Methods $api_methods always;
-    add_header Access-Control-Allow-Headers $api_headers always;
-    add_header Vary Origin always;
-    # add_header here replaces the server-level set: repeat HSTS, nosniff and Referrer-Policy.
-}
-```
+Use `Authorization: Bearer <key>`. `/v1/*` accepts the admin key, the configured legacy API key or a non-revoked client key created in the console. `/admin/*` requires the admin key; ordinary client keys cannot administer the service. Media also supports expiring signed links as described below. API details remain here until a standalone reference exists.
 
-`always` keeps the header on 4xx/5xx so a browser shows the real error instead of a CORS failure.
-
-## API examples
-
-Every `/v1/*` endpoint requires the header `Authorization: Bearer <API_KEY>`. The `/admin/*` endpoints use `MUSE_CONSOLE_ADMIN_KEY`, which defaults to the API key when unset.
-
-**Chat (streaming)**
+Set `KEY` locally to your own key without posting it to logs or issues. These are Bash examples:
 
 ```bash
-curl http://localhost:18610/v1/chat/completions \
+# Streaming chat; omit stream or set false for ordinary JSON.
+curl http://127.0.0.1:18610/v1/chat/completions \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
-  -d '{"model":"gpt-4o","messages":[{"role":"user","content":"Hello"}],"stream":true}'
+  -d '{"model":"muse-chat","messages":[{"role":"user","content":"Hello"}],"stream":true}'
+
+# Stateless Responses subset.
+curl http://127.0.0.1:18610/v1/responses \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"model":"muse-chat","input":"Write a short poem","store":false}'
+
+# Image task: poll the returned id (omit async for synchronous output).
+curl http://127.0.0.1:18610/v1/images/generations \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"model":"muse-image","prompt":"A red fox","size":"16:9","async":true}'
+curl http://127.0.0.1:18610/v1/images/generations/task_example \
+  -H "Authorization: Bearer $KEY"
+
+# Reference-image generation, not masked inpainting.
+curl http://127.0.0.1:18610/v1/images/edits \
+  -H "Authorization: Bearer $KEY" \
+  -F 'image[]=@reference.png' -F 'prompt=The same fox wearing a red scarf'
+
+# Video task; JSON duration or matching seconds is also accepted.
+curl http://127.0.0.1:18610/v1/videos \
+  -H "Authorization: Bearer $KEY" \
+  -F model=muse-video -F 'prompt=Maple leaves falling' -F seconds=5 \
+  -F size=1280x720 -F first_frame=@reference.png
+curl http://127.0.0.1:18610/v1/videos/task_example -H "Authorization: Bearer $KEY"
+curl -L http://127.0.0.1:18610/v1/videos/task_example/content \
+  -H "Authorization: Bearer $KEY" -o output.mp4
 ```
 
-**OpenAI Python SDK**
+The optional `openai` SDK is a separate client dependency, not a server prerequisite:
 
 ```python
+import os
 from openai import OpenAI
 
-client = OpenAI(base_url="http://localhost:18610/v1", api_key="<API_KEY>")
-resp = client.chat.completions.create(
-    model="muse-chat",
-    messages=[{"role": "user", "content": "Write a short poem about autumn"}],
+client = OpenAI(base_url="http://127.0.0.1:18610/v1", api_key=os.environ["KEY"])
+reply = client.chat.completions.create(
+    model="muse-chat", messages=[{"role": "user", "content": "Hello"}]
 )
-print(resp.choices[0].message.content)
+print(reply.choices[0].message.content)
 ```
 
-**Text to image**
+Image JSON accepts `image` as one reference or up to 4 data URLs, public HTTP(S) URLs or bare base64 strings. `response_format` is `url` or `b64_json`; asynchronous results use stored media URLs. For optional local transparent cutout, install with `uv sync --locked --extra dev --extra matting --python 3.12` and send `"background":"transparent"`. This uses local BiRefNet/rembg, not native upstream transparency; first use downloads model weights and CPU work can be substantial. Optional matting needs separate platform/runtime acceptance.
 
-```bash
-curl http://localhost:18610/v1/images/generations \
-  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
-  -d '{"prompt":"A cyberpunk street on a rainy night","size":"16:9","response_format":"url"}'
-```
+### Endpoint index
 
-**Transparent background**
-
-muse.ai only returns flat RGB images, so `"background":"transparent"` cuts the subject out locally (BiRefNet + edge colour estimation) and returns an RGBA PNG. Requires `pip install -e '.[matting]'`; the model (~930MB) is downloaded to `~/.u2net` on first use. Expect ~30s extra per image on CPU.
-
-```bash
-curl http://localhost:18610/v1/images/generations \
-  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
-  -d '{"prompt":"A red fox sitting","background":"transparent"}'
-```
-
-**Image from reference images**
-
-`"image"` takes one reference image or a list of up to 4 (data URL, http(s) URL or bare base64). They are attached to the muse.ai message like a chat upload, and the prompt says how to use them, e.g. put a product on a model, or "the same fox, now wearing a red scarf" to keep the subject and scene. `/v1/images/edits` does the same with OpenAI-style multipart uploads, so `client.images.edit()` works; `mask` (inpainting a region) is not supported.
-
-```bash
-curl http://localhost:18610/v1/images/generations \
-  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
-  -d '{"prompt":"A model wearing exactly this hoodie, studio photo","image":"data:image/jpeg;base64,..."}'
-
-curl http://localhost:18610/v1/images/edits \
-  -H "Authorization: Bearer $KEY" \
-  -F "image[]=@fox.png" -F "prompt=The same fox, now wearing a red scarf"
-```
-
-**Image as an async task**
-
-A sync image call (page load plus generation) can take longer than a reverse proxy allows; Cloudflare cuts it after about 100 s with HTTP 524. Add `"async": true` to get a task back, then poll it. Results are always stored as media URLs.
-
-```bash
-curl http://localhost:18610/v1/images/generations \
-  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
-  -d '{"prompt":"A red fox sitting","async":true}'          # -> {"id":"task_xxx","object":"image.task",...}
-curl http://localhost:18610/v1/images/generations/task_xxx -H "Authorization: Bearer $KEY"
-```
-
-**Text to video (async task)**
-
-```bash
-# Create a task; returns {"id": "task_xxx", "status": "queued", ...}
-curl http://localhost:18610/v1/videos   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json"   -d '{"prompt":"Maple leaves falling in a light breeze","duration":5,"size":"16:9"}'
-
-# Multipart works too, for clients that post a form instead of JSON
-curl http://localhost:18610/v1/videos -H "Authorization: Bearer $KEY"   -F model=muse-video -F prompt="Maple leaves" -F seconds=5 -F size=1280x720   -F first_frame=@first.png
-
-# Poll the task; once status is succeeded, video_url and result.url both point at the video
-curl http://localhost:18610/v1/videos/task_xxx -H "Authorization: Bearer $KEY"
-# Or download the bytes directly
-curl -L http://localhost:18610/v1/videos/task_xxx/content -H "Authorization: Bearer $KEY" -o out.mp4
-```
-
-**Import an account**
-
-```bash
-curl http://localhost:18610/admin/accounts \
-  -H "Authorization: Bearer $ADMIN_KEY" -H "Content-Type: application/json" \
-  -d '{"label":"acc1","cookies":{"hatch_sess":"...","hatch_vml":"...","hatch_native_auth_device":"..."}}'
-```
-
-### Endpoints
-
-| Method | Path | Description |
+| Method | Path | Purpose |
 |---|---|---|
-| GET | `/healthz` · `/readyz` | Liveness · readiness (driver state and available accounts) |
-| GET | `/v1/models` | Model list, including aliases such as `gpt-4o` and `dall-e-3`. Unknown model names return 404 `model_not_found` |
-| POST | `/v1/chat/completions` | Chat, streaming and non-streaming |
-| POST | `/v1/images/generations` · GET `/v1/images/generations/{id}` | Text to image (optional `image` references), returns `url` or `b64_json`; `"async": true` returns a task to poll |
-| POST | `/v1/images/edits` | Multipart `image`/`image[]` files + `prompt`, OpenAI-compatible |
-| POST | `/v1/videos` · GET `/v1/videos/{id}` · GET `/v1/videos/{id}/content` | Create a video task (JSON or multipart) · query a task · download the finished file |
-| GET | `/v1/media/{name}` | Owning-key/admin download or short-lived signed link |
-| GET/POST/PATCH/DELETE | `/admin/accounts[/{id}]` | Account CRUD |
-| POST | `/admin/accounts/{id}/renew` · `/reset` | Renew session · reset account state |
-| POST | `/admin/accounts/{id}/merge` | `{"into": "acc_..."}` fold a duplicate entry into another, moving device bindings |
-| GET | `/admin/status` · `/admin/tasks` | Service status · task list |
-| GET/POST/PATCH/DELETE | `/admin/keys[/{id}]` | Client API keys (create returns the key once; PATCH renames / revokes) |
-| GET | `/admin/requests` · `/admin/stats?window=1h\|24h\|7d` | Request log (filters: `key_id`, `account_id`, `status=2xx\|4xx\|5xx`, `path`, `since`, `hide_polls`) · aggregates |
-| GET | `/dashboard` · `/admin` | React console (asks for the admin key in the browser) |
-| POST | `/admin/accounts/import` | `{content, preview}` batch import with per-row results |
+| GET | `/healthz`, `/readyz` | Liveness / driver and account readiness |
+| GET | `/v1/models` | Canonical models and aliases; unknown names return 404 `model_not_found` |
+| POST | `/v1/chat/completions`, `/v1/responses` | Chat / stateless Responses subset |
+| POST / GET | `/v1/images/generations`, `/v1/images/generations/{id}` | Image generation / task poll |
+| POST | `/v1/images/edits` | Multipart `image`/`image[]` + `prompt`; no `mask` |
+| POST / GET | `/v1/videos`, `/v1/videos/{id}`, `/v1/videos/{id}/content` | Create / poll / download video |
+| GET | `/v1/media/{name}` | Owning-key/admin or signed-link download |
+| GET | `/dashboard`, `/admin` | Console shell; admin APIs require authentication |
+| GET/POST/PATCH/DELETE | `/admin/accounts[/{id}]` | Account management |
+| POST | `/admin/accounts/{id}/renew`, `/reset`, `/merge` | Renew / reset / merge (`{"into":"acc_example"}`) |
+| POST | `/admin/accounts/import` | `{content, preview}` batch import |
 | GET/PATCH | `/admin/pool` | Pool status and persistent scheduling strategy |
-| POST/GET/DELETE | `/admin/login-sessions[/{id}]` | Create, inspect or cancel an isolated manual login |
-| GET/POST | `/admin/login-sessions/{id}/frame` · `/input` · `/complete` | Read screenshot, send allowlisted input, validate and import |
-| GET/POST/DELETE | `/admin/credential-devices` · `/pairings` · `/{id}` | List restricted devices, create one-use pairing challenge, revoke a device (admin only) |
-| POST | `/admin/credential-devices/{id}/confirm` | Confirm only `{capture_id, account_id}` after checking identity/version |
-| GET/POST | `/credential-ingestions/server` · `/pair` · `/rotate` | Server identity, challenge exchange, restricted device-token rotation |
-| POST/GET | `/credential-ingestions` · `/{capture_id}` | Scope-preserving candidate import / own redacted receipt (device token only, 64 KiB limit) |
-| POST | `/v1/responses` | Stateless text/image input and ordinary/SSE output; unsupported controls return 400 |
+| GET | `/admin/status`, `/admin/tasks`, `/admin/metrics` | Status / task list / Prometheus metrics |
+| GET/POST/PATCH/DELETE | `/admin/keys[/{id}]` | Client key management; creation shows the secret once |
+| GET | `/admin/requests`, `/admin/stats?window=1h\|24h\|7d` | Logs / aggregates; filters include key, account, status, path, since, hide_polls |
+| POST/GET/DELETE | `/admin/login-sessions[/{id}]` | Create / inspect / cancel login |
+| GET / POST | `/admin/login-sessions/{id}/frame`, `/input`, `/complete` | Screenshot / allowlisted input / validate-import |
+| GET/POST/DELETE | `/admin/credential-devices`, `/pairings`, `/{id}` | Device list / pairing challenge / revoke |
+| POST | `/admin/credential-devices/{id}/confirm` | Confirm `{capture_id, account_id}` |
+| GET / POST | `/credential-ingestions/server`, `/pair`, `/rotate` | Identity / challenge exchange / device-token rotation |
+| POST / GET | `/credential-ingestions`, `/{capture_id}` | Candidate import / own redacted receipt; restricted device token, 64 KiB limit |
 
-### Dashboard, API keys and request log
+Abbreviated suffixes in the table inherit the preceding route prefix. Task IDs and file names in examples are placeholders, not existing resources.
 
-Open `http://localhost:18610/dashboard` and enter the admin key. The React console keeps it in `sessionStorage`, clears it on logout, and sends it as a Bearer token to `/admin/*`. Account pool, request statistics, async tasks, filtered request logs and client key management use real backend APIs. The visual system follows Muse's public blue/white palette; this remains an independent, unofficial management tool.
+## Compatibility boundaries
 
-Accounts are stored as authenticated encrypted payloads in `data/accounts.db` using `data/credentials.key`. Back up **both** while the service is stopped. Losing the key makes encrypted accounts unrecoverable; the service fails closed rather than overwriting them. A legacy `accounts.json` is imported once without deleting or editing the source. That preserved file can still contain plaintext credentials: restrict its permissions and handle its retirement separately. Windows `chmod` does not replace NTFS ACL management. Encryption at rest does not protect against an attacker who can read both the database and key.
-
-Use one application process/worker. Scheduling and browser leases are process-local; running multiple workers against the same data directory is not supported. Default scheduling is fair round-robin; `lru` and `affinity` remain selectable. Busy accounts wait up to the acquire deadline; invalid accounts are excluded and cooling accounts rejoin after their cooldown. A stream never switches accounts after emitting content. From v0.3.1, chat reuse keys are derived from the authenticated API-key identity plus the optional OpenAI `user` hint; a caller cannot select another key's reuse namespace. Sharing one API key also shares its namespace: use distinct keys for distinct callers. Same-key/same-hint chat execution is serialized.
-
-Browser login controls are admin-only, accept a small input allowlist and never expose a CDP endpoint. Sessions expire by default after 600 seconds, with at most 3 simultaneous login windows. Do not expose the admin service over plain HTTP on an untrusted network. Docker publishes to loopback by default; put a TLS reverse proxy in front before deliberately broadening access.
-
-Besides the admin key and `MUSE_CONSOLE_API_KEY` (still accepted, logged as `legacy`), `/v1/*` accepts any non-revoked key created on the dashboard or with `POST /admin/keys {"name": "..."}`. Keys look like `m2a-...` and are shown once; `data/keys.json` stores only their SHA-256 hash and an 8-character prefix. Every `/v1/*` request (except `/v1/media/*` downloads, which may contain bearer-link query parameters) is recorded in `data/requests.db` (SQLite) with its key, model, account, status, latency and client IP (`CF-Connecting-IP` / `X-Forwarded-For` aware). Task status polls are flagged so the dashboard and stats can leave them out.
-
-### Ownership and resource boundaries
-
-Image/video tasks belong to the authenticated key that submitted them. Other ordinary keys receive 404; the administrator can inspect all tasks. Old tasks without an owner remain administrator-only. This is a deliberate migration boundary, not an invitation to infer ownership from historical prompts.
-
-Generated media require the owning key/admin key, or an expiring signed URL (default one hour). Links are bearer capabilities: recipients can share them until expiry. Revoking a stored client key invalidates its signed links. Task polling refreshes result links after ownership checks. Legacy media without ownership metadata are administrator-only. Responses use `private, no-store`; preserve `media-owners.db` and `media-signing.key` in backups. Old public links no longer work without authentication after upgrade.
-
-Defaults: 12 MiB request body, 16 in-flight generation HTTP requests, 32 queued/running tasks, 4 task runners, 8 MiB per input image, 32 MiB per output file and 1 GiB media storage. Reaching a generation/queue/storage budget returns 429; oversized request bodies return 413. These are local safety limits, not throughput guarantees. Account concurrency remains independently configured. Storage is not silently deleted when full; configure retention or explicitly free space.
-
-Reference URL downloads accept public HTTP(S) raster images only. DNS results are validated and connections pinned to an approved IP with hostname TLS verification; each redirect is revalidated. Proxy environment variables are not used for this path. Private/link-local/metadata destinations, unsafe redirects and oversized responses are rejected. Keep network-level egress controls as defense in depth.
-
-API-key conversation namespacing does not erase Muse account memory. Do not share an account containing private upstream memories between mutually untrusted users. This release does not claim tenant-isolated upstream accounts, per-key billing or a durable distributed queue.
-
-### Execution safety (v0.3.1)
-
-Media generation is deliberately not automatically replayed on another account after errors: the browser adapter cannot prove whether the upstream already accepted or charged for it. A timeout is not proof that generation never happened. Inspect upstream results before manually retrying. Multi-image partial-result recovery and exactly-once execution are not implemented.
-
-Task cancellation waits for local cleanup; it does **not** prove that Muse stopped generating or refunded quota. Interrupted browser tabs are retired. Active/queued tasks are retained independently of the completed-history cap; task runners have bounded local concurrency. This remains an in-process worker, not a durable distributed job queue.
-
-### Protocol support matrix
-
-| Surface | Supported | Explicitly not supported |
+| Surface | Supported | Not supported / not guaranteed |
 |---|---|---|
-| Chat | Full-history text, system/developer/user/assistant roles, user images, ordinary/SSE output, optional usage event | Tool/function execution, audio/files, structured output, enforced token limits, stop sequences and sampling controls |
-| Responses | Text/image input, instructions, metadata echo, ordinary/SSE events, `store:false` | Stored state, previous response/conversation references, tools, background execution, reasoning controls and JSON schema output |
-| Images | 1–4 sequential results, up to 4 references, URL/base64 output, optional local transparent cutout | Mask inpainting, style/output-format controls, non-neutral `quality` |
-| Video | Async task, optional first-frame image, consistent duration/seconds and image/input_reference aliases | Guaranteed exact dimensions or duration |
-| Models | Muse chat/image/video plus compatibility aliases | Access to the actual GPT/Claude/DeepSeek models named by aliases |
+| Chat | Full-history text flattened into a prompt; system/developer/user/assistant roles; user images; ordinary/SSE output; optional usage event | Tools/functions, audio/files, structured output, enforced token budgets, stop sequences or sampling controls |
+| Responses | Text/image input, instructions, metadata echo, ordinary/SSE events, `store:false` | Stored responses, previous response/conversation references, tools, background execution, reasoning controls or JSON schema |
+| Images | 1–4 sequential results, up to 4 references, URL/base64 output, optional local cutout | Mask inpainting, style/output-format controls or non-neutral quality |
+| Video | Async task and one optional reference frame | Exact dimensions/duration, last-frame/video/audio references |
+| Models | Muse capability IDs and compatibility aliases | The actual vendor models suggested by alias names |
 
-Unknown controls return 400 rather than being silently ignored. Chat/Responses accept neutral client defaults: `temperature/top_p=1`, penalties `0`, `n=1`, empty tools, `tool_choice:auto/none`, text-only response format and `store:false`; meaningful unsupported values are rejected. Image `size` and video size/duration are natural-language hints, not guaranteed generation parameters. Image `quality` is accepted only as `auto` or empty because clients such as infinite-canvas send it on every call; other values return 400, and `background: ""` means unset. Video accepts `application/json`, `multipart/form-data` and form-encoded bodies: `first_frame` (or the first `image[]`) becomes the single reference frame, while `last_frame`, `video[]` and `audio[]` references return 400 because Muse is driven here by a prompt plus one image. `mode`, `resolution_name`, `generate_audio` and `watermark` are accepted and ignored. Usage is a text-length estimate, excluding image cost and upstream billing. SSE follows page updates and may arrive in large chunks rather than token-by-token. Official SDK acceptance remains a separate gate.
+Chat/Responses reject unknown controls or meaningful unsupported values with 400. Neutral defaults such as `temperature/top_p=1`, penalties `0`, `n=1`, empty tools, `tool_choice:auto/none`, text-only output and `store:false` are accepted without implying enforcement. Image `quality` accepts only `auto`/empty (or omission); empty `background` means unset. Schema failures may return validation errors rather than a protocol-control 400.
 
-### Upgrade, backup and rollback
+Video accepts JSON, multipart and form-encoded bodies. `duration`/`seconds` and `image`/`input_reference` must agree if supplied together. Multipart `first_frame` or the first `image[]` becomes the reference; `last_frame`, `video[]` and `audio[]` are rejected. `mode`, `resolution_name`, `generate_audio` and `watermark` are accepted but ignored. Sizes/durations are prompt hints, not guaranteed upstream parameters.
 
-1. Stop every data writer and back up the entire data directory plus the matched old source/image. `tools/backup_restore.py backup --data <stopped-data> --output <new-backup-dir> --stopped` creates an exclusive, hash-verified copy; it never stops services for you. Existing targets, symlinks/reparse paths, hardlinks and SQLite sidecars are refused. Never test against your only production data.
-2. Start this rebuild with a copy in a separate data directory and port. Check `/readyz`, admin login, import preview, account distribution and a real upstream request before cutover.
-3. Legacy JSON import does not edit the original. New changes are written only to SQLite; a legacy binary cannot read them. To roll back, stop the rebuild and restore the **matched pre-upgrade source/image and full data backup**, not just `accounts.json` on top of newer data.
-4. Keep `credentials.key`, account/device databases, media ownership/signing files and all other data together, protected by filesystem access controls. To restore, use `tools/backup_restore.py restore --backup <backup-dir> --output <new-restore-dir> --stopped`, then start the matching release against that new directory. Never overlay a partial backup. Hashes detect corruption, not malicious replacement. Backup archives contain secrets and must never enter source deliveries or bug reports.
+Usage is a text-length estimate, not exact tokens or upstream billing, and excludes image cost. SSE follows page updates and may arrive in large chunks. By default the first chunk is fetched before sending HTTP 200; optional `MUSE_CONSOLE_STREAM_HEARTBEAT_INTERVAL>0` sends 200 earlier, so later errors arrive in-stream. Official SDK acceptance for the implemented subset remains a separate verification gate.
 
-Read-only observation is available with `python tools/soak_check.py --base-url http://127.0.0.1:18610 --duration 10 --interval 1 --report <new-report.jsonl>`. URL, duration and report are explicit; remote targets require HTTPS. Add `--admin-key-env <VARIABLE_NAME>` for redacted aggregate counts. It runs in the foreground, performs GET only, follows no redirects and never generates content, renews sessions or stores response bodies. A 72-hour health report alone does not prove credentials remain usable for generation.
+## Security and operational boundaries
 
-Validation must be performed for the exact revision being deployed. Offline tests and mock-driver checks do not establish live Muse authentication/generation, Docker runtime readiness or a successful GitHub Actions run. This hardening revision does not certify those acceptance gates.
+- **Keys:** set a separate `MUSE_CONSOLE_ADMIN_KEY` before sharing API access; otherwise the legacy API key is also an admin credential. Admin can use inference and inspect all tasks/media. Give each caller a distinct client key (`clientKey` in integrations), never the admin key. Stored client keys are shown once and retained as hashes/prefixes in `keys.json`.
+- **Console/logs:** the console keeps the admin key in `sessionStorage` and clears it on logout. Request history in `requests.db` includes key/model/account/status/latency/client-IP metadata and poll flags; treat it as private. Forwarded IP headers are not an authorization boundary and require trusted proxy handling.
+- **Conversation isolation:** reuse namespaces derive from authenticated key identity plus optional `user`; identical key/hint execution is serialized. Sharing a key shares that namespace. This does not erase upstream Muse memory: do not share a private-memory account among mutually untrusted users. Tenant-isolated upstream accounts and per-key billing/quotas are not provided.
+- **Task/media ownership:** ordinary keys receive 404 for other owners' tasks/media; legacy ownerless records are admin-only. Signed media URLs default to one hour and act as shareable bearer capabilities. Revoking a stored client key invalidates its signed links; authorized task polling refreshes links. Media responses are `private, no-store`. Preserve `media-owners.db` and `media-signing.key` with the data.
+- **Single worker:** run one process/worker per data directory. Scheduling, browser leases, runners and metrics are process-local; shared-directory multi-worker operation and distributed queues are unsupported. Restart marks unfinished tasks interrupted.
+- **Execution:** media is not automatically replayed on another account after errors. A timeout/cancellation does not prove upstream stopped, did not charge, or refunded quota; inspect results before retrying. The optional same-account text-only video retry is not exactly-once execution. Multi-image partial recovery is not implemented.
+- **Budgets:** defaults are 12 MiB request body, 16 in-flight generation HTTP requests, 32 queued/running tasks, 4 runners, 8 MiB per input image, 32 MiB per output, 1 GiB media storage and 16 generation tabs (900-second idle cleanup). Account concurrency defaults to 1. Generation/queue/storage exhaustion returns 429; oversized request bodies return 413. These are limits, not throughput promises. Full storage is not silently deleted; retention is opt-in.
+- **Reference URLs:** public HTTP(S) raster-image MIME types only, standard ports, no URL credentials/fragments, private/link-local/metadata targets or unsafe redirects. DNS answers and every redirect are checked; connections pin an approved IP while retaining hostname TLS verification. This downloader ignores proxy environment variables and bounds transfer/decompressed size. MIME checking is not complete image-content validation; retain network egress controls.
+- **Exposure:** keep admin and CDP private. Use trusted TLS and a protected backend; trust only your fixed reverse proxy for forwarded headers, never `forwarded_allow_ips="*"`. The ingestion origin check uses the resulting ASGI origin. No global CORS exception exists: if needed, allow exact client origins for `/v1/*` at the proxy, not wildcard origins or the dashboard. See [Deployment](docs/DEPLOYMENT.md).
+- **Publication:** never include `.env`, cookies, keys, data directories, browser profiles, conversations/media, backups or unredacted logs/screenshots in Git, archives, issues or CI artifacts. Ignored files and old history still need review. Follow [SECURITY.md](SECURITY.md) for a suspected leak; deleting a file alone does not revoke a secret.
 
 ## Configuration
 
-All settings come from environment variables (preferred prefix `MUSE_CONSOLE_`) or a `.env` file. Legacy `MUSE2API_` aliases remain supported by the core configuration layer; when both names for a setting are supplied, the `MUSE_CONSOLE_` name takes precedence. Use only the new names in new deployments. See [.env.example](.env.example) for the full list. The most common ones:
+Use environment variables or `.env`; new deployments should use `MUSE_CONSOLE_`. Core-managed legacy `MUSE2API_` names remain accepted, with the new namespace taking precedence. See [.env.example](.env.example) and [config.py](src/muse_console/config.py) for all settings/ranges; deployment guidance is in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-| Variable | Default | Description |
+| Variable(s), prefixed `MUSE_CONSOLE_` | Default | Meaning |
 |---|---|---|
-| `MUSE_CONSOLE_DRIVER` | `mock` | Driver: `mock` / `browser` / `http` |
-| `MUSE_CONSOLE_HOST` · `MUSE_CONSOLE_PORT` | `127.0.0.1` · `18610` | Listen address and port |
-| `MUSE_CONSOLE_API_KEY` | auto-generated | Key for `/v1/*` endpoints |
-| `MUSE_CONSOLE_ADMIN_KEY` | same as API key | Key for `/admin/*` endpoints |
-| `MUSE_CONSOLE_REQUEST_LOG_RETENTION_DAYS` | `14` | Days of request history kept in `data/requests.db` |
-| `MUSE_CONSOLE_MEDIA_RETENTION_DAYS` | `0` | Days to retain generated files; `0` disables automatic cleanup |
-| `MUSE_CONSOLE_MEDIA_URL_TTL` | `3600` | Signed media link lifetime, seconds |
-| `MUSE_CONSOLE_MEDIA_MAX_BYTES` · `MUSE_CONSOLE_BROWSER_MEDIA_MAX_BYTES` | `33554432` | Output storage / browser attachment byte budgets |
-| `MUSE_CONSOLE_MEDIA_STORAGE_MAX_BYTES` | `1073741824` | Total local media budget; full storage rejects new saves |
-| `MUSE_CONSOLE_INPUT_IMAGE_MAX_BYTES` | `8388608` | Per input image byte limit |
-| `MUSE_CONSOLE_REQUEST_MAX_BYTES` · `MUSE_CONSOLE_REQUEST_MAX_INFLIGHT` | `12582912` · `16` | Request body / in-flight generation HTTP limits |
-| `MUSE_CONSOLE_TASK_MAX_PENDING` · `MUSE_CONSOLE_TASK_MAX_CONCURRENT` | `32` · `4` | Queued+running jobs / runner limits |
-| `MUSE_CONSOLE_BROWSER_MAX_TABS` · `MUSE_CONSOLE_BROWSER_IDLE_TTL` | `16` · `900` | Generation-tab budget / idle cleanup seconds; manual login and credential probes have separate limits |
-| `MUSE_CONSOLE_PUBLIC_BASE` | empty | Public base URL used in media links; derived from the request when empty |
-| `MUSE_CONSOLE_POOL_STRATEGY` | `round_robin` | Account scheduling: `lru` / `round_robin` / `affinity` |
-| `MUSE_CONSOLE_MAX_FAILOVER` | `2` | Maximum pre-output chat retries on another account; media is not automatically replayed |
-| `MUSE_CONSOLE_ACCOUNT_MAX_CONCURRENCY` | `1` | Default parallel requests per account (1–16); each account may override it |
-| `MUSE_CONSOLE_LOGIN_SESSION_TTL` | `600` | Manual login lifetime in seconds (30–1800) |
-| `MUSE_CONSOLE_LOGIN_SESSION_LIMIT` | `3` | Simultaneous manual login contexts (1–10) |
-| `MUSE_CONSOLE_LOGIN_AUTO_COMPLETE_ENABLED` | `false` | Detect successful isolated login and validate/import automatically |
-| `MUSE_CONSOLE_CREDENTIAL_INGESTION_ENABLED` | `false` | Enable restricted extension pairing/import APIs |
-| `MUSE_CONSOLE_CREDENTIAL_SERVER_ORIGIN` | empty | Exact HTTPS receiver origin; required when ingestion is enabled |
-| `MUSE_CONSOLE_CREDENTIAL_ALLOW_LOOPBACK_HTTP` | `false` | Explicit local-development exception; never permits LAN/public HTTP |
-| `MUSE_CONSOLE_CHROMIUM_PATH` | auto-detected | Path to the browser executable |
-| `MUSE_CONSOLE_KEEPALIVE_ENABLED` | `false` | Periodically renew sessions in the background |
-| `MUSE_CONSOLE_MATTING_MODEL` | `birefnet-general` | Model for `background: "transparent"` (`birefnet-general-lite` is faster) |
+| `DRIVER` | `mock` | `mock` / `browser` / reserved `http` |
+| `HOST`, `PORT` | `127.0.0.1`, `18610` | Listen address/port |
+| `DATA_DIR` | `data` | Private persistence root |
+| `API_KEY`, `ADMIN_KEY` | generated, same as API key | Legacy inference key / administrator credential |
+| `PUBLIC_BASE` | empty | Media base URL; otherwise derived from request |
+| `REQUEST_LOG_RETENTION_DAYS`, `MEDIA_RETENTION_DAYS` | `14`, `0` | History retention / optional media cleanup (0 disables) |
+| `MEDIA_URL_TTL` | `3600` | Signed URL lifetime in seconds |
+| `MEDIA_MAX_BYTES`, `BROWSER_MEDIA_MAX_BYTES` | `33554432` each | Output / browser attachment byte caps |
+| `MEDIA_STORAGE_MAX_BYTES`, `INPUT_IMAGE_MAX_BYTES` | `1073741824`, `8388608` | Total media / input image byte caps |
+| `REQUEST_MAX_BYTES`, `REQUEST_MAX_INFLIGHT` | `12582912`, `16` | Body bytes / generation HTTP concurrency |
+| `TASK_MAX_PENDING`, `TASK_MAX_CONCURRENT` | `32`, `4` | Queued+running tasks / runners |
+| `BROWSER_MAX_TABS`, `BROWSER_IDLE_TTL` | `16`, `900` | Generation tabs / idle seconds |
+| `POOL_STRATEGY`, `POOL_ACQUIRE_TIMEOUT` | `round_robin`, `60` | Scheduling / acquire deadline seconds |
+| `ACCOUNT_MAX_CONCURRENCY`, `MAX_FAILOVER` | `1`, `2` | Per-account concurrency / pre-output chat failovers |
+| `ACCOUNT_COOLDOWN` | `120` in code; `30` in example | Cooldown seconds; review the effective setting |
+| `LOGIN_SESSION_TTL`, `LOGIN_SESSION_LIMIT` | `600`, `3` | Login seconds / context count |
+| `LOGIN_AUTO_COMPLETE_ENABLED` | `false` | Validate/import after manual authentication |
+| `CREDENTIAL_INGESTION_ENABLED`, `CREDENTIAL_SERVER_ORIGIN` | `false`, empty | Restricted import / exact receiver origin |
+| `CREDENTIAL_ALLOW_LOOPBACK_HTTP` | `false` | Explicit loopback development exception |
+| `CHROMIUM_PATH`, `BROWSER_PROFILE_DIR`, `BROWSER_PROXY` | detected, data-owned profile, empty | Browser executable / profile / browser-only proxy |
+| `CHROMIUM_NO_SANDBOX` | `false` | Weaker isolation; prefer fixing sandbox support |
+| `CHAT_TIMEOUT`, `IMAGE_TIMEOUT`, `VIDEO_TIMEOUT` | `300`, `240`, `600` | Generation timeouts in seconds |
+| `FIRST_TOKEN_TIMEOUT`, `STREAM_HEARTBEAT_INTERVAL` | `45`, `0` | First output deadline / optional SSE heartbeat seconds |
+| `VIDEO_DEADLINE_CAP`, `VIDEO_TEXT_ONLY_RETRIES` | `600`, `1` | Overall video budget / text-only resubmissions |
+| `KEEPALIVE_ENABLED`, `KEEPALIVE_INTERVAL` | `false`, `21600` | Unverified renewal / interval seconds |
+| `MATTING_MODEL` | `birefnet-general` | Optional local cutout model |
 
-## Roadmap
+## Backup, upgrade and verification
 
-All reserved modules and outstanding work are tracked in **[TODO.md](TODO.md)**, in four groups:
+Account payloads in `accounts.db` are encrypted using `credentials.key`: **back up the database and key together** while stopped. Losing the key makes accounts unrecoverable; encryption does not protect against access to both files. Legacy `accounts.json` is imported without modifying/deleting it and may still contain plaintext secrets. Restrict filesystem permissions (NTFS ACLs on Windows; `chmod` alone is insufficient there).
 
-- **Live verification (do first)**: run live regression for the exact hardening revision, then multi-account load and 72-hour renewal observation. Earlier real-account samples are not substitutes.
-- **Drivers**: direct HTTP protocol driver, conversation thread reuse, quota lookup.
-- **Protocol**: official SDK acceptance for the implemented subset and mask-based inpainting. Streaming heartbeats are available via `MUSE_CONSOLE_STREAM_HEARTBEAT_INTERVAL` (off by default). Tool calling is not currently supported.
-- **Accounts, admin and operations**: 72-hour renewal acceptance, multi-account load validation, per-key quotas/rate limits. Process-local Prometheus metrics are served at `/admin/metrics` (admin key). Distributed scheduling is outside the single-worker contract.
+1. Stop **all writers**. Back up the complete data directory and matched source/image, including account/device databases, encryption key, media ownership/signing files and other state. Protect backups as secrets; never publish them.
+2. The helper `uv run --no-sync python tools/backup_restore.py backup --data <stopped-data> --output <new-backup-dir> --stopped` creates an exclusive hash-verified copy. It does not stop services; existing targets, symlinks/reparse paths, hardlinks and SQLite sidecars are refused.
+3. Test the new revision on a copy with a separate data directory/port. Check readiness, admin access, import preview, account distribution and an authorized real request before cutover. Never test on the only production copy.
+4. Restore with `uv run --no-sync python tools/backup_restore.py restore --backup <backup-dir> --output <new-restore-dir> --stopped`. Roll back to the **matched old release and complete pre-upgrade backup**, not legacy JSON over newer SQLite. Hashes detect corruption, not malicious replacement.
 
-Each task lists its location, approach and definition of done. Places marked `TODO(contributors)` in the code are the reserved extension points.
+Read-only observation: `uv run --no-sync python tools/soak_check.py --base-url http://127.0.0.1:18610 --duration 10 --interval 1 --report <new-report.jsonl>`. Remote URLs require HTTPS; optional `--admin-key-env <VARIABLE_NAME>` adds redacted counts. It follows no redirects and does not generate, renew or store response bodies. A 72-hour health report alone does not prove credential usability. Verify live behavior, Docker, optional matting and CI for the exact deployed revision separately.
 
-## Contributing
+## Architecture and development
 
-You are welcome to pick up any task in [TODO.md](TODO.md). Please open an issue describing what you plan to do before you start; see [CONTRIBUTING.md](CONTRIBUTING.md) for conventions.
+Dependency direction: `api → services → accounts/core → drivers → upstream`. Routes handle authentication/validation/SSE; the gateway leases accounts and retries eligible chat failures only before output; drivers implement upstream access. Persistence uses bounded synchronous local I/O within an async application.
+
+- `src/muse_console/`: app/config, protocol routes, account pool/storage, gateway/tasks, mock/browser/reserved HTTP drivers and packaged `web/` assets.
+- `frontend/`: React/TypeScript console; `extension/`: optional MV3 importer.
+- `tests/`: offline service, persistence and fake-CDP regressions; `tools/`: publication checks, backup/restore and monitoring.
+- [Architecture](docs/ARCHITECTURE.md), [Contributing](CONTRIBUTING.md), [Security](SECURITY.md), [Deployment](docs/DEPLOYMENT.md), [task board](TODO.md).
+
+Run checks with mock/renewal disabled and synthetic fixtures, not private credentials:
 
 ```bash
-uv sync --locked --extra dev
-uv run --no-sync ruff format .
+uv lock --check
+uv sync --locked --extra dev --python 3.12
+uv run --no-sync ruff format --check .
 uv run --no-sync ruff check .
-uv run --no-sync pytest    # offline; no real Muse account required
-cd frontend
-npm ci
-npm run format
-npm run lint
-npm test
-npm run build
+uv run --no-sync python -m pytest
+(cd frontend && npm ci && npm run lint && npm test && npm run build)
+(cd extension && npm ci && npm test && npm run build)
 ```
 
-## Disclaimer
+Use `python -m pytest` rather than the direct pytest entry point. See CONTRIBUTING for extension formatting/type checks and isolated environments. Outstanding work includes exact-revision live regression, multi-account load/renewal acceptance, direct HTTP access, SDK subset acceptance and mask inpainting; no delivery dates or response SLA are promised.
 
-This project is for learning and technical research only. Please comply with muse.ai's terms of service and local laws. Never commit or publish account cookies.
+## Before publication
 
-## License and upstream attribution
+Documentation preparation does **not** authorize changing repository visibility, pushing code or publishing packages/images. Follow the [publishing checklist](docs/PUBLISHING.md):
 
-Muse Console is derived from [www222fff/muse2api](https://github.com/www222fff/muse2api), the MIT-licensed upstream project. The upstream repository is a source attribution, not the Muse Console repository; its stars, releases and maintainers must not be represented as those of this project.
+1. Review tracked changes, all local Git refs/history and commit identities for secrets or personal information. Check ignored/untracked files, delivery archives, build artifacts, screenshots and CI attachments separately; exclude real account details, production hosts/IPs and local absolute paths from examples.
+2. Run the standard-library [publication guard](tools/check_publication.py) from the repository root:
 
-[LICENSE](LICENSE) retains the original MIT terms and `Copyright (c) 2026 www222fff`. Redistributed copies and substantial portions must retain that copyright and permission notice, including in packages and container images. The rename does not transfer copyright or imply upstream endorsement.
+   ```bash
+   uv run --no-sync python tools/check_publication.py
+   uv run --no-sync python tools/check_publication.py --history
+   ```
 
-Muse Console is maintained independently at [YunMengXue42/muse-console](https://github.com/YunMengXue42/muse-console). The distribution/CLI name is `muse-console`; the Python module/package is `muse_console`. There is no published PyPI release or Docker registry image; installation examples use the local source, and Compose builds a local image. See [CHANGELOG.md](CHANGELOG.md) for release notes and [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
+   The default scans tracked working-tree files; `--history` scans blobs reachable from all local Git refs. JSON findings omit matched secret values and hash commit identities for separate review. Its finite pattern/path rules are not a security audit, credential-validity check or publication certification. Untracked/ignored files, unreachable objects, remote settings and external artifacts are outside its scope.
+3. Revoke/rotate any exposed credential and review history/artifacts before release. Confirm actual test results, unresolved acceptance gates and retained MIT notices; a clean scan or CI guard alone is not clearance to publish.
+
+## License, attribution and trademarks
+
+Muse Console derives from the MIT-licensed [www222fff/muse2api](https://github.com/www222fff/muse2api). [LICENSE](LICENSE) retains `Copyright (c) 2026 www222fff` and the MIT permission notice. Copies/substantial portions, packages and container images must preserve these notices. Renaming does not transfer copyright or imply upstream endorsement; upstream stars, releases and maintainers are not those of Muse Console.
+
+Maintained independently at [YunMengXue42/muse-console](https://github.com/YunMengXue42/muse-console). Distribution/CLI: `muse-console`; Python module: `muse_console`. Muse/muse.ai, OpenAI and other product/model names belong to their respective owners; names identify integrations/compatibility only and do not imply affiliation or endorsement. Comply with upstream terms, account authorization and applicable law. The MIT software is provided as-is, without a security, availability or compatibility guarantee.

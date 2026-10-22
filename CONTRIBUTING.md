@@ -1,64 +1,111 @@
 # Contributing to Muse Console
 
-## Setup
+English is canonical. [简体中文](CONTRIBUTING.zh-CN.md)
 
-Clone `https://github.com/YunMengXue42/muse-console.git` and run these commands from that directory. The upstream attribution URL in README is not a clone URL for this project. The distribution/CLI is `muse-console`, the Python module/package is `muse_console`, and packaged UI assets live in `src/muse_console/web`.
+## Setup and checks
+
+Work from the Muse Console repository root (`https://github.com/YunMengXue42/muse-console`). Repository access/public availability is not assumed. The distribution/CLI is `muse-console`, the Python package is `muse_console`, and packaged UI assets live in `src/muse_console/web`.
+
+Use **uv 0.12.11**, **Python 3.12** for local development, and **Node.js 24** as in CI. The declared Python minimum is 3.10; CI defines a 3.10/3.12 matrix on Windows, Linux x64 and Linux ARM. A workflow definition is not evidence that a run passed.
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
-uv sync --locked --extra dev
-uv run --no-sync ruff format .
+uv --version
+uv lock --check
+uv sync --locked --extra dev --python 3.12
+uv run --no-sync ruff format --check .
 uv run --no-sync ruff check .
-uv run --no-sync pytest
+uv run --no-sync python -m pytest
+
 cd frontend
 npm ci
-npm run format
 npm run lint
 npm test
 npm run build
+cd ..
+
+cd extension
+npm ci
+node ../frontend/node_modules/prettier/bin/prettier.cjs --check "src/**/*.ts" "tests/**/*.ts" "*.json" "*.mjs" "*.html" "*.css"
+node node_modules/typescript/bin/tsc --noEmit
+npm test
+npm run build
+cd ..
 ```
 
-Start with `muse-console` or `python -m muse_console` after building the frontend. Copy `.env.example` to `.env` for local settings. Prefer `MUSE_CONSOLE_`; legacy `MUSE2API_` aliases are core-managed, with the new name taking precedence.
+Run checks with `MUSE_CONSOLE_DRIVER=mock` and `MUSE_CONSOLE_KEEPALIVE_ENABLED=false` in a clean, isolated environment, not against real accounts. CI runs `uv run --no-sync python -m pytest -q`; like the command above, it explicitly uses the selected environment's Python. Frontend `lint` checks TypeScript and Prettier; extension `build` includes TypeScript checking and has no separate lint/format script. Its formatter is the locked frontend Prettier installed by `npm ci` above. To fix formatting deliberately, use `uv run --no-sync ruff format .`, `npm run format` in `frontend`, or the extension formatter command with `--write` instead of `--check`, then review the diff and rerun checks.
 
-The default is `MUSE_CONSOLE_DRIVER=mock`, so you can work on the API layer and front end without any account.
+`uv.lock` is a universal platform/Python lock, not a machine snapshot. Update dependencies deliberately with `uv lock`, review the diff and run `uv lock --check`; do not substitute `pip freeze`. Optional matting dependencies need separate platform/runtime acceptance.
 
-Use uv 0.12.11 as in CI. `uv.lock` is a universal platform/Python lock, not a snapshot of one machine. Update dependencies deliberately with `uv lock`, review the resulting diff and run `uv lock --check`; do not replace it with `pip freeze`. CI covers Python 3.10/3.12 on Windows, Linux x64 and Linux ARM. Optional matting dependencies require their own platform/runtime acceptance.
+If a preview holds the normal environment open, set `UV_PROJECT_ENVIRONMENT=.venv-hardening` before **all** sync/run commands (PowerShell: `$env:UV_PROJECT_ENVIRONMENT = '.venv-hardening'`). Do not reinstall into or stop an active preview environment. uv commands do not require manual virtualenv activation.
 
-For QA while a preview holds the normal virtualenv open, set `UV_PROJECT_ENVIRONMENT=.venv-hardening` before `uv sync --locked --extra dev --python 3.12` and all `uv run --no-sync ...` commands. Do not reinstall into or stop an active preview environment. On PowerShell use `$env:UV_PROJECT_ENVIRONMENT = '.venv-hardening'`.
+## Local development
 
-Extension checks run from `extension`: `npm ci`, `npm test`, `npm run build` (the build includes TypeScript checking). After installing frontend dependencies, formatting is checked with `node ../frontend/node_modules/prettier/bin/prettier.cjs --check "src/**/*.ts" "tests/**/*.ts" "*.json" "*.mjs" "*.html" "*.css"`. CI uses this locked formatter and explicit TypeScript checking, not absent optional scripts. Build output is for an explicitly authorized independent browser only.
+Copy `.env.example` to a new local `.env` without overwriting existing settings (`cp .env.example .env` on POSIX; `Copy-Item .env.example .env` in PowerShell). Review it before starting:
 
-Offline operations: `python tools/backup_restore.py --help` and `python tools/soak_check.py --help`. Backup/restore requires all writers stopped and explicit disjoint paths. Soak checks health/readiness and optional redacted admin counts; it is not model or renewal acceptance. Never point live tests at a daily browser profile or production data.
+```bash
+uv run --no-sync muse-console
+# Alternative:
+uv run --no-sync python -m muse_console
+```
+
+Build the frontend first. The default `mock` driver needs no account. Use `MUSE_CONSOLE_`; core-managed legacy `MUSE2API_` aliases remain supported, with the new name taking precedence. For UI development run `npm run dev` in `frontend`; its API proxy defaults to `http://127.0.0.1:18610`.
+
+See [Deployment](docs/DEPLOYMENT.md) before using real credentials, browser profiles, the extension or a reverse proxy. Extension build output is only for an explicitly authorized independent browser, never an invitation to inspect a daily browser profile.
+
+Offline tools:
+
+```bash
+uv run --no-sync python tools/backup_restore.py --help
+uv run --no-sync python tools/soak_check.py --help
+```
+
+Backup/restore requires all writers stopped and explicit disjoint paths. Soak monitoring is read-only health/readiness and optional redacted admin counts, not generation or renewal acceptance. Never point live tests at production data or a daily browser profile.
 
 ## Picking up a task
 
-Available tasks are listed in [TODO.md](TODO.md). Before starting, open an issue titled `[Claim] <ID> <task name>` and put your GitHub ID in the "Owner" column of TODO.md, so that nobody duplicates the work. Places marked `TODO(contributors)` in the code are the reserved extension points.
+Tasks are listed in [TODO.md](TODO.md). When repository access permits, open an issue titled `[Claim] <ID> <task name>` and put your GitHub ID in its Owner column to avoid duplicate work. `TODO(contributors)` marks reserved extension points. Do not use a public task issue to report a vulnerability; follow [SECURITY.md](SECURITY.md).
 
-## Conventions
+## Conventions and drivers
 
-- Dependency direction: `api → services → accounts/core → drivers → upstream`. Never import upward.
-- Anything that depends on muse.ai's page structure belongs only in `drivers/browser/dom.py`; upstream URLs and cookie names belong only in `upstream/muse.py`.
-- When adding a driver capability, update `DriverCapabilities` and add a fake implementation to `MockDriver` so that tests never need network access.
-- Upstream errors must be mapped to the types in `errors.py`; never swallow exceptions inside a driver.
-- CI must never contact the real muse.ai; tests that need upstream data should use recorded fixtures.
-- Never commit cookies, the `data/` directory or `.env`.
+- Dependency direction: `api → services → accounts/core → drivers → upstream`; never import upward.
+- Muse page structure belongs in `drivers/browser/dom.py`; upstream URLs and cookie names belong in `upstream/muse.py` (paths relative to `src/muse_console`).
+- Extend `DriverCapabilities` and the fake `MockDriver` when adding capabilities, so tests need no network access.
+- Map upstream failures to `errors.py` types; do not silently swallow driver exceptions.
+- CI must not contact real Muse. Use synthetic fixtures, not captured private credentials or personal conversations.
 
-## Adding a driver
+To add a driver, implement `MuseDriver` under `src/muse_console/drivers/<name>/`, register it in `drivers/registry.py` and `config.DriverName`, implement at least `chat_stream`, and leave unsupported capabilities raising `FeatureNotImplemented`. Add offline tests and documentation.
 
-1. Implement a `MuseDriver` subclass under `src/muse_console/drivers/<name>/`.
-2. Register it in `drivers/registry.py` and add its name to `config.DriverName`.
-3. Implement at least `chat_stream`; leave other capabilities raising `FeatureNotImplemented` until they are done.
-4. Add tests and documentation.
+## Secrets and publication discipline
 
-## Packaging
+Never commit or publish `.env`, cookies, API/admin/client/device tokens, encryption/signing keys, any data directory, browser profiles, private conversations, media, backups or unredacted logs/screenshots. Use synthetic data and `example.com` or loopback in deployment examples. Check staged changes and delivery contents, not just `.gitignore`: ignored files and old Git history can still leak through archives or publication. If a secret escaped, revoke/rotate it and follow [SECURITY.md](SECURITY.md); deleting the visible file is not sufficient.
 
-After the frontend build, create a wheel with `python -m pip wheel . --no-deps -w dist` and inspect that it contains `muse_console/web/dashboard.html` and its referenced assets. Verify the wheel also contains the MIT license notice with `Copyright (c) 2026 www222fff`; preserve [LICENSE](LICENSE) and the README upstream attribution in redistributions. These are verification requirements, not claims that a release has passed them. Use local-source builds; no published PyPI or registry identity is assumed. Keep `.env`, all data directories, encryption keys, browser profiles, virtualenvs and `node_modules` out of delivery archives.
+Run the offline publication guard from the repository root:
 
-For local UI development, run the backend normally and `npm run dev` from `frontend`; its API proxy defaults to `http://127.0.0.1:18610`. On Windows, activate with `.venv\\Scripts\\activate` (PowerShell: `.venv\\Scripts\\Activate.ps1`) instead of the POSIX `source` command.
+```bash
+uv run --no-sync python tools/check_publication.py
+uv run --no-sync python tools/check_publication.py --history
+```
+
+The default scans tracked working-tree files; `--history` scans blobs reachable from **all local Git refs**, not just the current branch, and reports commit-identity hashes for separate review. It is a limited pattern/path guard, not a credential-validity check or security audit. It excludes untracked/ignored files, unreachable objects, remote GitHub settings and external artifacts; a clean result is not publication clearance. Review those separately and see [Publishing](docs/PUBLISHING.md).
+
+Do not upload private data to an issue, PR, CI artifact or external service. A local build/test is not authorization to publish a repository, package or image; publication and pushing require explicit approval.
+
+## Packaging and upstream attribution
+
+After the frontend build, a local wheel can be built with:
+
+```bash
+uv run --no-sync python -m pip wheel . --no-deps -w dist
+```
+
+This command requires pip in that interpreter; if unavailable, use a separate Python packaging environment with pip. Inspect the wheel for `muse_console/web/dashboard.html`, referenced assets, the CLI entry point and the MIT license notice. These are verification requirements, not a claim that a release passed them. Use local-source builds: no published PyPI release or Docker registry image is assumed or claimed.
+
+Muse Console derives from [www222fff/muse2api](https://github.com/www222fff/muse2api). Preserve [LICENSE](LICENSE), including `Copyright (c) 2026 www222fff` and the MIT permission notice, in copies/substantial portions, packages and container images; retain the README upstream attribution. Renaming does not transfer copyright, imply upstream endorsement, or make upstream stars/releases/maintainers those of Muse Console. Keep all secrets, data, profiles, virtualenvs and `node_modules` out of delivery archives.
 
 ## Submitting changes
 
-- Branch names: `feat/<module>`, `fix/<issue>`.
-- Make sure `pytest` and `ruff check .` pass before opening a PR.
-- Add a line to [CHANGELOG.md](CHANGELOG.md) for user-visible changes.
-- Report security problems privately as described in [SECURITY.md](SECURITY.md).
+- Use branches such as `feat/<module>` or `fix/<issue>`.
+- Run the relevant checks above and report actual results and unverified gates separately.
+- Add a [CHANGELOG.md](CHANGELOG.md) entry for user-visible changes when appropriate.
+- Keep English documentation canonical and update matching Chinese translations and reciprocal language links together.
+- Report vulnerabilities privately using [SECURITY.md](SECURITY.md), not a public issue or PR.

@@ -19,7 +19,7 @@ Priorities: **P0** must be done first · **P1** core feature · **P2** better ex
 | A3 | Verify how image/video generation is triggered | P0 | `drivers/browser/driver.py` | | Previous image/video sample passed; bounded downloader live regression pending |
 | A4 | Verify session renewal | P0 | `upstream/muse.py` | | Not started |
 | A5 | Verify the Docker image builds and runs | P1 | `Dockerfile` | | CI mock smoke job exists; real-driver container not verified |
-| A6 | Enable GitHub Actions CI | P1 | `.github/workflows/ci.yml` | | Workflow in repo; first hosted run with the public repository |
+| A6 | Enable GitHub Actions CI | P1 | `.github/workflows/ci.yml` | | Hosted CI passes for v0.4.2; publication changes need their own run |
 | B1 | Direct HTTP protocol driver | P1 | `drivers/http/` | | Not started |
 | B2 | Reuse conversation threads to cut first-token latency | P2 | `drivers/browser/` | | Done |
 | B3 | Quota lookup | P2 | `MuseDriver.quota` | | Admin endpoint and mock done; browser driver pending |
@@ -29,7 +29,7 @@ Priorities: **P0** must be done first · **P1** core feature · **P2** better ex
 | C4 | Streaming heartbeats to avoid client timeouts | P2 | `api/heartbeat.py` | | Done in 0.3.5: opt-in `MUSE_CONSOLE_STREAM_HEARTBEAT_INTERVAL` |
 | D1 | Support more cookie import formats | P1 | `services/account_manager.py` | | Done: JSON, browser export, Netscape, header lines |
 | D2 | Cookie import browser extension | P2 | `extension/` | | Implemented; previous independent-browser transfer/sync passed; HTTPS re-pair and 72h observation pending |
-| D3 | Web admin console | P2 | `frontend/` / `web/` | | Implemented; previous rendered acceptance passed; style unchanged |
+| D3 | Web admin console | P2 | `frontend/` / `web/` | | Implemented; v0.4.2 web-login dialog has rendered acceptance; upstream account renewal remains separate |
 | D4 | SQLite / Redis storage backends | P3 | `accounts/store.py` | | Encrypted SQLite done; Redis out of scope |
 | E1 | Automatic media cleanup | P2 | `core/media.py` | | Done: optional retention cleanup |
 | E2 | Multiple API keys and rate limiting | P3 | `api/deps.py` | | Multiple keys and task/media ownership implemented; per-key quota/rate limiting pending |
@@ -42,7 +42,7 @@ Priorities: **P0** must be done first · **P1** core feature · **P2** better ex
 Earlier rebuild notes record local offline regressions, frontend checks and a mock-driver smoke test. These are not acceptance evidence for the renamed revision. Re-run offline checks for the exact revision; live Muse account acceptance and Docker runtime verification remain separate, unfinished gates.
 
 ### A1 Install dependencies, get tests and lint passing · P0
-- Run `uv sync --locked --extra dev`, `uv run --no-sync ruff format .`, `uv run --no-sync ruff check .` and `uv run --no-sync pytest`.
+- Run `uv sync --locked --extra dev`, `uv run --no-sync ruff format .`, `uv run --no-sync ruff check .` and `uv run --no-sync python -m pytest`.
 - Tests use fake upstreams; HTTP integration tests may bind ephemeral loopback listeners, never real Muse or production services.
 - **Done when**: `pytest` and `ruff check .` both pass locally.
 
