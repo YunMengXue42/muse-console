@@ -287,7 +287,7 @@ class CredentialIngestion:
             account.credential_version = version
             account.credential_subject = verified.subject
             account.status = AccountStatus.ACTIVE
-            account.last_error = None
+            account.clear_error()
             account.cooldown_until = 0
             marker = {
                 "source": source,

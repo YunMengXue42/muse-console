@@ -2,6 +2,11 @@
 
 All notable changes to Muse Console are listed here. Versions follow [Semantic Versioning](https://semver.org/) while the project is pre-1.0: minor versions may change behavior.
 
+## [0.4.1] - 2026-10-22
+
+### Changed
+- Account request failures use allowlisted Chinese reasons and a neutral, expandable history note instead of a persistent red warning. Current login invalidation has a separate reauthentication notice. Legacy records without detailed causes are labeled as unknown; raw upstream errors remain private.
+
 ## [0.4.0] - 2026-10-22
 
 ### Added
@@ -91,6 +96,7 @@ Dashboard, per-client API keys, request log, async image tasks, reference images
 
 Initial layered OpenAI-compatible gateway with pluggable drivers.
 
+[0.4.1]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.4.1
 [0.4.0]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.4.0
 [0.3.10]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.3.10
 [0.3.9]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.3.9

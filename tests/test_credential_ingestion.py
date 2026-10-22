@@ -116,7 +116,12 @@ async def test_confirmation_is_capture_specific_and_base_version_required(tmp_pa
     )
     assert (await svc.ingest(changed))["status"] == "needs_identity_confirmation"
     svc.confirm(grant["device_id"], changed.capture_id, first["account_id"])
+    from muse_console.errors import UpstreamAuthError
+
+    svc.pool.get(first["account_id"]).record_error(UpstreamAuthError("private"))
     assert (await svc.ingest(changed))["credential_version"] == 2
+    current = svc.pool.get(first["account_id"])
+    assert current.last_error is current.last_error_code is current.last_error_at is None
     third = envelope(grant["device_id"], capture="capture_0003", revision=3, value="third", base=2)
     assert (await svc.ingest(third))["status"] == "needs_identity_confirmation"
     stale = envelope(grant["device_id"], capture="capture_0004", revision=4, value="fourth", base=1)

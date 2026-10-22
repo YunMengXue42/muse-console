@@ -5,6 +5,7 @@ import { Api, time } from "../api";
 import type { Pool, Setter, Act, ModalKind, Ask, Status } from "../types";
 import { Empty } from "../ui";
 import { badge } from "../status";
+import { AccountIssue } from "./AccountIssue";
 
 function formatRemaining(untilSec?: number, nowMs = Date.now()): string | null {
   if (!untilSec) return null;
@@ -233,11 +234,7 @@ export function PoolPage({
                                       : ""}
                                 </small>
                               )}
-                              {a.last_error && (
-                                <small className="danger-text">
-                                  {a.last_error}
-                                </small>
-                              )}
+                              <AccountIssue account={a} />
                             </div>
                           </div>
                         </td>

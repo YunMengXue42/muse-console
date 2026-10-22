@@ -99,6 +99,26 @@ describe("账号池", () => {
     await user.clear(screen.getByLabelText("搜索账号"));
     expect(screen.getByText("账号 gamma")).toBeTruthy();
   });
+  it("历史请求问题不影响当前可用筛选，登录失效有独立提示", async () => {
+    const { user } = setup({
+      accounts: [
+        { ...account("ok", "available"), last_error_code: "upstream_timeout" },
+        {
+          ...account("expired", "invalid"),
+          status: "invalid",
+          last_error_code: "upstream_auth_failed",
+        },
+      ],
+    });
+    expect(screen.getByText("上次请求：等待上游响应超时")).toBeTruthy();
+    expect(screen.getByText("登录已失效，请重新登录")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "可用 1" }));
+    expect(screen.getByText("账号 ok")).toBeTruthy();
+    expect(screen.queryByText("账号 expired")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "需关注 1" }));
+    expect(screen.queryByText("账号 ok")).toBeNull();
+    expect(screen.getByText("账号 expired")).toBeTruthy();
+  });
   it("搜索/筛选无结果有明确提示并可清除，不误显示首次接入", async () => {
     const { user } = setup();
     await user.type(screen.getByLabelText("搜索账号"), "missing");

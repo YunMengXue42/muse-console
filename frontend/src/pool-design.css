@@ -420,6 +420,37 @@
     gap: 16px;
   }
 }
+.account-history,
+.account-reauth {
+  display: block;
+  max-width: 260px;
+  margin-top: 4px;
+  font-size: var(--text-caption);
+  line-height: 1.5;
+}
+.account-history {
+  color: var(--muted);
+}
+.account-history summary {
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.account-history summary:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+.account-history-detail {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  margin-top: 6px;
+  background: var(--soft);
+  border-radius: 8px;
+}
+.account-reauth {
+  color: var(--danger);
+}
 @media (prefers-reduced-motion: reduce) {
   .pool-page *,
   .pool-page *::before,

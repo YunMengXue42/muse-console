@@ -110,7 +110,8 @@ async def merge_account(
 @router.post("/accounts/{account_id}/reset")
 async def reset_account(account_id: str, svc: Services = Depends(get_services)) -> dict:
     acc = _get(svc, account_id).model_copy(deep=True)
-    acc.status, acc.cooldown_until, acc.last_error = AccountStatus.ACTIVE, 0.0, None
+    acc.status, acc.cooldown_until = AccountStatus.ACTIVE, 0.0
+    acc.clear_error()
     await svc.pool.upsert(acc)
     return {"account": acc.public()}
 

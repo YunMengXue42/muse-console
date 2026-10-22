@@ -78,6 +78,8 @@ export interface Account {
   fail_count: number;
   last_used_at: number | null;
   last_error?: string | null;
+  last_error_code?: string | null;
+  last_error_at?: number | null;
   cooldown_until?: number;
   cookies?: Record<string, string>;
   meta?: {

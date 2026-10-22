@@ -54,9 +54,9 @@ async def renew_account(pool: AccountPool, driver: MuseDriver, account_id: str) 
                 account.cookie_expires.update(info.cookie_expires)
         except FeatureNotImplemented:
             return {"ok": False, "error": "renewal is unsupported for these credentials"}
-        except UpstreamAuthError:
+        except UpstreamAuthError as exc:
             account.status = AccountStatus.INVALID
-            account.last_error = "UpstreamAuthError"
+            account.record_error(exc)
             account.meta["renewal_state"] = "needs_reauth"
             await pool.upsert_if_current(account, expected)
             return {"ok": False, "error": "session rejected by upstream"}
@@ -78,6 +78,7 @@ async def renew_account(pool: AccountPool, driver: MuseDriver, account_id: str) 
         if subject and account.credential_subject and subject != account.credential_subject:
             return {"ok": False, "error": "renewal identity changed"}
         account.meta.update({k: v for k, v in info.meta.items() if k != "credential_subject"})
+        account.clear_error()
         account.meta.update(renewed_at=time.time(), renewal_failures=0, renewal_state="ready")
         interval = getattr(getattr(driver, "settings", None), "keepalive_interval", 6 * 3600)
         account.meta["next_renewal_at"] = next_renewal(account, interval)

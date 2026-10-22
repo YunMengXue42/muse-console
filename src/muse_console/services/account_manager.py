@@ -260,6 +260,8 @@ class AccountManager:
                         status=AccountStatus.ACTIVE,
                         cooldown_until=0,
                         last_error=None,
+                        last_error_code=None,
+                        last_error_at=None,
                     )
                 updated = Account.model_validate({**account.model_dump(), **changes})
                 self._reject_duplicate(updated)

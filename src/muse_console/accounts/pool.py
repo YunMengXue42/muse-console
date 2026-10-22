@@ -366,12 +366,12 @@ class AccountPool:
     def _apply_result(self, acc: Account, error: BaseException | None) -> None:
         if error is None:
             acc.success_count += 1
-            acc.last_error = None
+            acc.clear_error()
             if acc.status == AccountStatus.COOLING and acc.is_available():
                 acc.status = AccountStatus.ACTIVE
             return
         acc.fail_count += 1
-        acc.last_error = type(error).__name__
+        acc.record_error(error)
         if acc.status == AccountStatus.INVALID:
             return
         if isinstance(error, UpstreamAuthError):
