@@ -15,6 +15,7 @@ import {
 } from "./api";
 import { Icon } from "./ui";
 import { ConsoleModals } from "./ConsoleModals";
+import { InstanceStatus } from "./InstanceStatus";
 import {
   formatConsoleHash,
   parseConsoleHash,
@@ -51,6 +52,8 @@ export default function App() {
     [error, setError] = useState(""),
     [loading, setLoading] = useState(false),
     [busy, setBusy] = useState(false);
+  const [statusFailed, setStatusFailed] = useState(false);
+  const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
   const [status, setStatus] = useState<Status>(),
     [accounts, setAccounts] = useState<Account[]>([]),
     [pool, setPool] = useState<Pool>(),
@@ -138,6 +141,8 @@ export default function App() {
     setDetail(null);
     setConfirm(null);
     setStatus(undefined);
+    setStatusFailed(false);
+    setLastSyncAt(null);
     setAccounts([]);
     setStats(undefined);
     setPromMetrics(undefined);
@@ -220,6 +225,7 @@ export default function App() {
     setError("");
     async function load() {
       clearTimeout(timer);
+      let statusOk = false;
       try {
         const common = await api.request<Status>(
           "/status",
@@ -228,7 +234,10 @@ export default function App() {
           controller.signal,
         );
         if (stopped || revision !== generation.current) return;
+        statusOk = true;
         setStatus(common);
+        setStatusFailed(false);
+        setLastSyncAt(Date.now());
         if (page === 0) {
           const [a, p] = await Promise.all([
             api.request<{ data: Account[] }>(
@@ -306,7 +315,11 @@ export default function App() {
         }
         if (!stopped) setError("");
       } catch (e) {
-        if (!stopped) setError((e as Error).message);
+        if (!stopped) {
+          setError((e as Error).message);
+          if (!statusOk && (e as Error).name !== "AbortError")
+            setStatusFailed(true);
+        }
       } finally {
         if (!stopped) {
           setLoading(false);
@@ -504,27 +517,11 @@ export default function App() {
           ))}
         </nav>
         <div className="side-bottom" aria-label="实例与偏好">
-          <div className="instance-status" role="status">
-            <span
-              className={`dot ${status ? (status.driver.ok ? "online" : "") : "pending"}`}
-              aria-hidden="true"
-            />
-            <div className="instance-copy">
-              <span className="instance-state">
-                {status
-                  ? status.driver.ok
-                    ? "驱动在线"
-                    : "驱动异常"
-                  : "连接中"}
-              </span>
-              <span className="instance-meta">
-                <span>{status?.driver.driver ?? "等待服务响应"}</span>
-                {status && (
-                  <span className="instance-version">v{status.version}</span>
-                )}
-              </span>
-            </div>
-          </div>
+          <InstanceStatus
+            status={status}
+            unreachable={statusFailed}
+            lastSyncAt={lastSyncAt}
+          />
           <div className="instance-actions">
             {themeButton}
             <button

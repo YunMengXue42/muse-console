@@ -2,6 +2,12 @@
 
 All notable changes to Muse Console are listed here. Versions follow [Semantic Versioning](https://semver.org/) while the project is pre-1.0: minor versions may change behavior.
 
+## [0.3.8] - 2026-10-22
+
+### Changed
+- Sidebar instance status is a card: green when online, amber when no account is schedulable, red when the driver is down or the console API is unreachable.
+- Animated signal (pulse rings online, breathing when warning, blinking when down), a flash on state change, a plain-language hint, schedulable-account bar and last-sync time. Respects reduced motion; compact on mobile.
+
 ## [0.3.7] - 2026-10-22
 
 ### Changed
@@ -58,6 +64,7 @@ Dashboard, per-client API keys, request log, async image tasks, reference images
 
 Initial layered OpenAI-compatible gateway with pluggable drivers.
 
+[0.3.8]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.3.8
 [0.3.7]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.3.7
 [0.3.6]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.3.6
 [0.3.5]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.3.5

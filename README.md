@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi" alt="FastAPI" />
   <img src="https://img.shields.io/badge/API-OpenAI%20Compatible-green" alt="OpenAI Compatible" />
   <a href="https://github.com/YunMengXue42/muse-console/actions/workflows/ci.yml"><img src="https://github.com/YunMengXue42/muse-console/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <img src="https://img.shields.io/badge/version-v0.3.7-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-v0.3.8-blue" alt="Version" />
   <img src="https://img.shields.io/badge/License-MIT-lightgrey" alt="License" />
 </p>
 
@@ -43,7 +43,7 @@ The project focuses on **clean engineering and easy collaboration**:
 
 ## Status
 
-> **v0.3.7**: one-screen console layout — list pages fill the window with a scrolling table body, the overview is a dense grid. **v0.3.6**: console upgrade — URL-hash routes, Prometheus metrics view, request filters by path/key, per-account concurrency and account merge. **v0.3.5**: adds optional streaming heartbeats, Prometheus metrics at `/admin/metrics` and automatic re-submission when a video reply arrives as text only. **v0.3.1, Muse Console rebuild**: account scheduling, encrypted persistence, batch import, isolated manual browser login and a React/TypeScript console are implemented. Offline regression tests exercise the real service boundaries with fake upstreams; successful live Muse authentication and generation are not implied by those tests.
+> **v0.3.8**: sidebar instance card shows driver state with colour, animation, plain-language hints and schedulable-account capacity. **v0.3.7**: one-screen console layout — list pages fill the window with a scrolling table body, the overview is a dense grid. **v0.3.6**: console upgrade — URL-hash routes, Prometheus metrics view, request filters by path/key, per-account concurrency and account merge. **v0.3.5**: adds optional streaming heartbeats, Prometheus metrics at `/admin/metrics` and automatic re-submission when a video reply arrives as text only. **v0.3.1, Muse Console rebuild**: account scheduling, encrypted persistence, batch import, isolated manual browser login and a React/TypeScript console are implemented. Offline regression tests exercise the real service boundaries with fake upstreams; successful live Muse authentication and generation are not implied by those tests.
 
 | Module | Status | Notes |
 |---|---|---|
