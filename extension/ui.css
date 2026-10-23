@@ -457,3 +457,28 @@ code {
     scroll-behavior: auto !important;
   }
 }
+.popup-shell .section-heading {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.state-pill {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: var(--text-caption);
+  line-height: 1.5;
+  background: var(--soft);
+  color: var(--muted);
+}
+.state-pill[data-tone="ok"] {
+  background: #e6f4ea;
+  color: #1e6b35;
+}
+.state-pill[data-tone="wait"] {
+  background: #e8f0fc;
+  color: #0b4fa6;
+}
+.state-pill[data-tone="warn"] {
+  background: #fdf0e1;
+  color: #8a4b08;
+}

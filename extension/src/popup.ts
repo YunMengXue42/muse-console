@@ -1,10 +1,16 @@
-export {};
+import { describeStatus, headline, type StatusView } from "./status-view";
 const status = document.getElementById("status")!;
+const badge = document.getElementById("state")!;
+function render(data: StatusView | undefined) {
+  const head = headline(data);
+  badge.textContent = head.text;
+  badge.dataset.tone = head.tone;
+  status.textContent = describeStatus(data);
+}
 void chrome.runtime.sendMessage({ type: "status" }).then(
   (response) => {
-    status.textContent = response?.ok
-      ? JSON.stringify(response.data, null, 2)
-      : "无法读取状态";
+    if (response?.ok) render(response.data);
+    else status.textContent = "无法读取状态";
   },
   () => {
     status.textContent = "无法读取状态";

@@ -1,5 +1,6 @@
 import { build } from "esbuild";
-import { mkdir, copyFile, cp } from "node:fs/promises";
+import { mkdir, copyFile, cp, rm } from "node:fs/promises";
+await rm("dist", { recursive: true, force: true });
 await mkdir("dist", { recursive: true });
 await build({
   entryPoints: ["src/worker.ts", "src/options.ts", "src/popup.ts"],
@@ -12,3 +13,4 @@ await build({
 for (const file of ["manifest.json", "options.html", "popup.html", "ui.css"])
   await copyFile(file, `dist/${file}`);
 await cp("fonts", "dist/fonts", { recursive: true });
+await cp("icons", "dist/icons", { recursive: true });

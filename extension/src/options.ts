@@ -1,4 +1,5 @@
 import { originOf, permission } from "./policy";
+import { describeStatus, type StatusView } from "./status-view";
 const input = (id: string) => document.getElementById(id) as HTMLInputElement;
 const status = document.getElementById("status")!;
 async function send(type: string, args = {}) {
@@ -6,11 +7,17 @@ async function send(type: string, args = {}) {
   if (!response?.ok) throw new Error("操作失败，请检查权限与服务器身份。");
   return response.data;
 }
+function show(data: unknown): string {
+  if (typeof data === "string") return data;
+  if (data && typeof data === "object" && "paired" in data)
+    return describeStatus(data as StatusView);
+  return JSON.stringify(data, null, 2);
+}
 function bind(id: string, fn: () => Promise<unknown>) {
   document.getElementById(id)!.addEventListener("click", () => {
     void fn().then(
       (data) => {
-        status.textContent = JSON.stringify(data, null, 2);
+        status.textContent = show(data);
       },
       () => {
         status.textContent = "操作失败，请检查权限、身份、配对或网络。";
@@ -40,11 +47,18 @@ bind("inspect", async () => {
     origin,
     development: input("development").checked,
   });
-  document.getElementById("identity")!.textContent = JSON.stringify(
-    identity,
-    null,
-    2,
-  );
+  const {
+    origin: target,
+    server_id,
+    fingerprint,
+  } = identity as {
+    origin: string;
+    server_id: string;
+    fingerprint: string;
+  };
+  document.getElementById("identity")!.textContent = `服务器：${target}
+server_id：${server_id}
+fingerprint：${fingerprint}`;
   input("pair").disabled = false;
   return "请在受信控制台核对身份";
 });
@@ -65,7 +79,7 @@ bind("forget", () => send("forget"));
 bind("rotate", () => send("rotate"));
 void send("status").then(
   (data) => {
-    status.textContent = JSON.stringify(data, null, 2);
+    status.textContent = show(data);
   },
   () => {
     status.textContent = "无法读取状态";

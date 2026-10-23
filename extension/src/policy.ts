@@ -13,7 +13,8 @@ export function originOf(input: string, development = false): string {
   const u = new URL(input);
   if (u.username || u.password || u.pathname !== "/" || u.search || u.hash)
     throw new Error("origin_only");
-  const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname);
+  // IPv6 loopback is excluded: Chrome rejects "http://[::1]:*" in extension CSP connect-src.
+  const loopback = ["localhost", "127.0.0.1"].includes(u.hostname);
   if (
     u.protocol !== "https:" &&
     !(development && loopback && u.protocol === "http:")

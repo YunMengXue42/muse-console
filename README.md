@@ -4,7 +4,11 @@
 
 English · [简体中文](README.zh-CN.md) · **0.4.2** · Python **3.10+** · **MIT**
 
-Muse Console is an independent, unofficial gateway for [muse.ai](https://muse.ai), exposing chat, image and video generation through a subset of OpenAI-style APIs.
+Muse Console is an independent, unofficial gateway for [muse.ai](https://muse.ai), exposing chat, image and video generation through a subset of OpenAI-style APIs. Self-hosted: your data stays on your server.
+
+![Usage overview](docs/images/console-overview.png)
+
+> Screenshots show the console in mock mode. The console UI is currently in Simplified Chinese.
 
 ## How it works
 
@@ -27,6 +31,13 @@ Call the API from your tools and maintain the service through a web console. Cli
 | **Visible operations** | Account health, request statistics, task progress and error reasons in the console, plus Prometheus metrics |
 | **Controlled access** | Separate client keys, task/media ownership checks, expiring download links and encrypted account payloads |
 | **Developer-friendly** | Account-free mock mode and layered drivers keep UI, protocol and upstream work independent |
+
+<details>
+<summary>Account pool screenshot</summary>
+
+![Account pool](docs/images/console-accounts.png)
+
+</details>
 
 ## Quick start
 
@@ -59,6 +70,12 @@ curl http://127.0.0.1:18610/v1/chat/completions \
 
 Prefer `muse-chat`, `muse-image` and `muse-video`. See the [API reference](docs/API.md) for endpoints, parameters and more examples.
 
+## Browser extension
+
+A companion MV3 extension makes onboarding accounts easier: log in to Muse as usual and the session syncs to your paired console, including later rotations. It reads only four Muse session cookies, sends them only to the single server you grant, and its device token can be revoked at any time.
+
+See the [extension guide](extension/README.md) to install and pair.
+
 ## Boundaries
 
 - **A compatibility subset, not a full OpenAI implementation.** Model aliases do not provide those vendors' actual models. Tool calling, structured output and masked inpainting are unsupported.
@@ -70,7 +87,7 @@ Build from source; no published PyPI package or container image is provided. Rea
 
 ## Documentation
 
-[API and configuration](docs/API.md) · [Deployment and backup](docs/DEPLOYMENT.md) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
+[API and configuration](docs/API.md) · [Browser extension](extension/README.md) · [Deployment and backup](docs/DEPLOYMENT.md) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 
 [Changelog](CHANGELOG.md) · [Roadmap](TODO.md) · [Publication checklist](docs/PUBLISHING.md)
 

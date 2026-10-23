@@ -1,11 +1,12 @@
 {
   "name": "muse-console-extension",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "tsc --noEmit && node build.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "package": "npm run build && node package.mjs"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.326",

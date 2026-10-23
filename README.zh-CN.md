@@ -4,7 +4,9 @@
 
 [English](README.md) · 简体中文 · **0.4.2** · Python **3.10+** · **MIT**
 
-Muse Console 是面向 [muse.ai](https://muse.ai) 的独立、非官方网关，将聊天、图像和视频生成封装为 OpenAI 风格 API 子集。
+Muse Console 是面向 [muse.ai](https://muse.ai) 的独立、非官方网关，将聊天、图像和视频生成封装为 OpenAI 风格 API 子集。自托管，数据留在自己的服务器上。
+
+![调用概览](docs/images/console-overview.png)
 
 ## 接入方案
 
@@ -27,6 +29,13 @@ Muse Console：鉴权 · 账号调度 · 异步任务 · 媒体访问
 | **过程可见** | 控制台集中查看账号状态、请求统计、任务进度与错误原因，提供 Prometheus 指标 |
 | **访问可控** | 独立客户端密钥、任务与媒体归属校验、限时签名下载；账号载荷加密保存 |
 | **便于开发** | Mock 模式无需账号即可联调；驱动分层，前端、协议与上游适配可独立维护 |
+
+<details>
+<summary>账号池截图</summary>
+
+![账号池](docs/images/console-accounts.png)
+
+</details>
 
 ## 快速开始
 
@@ -59,6 +68,12 @@ curl http://127.0.0.1:18610/v1/chat/completions \
 
 建议使用 `muse-chat`、`muse-image`、`muse-video`。接口、参数与更多示例见 [API 参考](docs/API.zh-CN.md)。
 
+## 浏览器扩展
+
+配套的 MV3 扩展让账号接入更省事：在浏览器正常登录 Muse，会话自动同步到已配对的控制台，轮换后也会自动更新。扩展只读 4 个 Muse 会话 Cookie，只发往你授权的单一服务器，设备令牌可随时撤销。
+
+安装与配对见 [扩展说明](extension/README.zh-CN.md)。
+
 ## 使用边界
 
 - **兼容子集，不是完整 OpenAI 实现。** 模型别名不代表供应商真实模型；不支持工具调用、结构化输出或蒙版重绘。
@@ -70,7 +85,7 @@ curl http://127.0.0.1:18610/v1/chat/completions \
 
 ## 文档
 
-[API 与配置](docs/API.zh-CN.md) · [部署与备份](docs/DEPLOYMENT.zh-CN.md) · [架构](docs/ARCHITECTURE.zh-CN.md) · [贡献](CONTRIBUTING.zh-CN.md) · [安全](SECURITY.zh-CN.md)
+[API 与配置](docs/API.zh-CN.md) · [浏览器扩展](extension/README.zh-CN.md) · [部署与备份](docs/DEPLOYMENT.zh-CN.md) · [架构](docs/ARCHITECTURE.zh-CN.md) · [贡献](CONTRIBUTING.zh-CN.md) · [安全](SECURITY.zh-CN.md)
 
 [更新记录](CHANGELOG.md) · [待办](TODO.md) · [公开检查清单](docs/PUBLISHING.zh-CN.md)
 

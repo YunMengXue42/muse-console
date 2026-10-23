@@ -2,6 +2,15 @@
 
 All notable changes to Muse Console are listed here. Versions follow [Semantic Versioning](https://semver.org/) while the project is pre-1.0: minor versions may change behavior.
 
+## [Unreleased]
+
+### Added
+- Browser extension 0.2.0: icons, readable status in popup and options (headline badge plus per-session state instead of raw JSON), `npm run package` producing a reproducible zip with SHA-256, bilingual extension README.
+- README screenshots from mock mode and a browser extension section.
+
+### Fixed
+- Extension development mode no longer offers IPv6 loopback (`http://[::1]`): Chrome rejects it in extension CSP, so pairing could never connect. Use `127.0.0.1` or `localhost`.
+
 ## [0.4.2] - 2026-10-22
 
 ### Changed
