@@ -269,6 +269,48 @@ def check_logs(name: str, since: str, fingerprint: str, *, first: bool) -> None:
             raise SmokeFailure("LOG_KEY_REPRINTED")
 
 
+def stop_diagnostic(name: str, state: dict) -> str:
+    """Whitelist stop evidence only; this does not decide whether a stop passes."""
+    if not isinstance(state, dict):
+        return "state=invalid"
+    fields = []
+    for label, field in (("running", "Running"), ("oom", "OOMKilled"), ("dead", "Dead")):
+        value = state.get(field)
+        fields.append(f"{label}={str(value).lower() if type(value) is bool else 'invalid'}")
+    exit_code = state.get("ExitCode")
+    fields.append(
+        f"exit={exit_code if type(exit_code) is int and 0 <= exit_code <= 255 else 'invalid'}"
+    )
+    fields.append(f"exited={str(state.get('Status') == 'exited').lower()}")
+    try:
+        since = state.get("StartedAt")
+        if not isinstance(since, str) or not re.fullmatch(r"[0-9T:.Z+-]+", since):
+            raise SmokeFailure("STATE_TIMESTAMP_INVALID")
+        logs = docker("logs", "--since", since, name).decode("utf-8", errors="replace")
+        # Match fixed Uvicorn log records, never return their dynamic PID suffix.
+        for label, marker in (
+            ("shutdown_started", "INFO:     Shutting down"),
+            ("shutdown_complete", "INFO:     Application shutdown complete."),
+            ("shutdown_failed", "ERROR:    Application shutdown failed. Exiting."),
+            ("server_finished", "INFO:     Finished server process ["),
+        ):
+            fields.append(
+                f"{label}={str(any(line.startswith(marker) for line in logs.splitlines())).lower()}"
+            )
+        categories = (
+            "+".join(
+                category
+                for category, phrases in LOG_ERROR_CATEGORIES
+                if any(phrase in logs for phrase in phrases)
+            )
+            or "NO_KNOWN_ERROR"
+        )
+        fields.append(f"errors={categories}")
+    except SmokeFailure:
+        fields.append("logs=unavailable")
+    return " ".join(fields)
+
+
 def run_smoke(image: str, arch: str) -> None:
     suffix = uuid.uuid4().hex
     name = "muse-smoke-" + suffix
@@ -294,6 +336,10 @@ def run_smoke(image: str, arch: str) -> None:
                     docker("stop", "--time", "20", name)
                     stage = "recreate.stopped"
                     state = inspect_container(name)["State"]
+                    print(
+                        "DIAG: stage=recreate.stopped " + stop_diagnostic(name, state),
+                        flush=True,
+                    )
                     if not (
                         state.get("Running") is False
                         and state.get("Status") == "exited"
