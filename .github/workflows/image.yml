@@ -17,12 +17,18 @@ on:
       - '*compose*.yml'
       - '*compose*.yaml'
       - tools/**
+      - tests/test_image_workflow.py
   workflow_dispatch:
     inputs:
       push:
-        description: "Push the image (tag edge; requires main CI for this SHA)"
+        description: "Push the image (edge unless release_tag is set; requires main CI)"
         type: boolean
         default: false
+      release_tag:
+        description: "Existing stable tag to publish; empty means edge"
+        type: string
+        required: false
+        default: ""
 
 permissions: {}
 
@@ -31,7 +37,58 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      tag_object: ${{ steps.resolve.outputs.tag_object }}
+      source_sha: ${{ steps.resolve.outputs.source_sha }}
+      image_tag: ${{ steps.resolve.outputs.image_tag }}
+      release: ${{ steps.resolve.outputs.release }}
+    steps:
+      - uses: actions/github-script@v7
+        id: resolve
+        env:
+          REQUESTED_TAG: ${{ inputs.release_tag }}
+          REQUESTED_PUSH: ${{ inputs.push }}
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const requested = process.env.REQUESTED_TAG || '';
+            if (requested && (context.eventName !== 'workflow_dispatch' || process.env.REQUESTED_PUSH !== 'true')) {
+              throw new Error('release_tag requires an explicit manual push=true');
+            }
+            const tag = context.eventName === 'push' ? context.ref.replace(/^refs\/tags\//, '') : requested;
+            if (tag && (tag.trim() !== tag || !/^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(tag))) {
+              throw new Error('release_tag must be an exact stable vX.Y.Z tag');
+            }
+            let sha = context.sha;
+            let object = '';
+            if (tag) {
+              const before = await github.rest.git.getRef({owner, repo, ref: `tags/${tag}`});
+              if (!['tag', 'commit'].includes(before.data.object.type)) throw new Error('Invalid tag object type');
+              object = before.data.object.sha;
+              if (!/^[0-9a-f]{40}$/.test(object)) throw new Error('Invalid tag object SHA');
+              // Full ref is essential; bare tags/... is not a commit API ref.
+              sha = (await github.rest.repos.getCommit({owner, repo, ref: `refs/tags/${tag}`})).data.sha;
+              const after = await github.rest.git.getRef({owner, repo, ref: `tags/${tag}`});
+              if (after.data.object.sha !== object || after.data.object.type !== before.data.object.type) {
+                throw new Error('Tag changed during resolution');
+              }
+              if (context.eventName === 'push' && sha !== context.sha) throw new Error('Tag differs from push SHA');
+            }
+            if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error('Invalid source commit SHA');
+            core.setOutput('tag', tag);
+            core.setOutput('tag_object', object);
+            core.setOutput('source_sha', sha);
+            core.setOutput('image_tag', tag ? tag.slice(1) : 'edge');
+            core.setOutput('release', tag ? 'true' : 'false');
+
   smoke:
+    needs: resolve
     name: Native browser smoke (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
@@ -47,6 +104,11 @@ jobs:
             runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
+        if: github.event_name == 'pull_request'
+      - uses: actions/checkout@v4
+        if: github.event_name != 'pull_request'
+        with:
+          ref: ${{ needs.resolve.outputs.source_sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -66,23 +128,23 @@ jobs:
 
   release-gate:
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push == true)
-    needs: smoke
+    needs: [resolve, smoke]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
       actions: read
-    outputs:
-      sha: ${{ steps.gate.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.source_sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Require exact stable tag and matching project version
-        if: github.event_name == 'push'
+        if: needs.resolve.outputs.release == 'true'
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
         run: |
           python - <<'PY'
           import os
@@ -98,17 +160,24 @@ jobs:
       - name: Verify current ref SHA and successful main push CI via GitHub API
         id: gate
         uses: actions/github-script@v7
+        env:
+          SOURCE_SHA: ${{ needs.resolve.outputs.source_sha }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+          TAG_OBJECT: ${{ needs.resolve.outputs.tag_object }}
         with:
           script: |
             const {owner, repo} = context.repo;
             const sha = (await exec.getExecOutput('git', ['rev-parse', 'HEAD'])).stdout.trim();
-            // The commits endpoint peels annotated tags as well as lightweight tags.
-            const ref = context.eventName === 'push'
-              ? `tags/${context.ref.slice('refs/tags/'.length)}`
-              : context.ref;
-            const current = await github.rest.repos.getCommit({owner, repo, ref});
-            if (current.data.sha !== sha || context.sha !== sha) {
-              throw new Error('Ref moved or checkout does not match the triggering SHA');
+            if (sha !== process.env.SOURCE_SHA) throw new Error('Checkout differs from resolved SHA');
+            const tag = process.env.RELEASE_TAG;
+            if (tag) {
+              const current = await github.rest.git.getRef({owner, repo, ref: `tags/${tag}`});
+              const commit = await github.rest.repos.getCommit({owner, repo, ref: `refs/tags/${tag}`});
+              const after = await github.rest.git.getRef({owner, repo, ref: `tags/${tag}`});
+              if (current.data.object.sha !== process.env.TAG_OBJECT ||
+                  after.data.object.sha !== process.env.TAG_OBJECT || commit.data.sha !== sha) {
+                throw new Error('Release tag moved since resolution');
+              }
             }
             const ancestry = await github.rest.repos.compareCommits({
               owner, repo, base: sha, head: 'main'
@@ -128,11 +197,10 @@ jobs:
             if (!latest || latest.status !== 'completed' || latest.conclusion !== 'success') {
               throw new Error('Latest main push CI for this exact SHA must be completed successfully');
             }
-            core.setOutput('sha', sha);
 
   publish:
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push == true)
-    needs: [smoke, release-gate]
+    needs: [resolve, smoke, release-gate]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -141,7 +209,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.release-gate.outputs.sha }}
+          ref: ${{ needs.resolve.outputs.source_sha }}
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - name: Image name
@@ -151,11 +219,15 @@ jobs:
         id: meta
         with:
           images: ${{ steps.name.outputs.image }}
+          labels: |
+            org.opencontainers.image.revision=${{ needs.resolve.outputs.source_sha }}
+            org.opencontainers.image.version=${{ needs.resolve.outputs.image_tag }}
+            org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}/tree/${{ needs.resolve.outputs.source_sha }}
           tags: |
-            type=semver,pattern={{version}},enable=${{ github.event_name == 'push' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'push' }}
-            type=raw,value=latest,enable=${{ github.event_name == 'push' }}
-            type=raw,value=edge,enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=semver,pattern={{version}},value=${{ needs.resolve.outputs.tag }},enable=${{ needs.resolve.outputs.release == 'true' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.resolve.outputs.tag }},enable=${{ needs.resolve.outputs.release == 'true' }}
+            type=raw,value=latest,enable=${{ needs.resolve.outputs.release == 'true' }}
+            type=raw,value=edge,enable=${{ needs.resolve.outputs.release == 'false' }}
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -176,8 +248,7 @@ jobs:
       - name: Verify manifest is anonymously readable (no Docker credentials)
         env:
           IMAGE: ${{ steps.name.outputs.image }}
-          RELEASE_TAG: ${{ github.ref_name }}
-          EVENT_NAME: ${{ github.event_name }}
+          IMAGE_TAG: ${{ needs.resolve.outputs.image_tag }}
         run: |
           python3 - <<'PY'
           import json
@@ -187,7 +258,7 @@ jobs:
 
           # Do not read ~/.docker/config.json or send GITHUB_TOKEN/basic auth.
           image = os.environ['IMAGE'].removeprefix('ghcr.io/')
-          tag = os.environ['RELEASE_TAG'][1:] if os.environ['EVENT_NAME'] == 'push' else 'edge'
+          tag = os.environ['IMAGE_TAG']
           opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
           query = urllib.parse.urlencode({'service': 'ghcr.io', 'scope': f'repository:{image}:pull'})
           try:
@@ -216,7 +287,7 @@ jobs:
 
   anonymous-pull-smoke:
     name: Anonymous published-image smoke (${{ matrix.arch }})
-    needs: [publish, release-gate]
+    needs: [resolve, publish, release-gate]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     permissions:
@@ -232,7 +303,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.release-gate.outputs.sha }}
+          ref: ${{ needs.resolve.outputs.source_sha }}
           persist-credentials: false
       - uses: actions/setup-python@v5
         with:
@@ -241,8 +312,7 @@ jobs:
       - name: Full anonymous native pull, then offline container acceptance
         env:
           IMAGE_OWNER: ${{ github.repository_owner }}
-          RELEASE_TAG: ${{ github.ref_name }}
-          EVENT_NAME: ${{ github.event_name }}
+          IMAGE_TAG: ${{ needs.resolve.outputs.image_tag }}
           IMAGE_ARCH: ${{ matrix.arch }}
         run: |
           python - <<'PY'
@@ -252,7 +322,7 @@ jobs:
           import tempfile
 
           owner = os.environ['IMAGE_OWNER'].lower()
-          tag = os.environ['RELEASE_TAG'][1:] if os.environ['EVENT_NAME'] == 'push' else 'edge'
+          tag = os.environ['IMAGE_TAG']
           image = f'ghcr.io/{owner}/muse-console:{tag}'
           arch = os.environ['IMAGE_ARCH']
           # Fresh job/daemon and explicit pull download the published layers,
