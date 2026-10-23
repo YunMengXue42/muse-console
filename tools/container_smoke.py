@@ -154,10 +154,83 @@ def check_isolation(name: str, volume: str) -> str:
     return info["State"]["StartedAt"]
 
 
+# Only literal application error phrases map to these fixed public categories.
+# Never return a regex capture, traceback line, path, or other log-derived text.
+LOG_ERROR_CATEGORIES = (
+    ("PROFILE_SYMLINK", ("owned paths must not contain symlink, junction or reparse ancestors",)),
+    ("PROFILE_LOCKED", ("Chromium profile is locked; refusing to remove browser locks",)),
+    (
+        "PROFILE_SAFETY",
+        (
+            "Refusing unknown browser profile",
+            "invalid project profile ownership marker",
+            "cannot verify project profile ownership marker",
+            "cannot exclusively claim project profile",
+            "cannot safely inspect profile metadata",
+            "cannot safely inspect owned path ancestors",
+            "cannot canonicalize owned path",
+            "owned paths must not overlap a main browser profile tree",
+            "browser profile must be inside the configured data_dir",
+            "cannot move stale browser lock",
+        ),
+    ),
+    (
+        "CHROMIUM_START_FAILED",
+        (
+            "Chromium did not expose a DevTools endpoint",
+            "Chromium exited",
+            "Chromium process exited",
+        ),
+    ),
+    ("CDP_PORT_OCCUPIED", ("Chromium debugging port is already in use",)),
+    ("PERMISSION_DENIED", ("PermissionError: [Errno 13]",)),
+)
+
+
+def require_running(name: str) -> None:
+    """Fail early on process death, with strictly typed state and allowlisted logs."""
+    try:
+        state = inspect_container(name)["State"]
+    except (SmokeFailure, ValueError, KeyError, IndexError, TypeError):
+        raise SmokeFailure("STATE_INSPECT_FAILED") from None
+    if not isinstance(state, dict) or type(state.get("Running")) is not bool:
+        raise SmokeFailure("STATE_INVALID")
+    if state["Running"]:
+        return
+
+    exit_code = state.get("ExitCode")
+    oom = state.get("OOMKilled")
+    # bool is an int subclass: require exact types, never stringify arbitrary data.
+    if type(exit_code) is not int or not 0 <= exit_code <= 255 or type(oom) is not bool:
+        raise SmokeFailure("CONTAINER_STOPPED_STATE_INVALID")
+    categories = "LOGS_UNAVAILABLE"
+    try:
+        # Restrict to this boot when possible; timestamps are command arguments,
+        # never diagnostics. No raw output is persisted or forwarded.
+        since = state.get("StartedAt")
+        if not isinstance(since, str) or not re.fullmatch(r"[0-9T:.Z+-]+", since):
+            raise SmokeFailure("STATE_TIMESTAMP_INVALID")
+        logs = docker("logs", "--since", since, name).decode("utf-8", errors="replace")
+        categories = (
+            "+".join(
+                category
+                for category, phrases in LOG_ERROR_CATEGORIES
+                if any(phrase in logs for phrase in phrases)
+            )
+            or "NO_KNOWN_ERROR"
+        )
+    except SmokeFailure:
+        pass
+    raise SmokeFailure(
+        f"CONTAINER_STOPPED running=false exit={exit_code} oom={str(oom).lower()} errors={categories}"
+    )
+
+
 def wait_ready(name: str) -> str:
     deadline = time.monotonic() + 120
     code = "PROBE_NO_RESULT"
     while time.monotonic() < deadline:
+        require_running(name)
         try:
             result = json.loads(docker("exec", name, "python", "-c", PROBE, timeout=15))
             if "code" in result:
@@ -168,11 +241,14 @@ def wait_ready(name: str) -> str:
             assert re.fullmatch(r"[0-9a-f]{64}", fingerprint)
             return fingerprint
         except SmokeFailure:
+            # Catch a process that died between inspect and docker exec.
+            require_running(name)
             code = "PROBE_EXEC_FAILED"
             time.sleep(2)
         except (ValueError, KeyError, AssertionError, TypeError):
             code = "PROBE_INVALID_RESULT"
             time.sleep(2)
+    require_running(name)
     raise SmokeFailure("PROBE_TIMEOUT_" + code)
 
 
@@ -247,7 +323,10 @@ def run_smoke(image: str, arch: str) -> None:
                 raise SmokeFailure("KEY_CHANGED")
             stage = phase + ".logs"
             check_logs(name, since, fingerprint, first=phase == "first")
-            print(f"PASS: {arch} {phase} (offline browser, isolation, HTTP, key lifecycle)")
+            print(
+                f"PASS: {arch} {phase} (offline browser, isolation, HTTP, key lifecycle)",
+                flush=True,
+            )
     except SmokeFailure as error:
         print(f"FAIL: stage={stage} code={error}", file=sys.stderr)
         raise
