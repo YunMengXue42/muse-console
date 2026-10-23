@@ -12,8 +12,10 @@ LABEL org.opencontainers.image.source="https://github.com/YunMengXue42/muse-cons
       org.opencontainers.image.description="Self-hosted OpenAI-style gateway and console for muse.ai" \
       org.opencontainers.image.licenses="MIT"
 
+# chromium-sandbox provides the setuid helper: Docker's default seccomp profile blocks
+# the user namespaces Chromium would otherwise use, and we keep the sandbox on.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends chromium fonts-wqy-zenhei ca-certificates \
+ && apt-get install -y --no-install-recommends chromium chromium-sandbox fonts-wqy-zenhei ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
 RUN useradd --create-home --uid 1000 muse

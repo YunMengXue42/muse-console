@@ -65,10 +65,7 @@ jobs:
         continue-on-error: true
         run: |
           set -x
-          docker run --rm --entrypoint sh muse-console:smoke -c 'id; chromium --version; timeout 20 chromium --headless=new --disable-gpu --disable-dev-shm-usage --remote-debugging-port=9333 --user-data-dir=/tmp/p about:blank 2>&1 | head -20; echo exit=$?'
-          docker run --rm --entrypoint sh muse-console:smoke -c 'timeout 15 chromium --no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage --remote-debugging-port=9333 --user-data-dir=/tmp/p about:blank 2>&1 | head -8; echo exit=$?'
-          docker run --rm --network none --entrypoint sh muse-console:smoke -c 'timeout 15 chromium --no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage --remote-debugging-port=9333 --user-data-dir=/tmp/p about:blank 2>&1 | head -8; echo exit=$?'
-          cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null || true
+          docker run --rm --entrypoint sh muse-console:smoke -c 'id; ls -l /usr/lib/chromium/chrome-sandbox 2>&1; timeout 15 chromium --headless=new --disable-gpu --disable-dev-shm-usage --remote-debugging-port=9333 --user-data-dir=/tmp/p about:blank 2>&1 | grep -v dbus | head -10; echo exit=$?'
       - name: Smoke test (default browser driver, no network)
         run: |
           set -euo pipefail
