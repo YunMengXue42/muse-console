@@ -33,7 +33,7 @@ Use `http://127.0.0.1:18610/healthz` for liveness, `/readyz` for readiness, and 
 
 ## 2. Container
 
-The v0.4.4 GHCR image is not yet published; package visibility and anonymous pulls are not yet verified. GHCR packages default to private on first publication even for public repositories. Use source builds until release. The container target is `ghcr.io/yunmengxue42/muse-console` for linux/amd64 and linux/arm64 (`X.Y.Z`, `X.Y`, `latest`).
+Before using `ghcr.io/yunmengxue42/muse-console`, confirm that the image workflow for the corresponding release has passed anonymous pulls and native smoke checks on both linux/amd64 and linux/arm64, including restart, persistent storage and permissions. GHCR packages default to private on first publication even for public repositories, so public source code alone does not establish anonymous image access. Consult the corresponding release notes for publication status; otherwise build from source. Image tags are `X.Y.Z`, `X.Y` and `latest`; the commands below pin `0.4.4`.
 
 ```bash
 docker run -d --init --name muse-console -p 127.0.0.1:18610:18610 --shm-size 1g --memory 4g --pids-limit 512 --cap-drop ALL --security-opt no-new-privileges -v muse-data:/app/data ghcr.io/yunmengxue42/muse-console:0.4.4

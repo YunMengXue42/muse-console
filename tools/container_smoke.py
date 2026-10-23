@@ -288,7 +288,24 @@ def run_smoke(image: str, arch: str) -> None:
                 docker("restart", "--time", "20", name)
             else:
                 if phase == "recreate":
-                    docker("rm", "--force", name)
+                    # Model a normal upgrade, not a forced cgroup kill. Preserve
+                    # the volume and all profile metadata; never remove locks.
+                    stage = "recreate.stop"
+                    docker("stop", "--time", "20", name)
+                    stage = "recreate.stopped"
+                    state = inspect_container(name)["State"]
+                    if not (
+                        state.get("Running") is False
+                        and state.get("Status") == "exited"
+                        and type(state.get("ExitCode")) is int
+                        and state["ExitCode"] == 0
+                        and state.get("OOMKilled") is False
+                    ):
+                        raise SmokeFailure("GRACEFUL_STOP_NOT_CLEAN")
+                    print("PASS: recreate stopped running=false exit=0 oom=false", flush=True)
+                    stage = "recreate.remove"
+                    docker("rm", name)
+                    stage = "recreate.start"
                 docker(
                     "run",
                     "--detach",

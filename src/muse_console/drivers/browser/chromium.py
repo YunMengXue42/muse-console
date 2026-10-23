@@ -182,12 +182,70 @@ class ChromiumProcess:
         code = self.proc.returncode if self.proc else None
         return f" (exit code {code})" if code is not None else " (still running)"
 
-    async def stop(self) -> None:
-        if self.proc and self.proc.returncode is None:
-            self.proc.terminate()
+    async def stop(self, browser=None) -> None:
+        """Finish owned cleanup even if the caller is cancelled; never discover CDP.
+
+        Budget: close command 1s, graceful exit 3s, terminate 2s, kill 1s.
+        A Windows launcher exiting zero is not proof that the browser exited.
+        """
+        cleanup = asyncio.create_task(self._stop_owned(browser))
+        cancelled = False
+        while not cleanup.done():
             try:
-                await asyncio.wait_for(self.proc.wait(), 10)
+                await asyncio.shield(cleanup)
+            except asyncio.CancelledError:
+                cancelled = True
+        cleanup.result()
+        if cancelled:
+            raise asyncio.CancelledError
+
+    async def _stop_owned(self, browser) -> None:
+        proc = self.proc
+        if proc is None:
+            return
+        if browser is not None and not browser.closed and not self.exited:
+            try:
+                await asyncio.wait_for(browser.send("Browser.close"), 1)
+            except Exception:
+                # Closing Chromium can disconnect CDP before replying. Never log
+                # raw protocol exceptions; still give the owned process time.
+                pass
+            try:
+
+                async def wait_exit():
+                    if proc.returncode is None:
+                        await proc.wait()
+                    if sys.platform == "win32" and proc.returncode == 0:
+                        # A launcher can exit during this wait, too. Only the
+                        # existing CDP connection can observe browser shutdown.
+                        # CDP exposes a closed property, not a disconnect event.
+                        while not browser.closed:  # noqa: ASYNC110
+                            await asyncio.sleep(0.05)
+
+                await asyncio.wait_for(wait_exit(), 3)
             except asyncio.TimeoutError:
-                self.proc.kill()
-                await self.proc.wait()
+                pass
+        if (
+            sys.platform == "win32"
+            and proc.returncode == 0
+            and browser is not None
+            and not browser.closed
+        ):
+            # The launcher has exited but the owned browser demonstrably has
+            # not. Retain ownership for a later retry on this same connection.
+            raise RuntimeError("browser shutdown incomplete (code=browser_close_timeout)") from None
+        if proc.returncode is None:
+            try:
+                proc.terminate()
+            except ProcessLookupError:
+                pass
+            try:
+                await asyncio.wait_for(proc.wait(), 2)
+            except asyncio.TimeoutError:
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
+                # Keep ownership if even the killed process cannot be reaped.
+                await asyncio.wait_for(proc.wait(), 1)
         self.proc = None

@@ -73,8 +73,8 @@ Earlier rebuild notes record local offline regressions, frontend checks and a mo
 
 ### A5 Verify the Docker image builds and runs · P1
 - Container design for 0.4.4: image defaults to `browser` and `CHROMIUM_NO_SANDBOX=true`; source retains `false`. Run non-root, drop ALL capabilities, set no-new-privileges, use init and loopback publishing. Never expose CDP, mount the Docker socket or use privileged mode. Browser vulnerabilities may expose container data; this is not equivalent to Chromium's sandbox.
-- Pending, not run: CI native amd64 and arm64 startup, restart/persistent-volume and permission checks using the documented hardening and 4 GiB / 512 PID budgets. A workflow definition or previous revision's result is not acceptance for this revision.
-- Still open: image publication, package visibility verification (GHCR first publication defaults to private even for public repositories), anonymous release-tag pulls and a real-account run (login, chat, image, video). Renewal testing is cancelled and not a v0.4.4 blocker.
+- Acceptance requirement: record native amd64 and arm64 startup, restart/persistent-volume and permission checks using the documented hardening and 4 GiB / 512 PID budgets. Restart checks must verify graceful shutdown closes owned Chromium without leaving a profile lock; retain the existing `PROFILE_LOCKED` safety checks. A workflow definition or previous revision’s result is not acceptance for this revision.
+- Release-image acceptance: verify package visibility (GHCR first publication defaults to private even for public repositories) and anonymous pulls of the exact release tag on both architectures; record publication status and results in the final release notes. Keep real-account login/chat/image/video verification separate from offline smoke checks. Renewal testing is excluded from v0.4.4.
 
 ### A6 Enable GitHub Actions CI · P1
 - The repository already contains `.github/workflows/ci.yml` (lint and tests on Python 3.10 / 3.12).

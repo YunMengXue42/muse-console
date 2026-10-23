@@ -47,16 +47,16 @@ Muse Console：鉴权 · 账号调度 · 异步任务 · 媒体访问
 
 ## 快速开始
 
-v0.4.4 GHCR 镜像尚未发布，包可见性与匿名拉取尚未核验。正式发布前请使用源码启动。
+使用 GHCR 镜像前，请确认对应 Release 的镜像工作流已通过 amd64、arm64 双架构匿名拉取及原生 smoke 检查，包括重启、持久化和权限。发布状态以对应 Release 正文为准；不满足条件时请使用源码构建。
 
-镜像发布后的一行启动命令：
+使用已核验发行镜像的一行启动命令：
 
 ```bash
 docker run -d --init --name muse-console -p 127.0.0.1:18610:18610 --shm-size 1g --memory 4g --pids-limit 512 --cap-drop ALL --security-opt no-new-privileges -v muse-data:/app/data ghcr.io/yunmengxue42/muse-console:0.4.4
 docker logs muse-console
 ```
 
-日志里有控制台地址和自动生成的密钥。打开 `http://127.0.0.1:18610/dashboard`，用密钥登录，再通过网页登录、Cookie 导入或浏览器扩展添加账号。容器发行目标为 amd64 和 arm64。发布后也可用 Compose：`docker compose up -d`（默认标签 `0.4.4`）。
+日志里有控制台地址和自动生成的密钥。打开 `http://127.0.0.1:18610/dashboard`，用密钥登录，再通过网页登录、Cookie 导入或浏览器扩展添加账号。容器发行目标为 amd64 和 arm64。也可用 Compose：`docker compose up -d`（默认标签 `0.4.4`）。
 
 镜像默认 `browser` 和 `MUSE_CONSOLE_CHROMIUM_NO_SANDBOX=true`。上述命令以非 root 运行，移除全部 capability、设置 `no-new-privileges`、使用 `--init` 且端口仅绑定 loopback。禁止暴露 CDP、挂载 Docker socket 或使用 privileged。浏览器漏洞可能暴露容器内数据；这些限制不等价于 Chromium 沙箱。内存/进程预算只是起点，不代表完整隔离。本地构建后可加 `-e MUSE_CONSOLE_DRIVER=mock` 离线试用。启动日志含首次生成的密钥，重启后旧日志仍可能保留，请勿公开。
 

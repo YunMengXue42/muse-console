@@ -33,7 +33,7 @@ MUSE_CONSOLE_LOGIN_AUTO_COMPLETE_ENABLED=false
 
 ## 2. 容器
 
-v0.4.4 GHCR 镜像尚未发布，包可见性与匿名拉取尚未核验；GHCR 包首次发布默认 private，即使仓库公开也不例外。正式发布前请使用源码构建。容器目标为 `ghcr.io/yunmengxue42/muse-console`，支持 linux/amd64 和 linux/arm64（标签 `X.Y.Z`、`X.Y`、`latest`）。
+使用 `ghcr.io/yunmengxue42/muse-console` 前，请确认对应 Release 的镜像工作流已通过 linux/amd64、linux/arm64 双架构匿名拉取及原生 smoke 检查，包括重启、持久化存储和权限。GHCR 包首次发布默认 private，即使仓库公开也不例外，公开源码本身不代表镜像可匿名访问。发布状态以对应 Release 正文为准；不满足条件时请使用源码构建。镜像标签为 `X.Y.Z`、`X.Y`、`latest`，以下命令固定使用 `0.4.4`。
 
 ```bash
 docker run -d --init --name muse-console -p 127.0.0.1:18610:18610 --shm-size 1g --memory 4g --pids-limit 512 --cap-drop ALL --security-opt no-new-privileges -v muse-data:/app/data ghcr.io/yunmengxue42/muse-console:0.4.4

@@ -47,16 +47,16 @@ Call the API from your tools and maintain the service through a web console. Cli
 
 ## Quick start
 
-The v0.4.4 GHCR image is not yet published; package visibility and anonymous pulls are not yet verified. Use the source instructions until release.
+Before using a GHCR image, confirm that the image workflow for the corresponding release has passed anonymous pulls and native smoke checks on both amd64 and arm64, including restart, persistence and permissions. See that release’s notes for publication status; otherwise build from source.
 
-One-command start after image publication:
+One-command start with the verified release image:
 
 ```bash
 docker run -d --init --name muse-console -p 127.0.0.1:18610:18610 --shm-size 1g --memory 4g --pids-limit 512 --cap-drop ALL --security-opt no-new-privileges -v muse-data:/app/data ghcr.io/yunmengxue42/muse-console:0.4.4
 docker logs muse-console
 ```
 
-The log shows the console URL and a generated key. Open `http://127.0.0.1:18610/dashboard`, sign in with the key, then add accounts by web login, cookie import or the browser extension. The container release targets amd64 and arm64. After publication, Compose supports `docker compose up -d` (default tag `0.4.4`).
+The log shows the console URL and a generated key. Open `http://127.0.0.1:18610/dashboard`, sign in with the key, then add accounts by web login, cookie import or the browser extension. The container release targets amd64 and arm64. Compose also supports `docker compose up -d` (default tag `0.4.4`).
 
 The image defaults to `browser` and `MUSE_CONSOLE_CHROMIUM_NO_SANDBOX=true`. The command above runs non-root with dropped capabilities, `no-new-privileges`, `--init` and loopback-only publishing. Never expose CDP, mount the Docker socket or use privileged mode. Browser vulnerabilities may expose container data; these restrictions are not equivalent to Chromium’s sandbox. Memory/PID budgets are starting points, not complete isolation. To try it offline after building locally, add `-e MUSE_CONSOLE_DRIVER=mock`. Startup logs contain the first generated key: keep them private, including after restart.
 

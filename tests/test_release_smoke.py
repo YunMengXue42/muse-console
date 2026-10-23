@@ -178,6 +178,36 @@ def _media(client, signed, owner, foreign):
     return public.content
 
 
+def _soak_failure_summary(report):
+    """Fixed categories/counts only: never include report lines, URLs or keys."""
+    try:
+        rows = [json.loads(line) for line in report.read_text(encoding="utf-8").splitlines()]
+        checks = [row for row in rows if row.get("type") == "check"]
+        summary = {}
+        for label, endpoint in (
+            ("health", "/healthz"),
+            ("ready", "/readyz"),
+            ("admin", "/admin/status"),
+        ):
+            selected = [row for row in checks if row.get("endpoint") == endpoint]
+            summary[label] = {
+                "samples": len(selected),
+                "failed": sum(row.get("ok") is not True for row in selected),
+                "request_or_response_failed": sum(
+                    row.get("error") == "request_or_response_failed" for row in selected
+                ),
+                "status_200_failed": sum(
+                    row.get("status") == 200 and row.get("ok") is not True for row in selected
+                ),
+                "status_other": sum(row.get("status") != 200 for row in selected),
+            }
+        summary["end_present"] = bool(rows and rows[-1].get("type") == "end")
+        summary["interrupted"] = bool(rows and rows[-1].get("interrupted") is True)
+        return "SOAK_FAILED " + json.dumps(summary, sort_keys=True)
+    except (OSError, ValueError, TypeError, AttributeError):
+        return "SOAK_FAILED REPORT_UNAVAILABLE_OR_INVALID"
+
+
 def test_release_smoke_loopback_backup_restore(tmp_path, monkeypatch):
     # Do not inherit a developer's data paths, browser flags, credentials or .env.
     for name in tuple(os.environ):
@@ -245,7 +275,7 @@ def test_release_smoke_loopback_backup_restore(tmp_path, monkeypatch):
             report,
             admin_key_env=_ADMIN_ENV,
             timeout=1,
-        )
+        ), _soak_failure_summary(report)
         text = report.read_text(encoding="utf-8")
         for secret in (_API_KEY, _ADMIN_KEY, *keys, _PROMPT, _ADMIN_ENV, signed, task_path):
             assert secret not in text
