@@ -61,22 +61,6 @@ jobs:
           tags: muse-console:smoke
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Diagnose Chromium in container (temporary)
-        continue-on-error: true
-        run: |
-          cat > /tmp/diag.sh <<'SH'
-          set -x
-          id; ls -ld /app/data; df -h /dev/shm
-          chromium --no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage --remote-debugging-port=19210 --remote-debugging-address=127.0.0.1 --user-data-dir=/app/data/browser-profile --no-first-run --no-default-browser-check --disable-background-networking --window-size=1440,2200 about:blank > /tmp/c.log 2>&1 &
-          pid=$!
-          for i in $(seq 1 40); do
-            if python -c 'import urllib.request;print(urllib.request.urlopen("http://127.0.0.1:19210/json/version",timeout=2).read()[:200])'; then echo UP after $i; break; fi
-            kill -0 $pid 2>/dev/null || { echo DIED; break; }
-            sleep 1
-          done
-          grep -v dbus /tmp/c.log | head -30
-          SH
-          docker run --rm --network none --shm-size 1g --cap-drop ALL --security-opt no-new-privileges -v /tmp/diag.sh:/tmp/diag.sh:ro --entrypoint sh muse-console:smoke /tmp/diag.sh 2>&1 | tail -60
       - name: Smoke test (default browser driver, no network)
         run: |
           set -euo pipefail
