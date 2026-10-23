@@ -23,6 +23,9 @@ services:
       # (owned by UID 1000), e.g. when upgrading a deployment that used ./data.
       - ${MUSE_CONSOLE_DATA:-muse-data}:/app/data
     shm_size: "1gb"
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   muse-data:
