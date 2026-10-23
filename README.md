@@ -1,8 +1,14 @@
-# Muse Console
+<div align="center">
 
-**Connect Muse to your AI tools. Manage accounts, keys and generation tasks in one console.**
+<img src="frontend/public/assets/muse-logo.svg" alt="Muse Console logo" width="88" />
 
-English · [简体中文](README.zh-CN.md) · **0.4.3** · Python **3.10+** · **MIT**
+<h1>Muse Console</h1>
+
+<p><strong>Connect Muse to your AI tools. Manage accounts, keys and generation tasks in one console.</strong></p>
+
+<p>English · <a href="README.zh-CN.md">简体中文</a> · <strong>0.4.3</strong> · Python <strong>3.10+</strong> · <strong>MIT</strong></p>
+
+</div>
 
 Muse Console is an independent, unofficial gateway for [muse.ai](https://muse.ai), exposing chat, image and video generation through a subset of OpenAI-style APIs. Self-hosted: your data stays on your server.
 
