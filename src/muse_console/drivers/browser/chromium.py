@@ -154,9 +154,12 @@ class ChromiumProcess:
             args.insert(1, "--no-sandbox")
 
         log.info("launching Chromium: %s", self.executable)
-        self.proc = await asyncio.create_subprocess_exec(
-            *args, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
-        )
+        # Keep stderr in a file, truncated each launch, so a failed start can say why.
+        self.stderr_path.unlink(missing_ok=True)
+        with open(self.stderr_path, "wb") as stderr:  # noqa: ASYNC230 - one local file at launch
+            self.proc = await asyncio.create_subprocess_exec(
+                *args, stdout=asyncio.subprocess.DEVNULL, stderr=stderr
+            )
         try:
             for _ in range(60):
                 if self.exited:
@@ -170,10 +173,30 @@ class ChromiumProcess:
                         raise RuntimeError("Chromium returned a non-local DevTools endpoint")
                     return url
                 await asyncio.sleep(0.5)
-            raise RuntimeError("Chromium did not expose a DevTools endpoint")
+            raise RuntimeError(
+                "Chromium did not expose a DevTools endpoint" + self._failure_detail()
+            )
         except BaseException:
             await self.stop()
             raise
+
+    @property
+    def stderr_path(self) -> Path:
+        return self.profile_dir.parent / "chromium-stderr.log"
+
+    def _failure_detail(self) -> str:
+        code = self.proc.returncode if self.proc else None
+        detail = f" (exit code {code})" if code is not None else " (still running)"
+        try:
+            with open(self.stderr_path, "rb") as f:
+                f.seek(0, os.SEEK_END)
+                f.seek(max(0, f.tell() - 4096))
+                lines = f.read().decode("utf-8", "replace").splitlines()
+        except OSError:
+            return detail
+        # D-Bus noise is expected in containers and hides the real cause.
+        useful = [ln for ln in lines if ln.strip() and "dbus" not in ln][-8:]
+        return detail + ("; stderr: " + " | ".join(useful) if useful else "")
 
     async def stop(self) -> None:
         if self.proc and self.proc.returncode is None:
