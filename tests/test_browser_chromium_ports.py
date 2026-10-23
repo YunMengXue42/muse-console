@@ -25,6 +25,8 @@ def fake_launch(tmp_path, monkeypatch):
             return self.returncode
 
     async def launch(*args, **kwargs):
+        assert kwargs["stdout"] == chromium.asyncio.subprocess.DEVNULL
+        assert kwargs["stderr"] == chromium.asyncio.subprocess.DEVNULL
         calls.append(args)
         return OwnedProcess()
 
@@ -34,6 +36,17 @@ def fake_launch(tmp_path, monkeypatch):
     monkeypatch.setattr(chromium.asyncio, "create_subprocess_exec", launch)
     monkeypatch.setattr(process, "browser_ws_url", endpoint)
     return process, calls
+
+
+@pytest.mark.parametrize("code", [None, 0, 1, -9])
+def test_failure_detail_contains_only_process_status(tmp_path, code):
+    process = chromium.ChromiumProcess("not-a-browser", 0, tmp_path / "owned")
+    process.proc = SimpleNamespace(returncode=code)
+    private_log = tmp_path / "chromium-stderr.log"
+    private_log.write_text("sensitive browser diagnostic", encoding="utf-8")
+    expected = " (still running)" if code is None else f" (exit code {code})"
+    assert process._failure_detail() == expected
+    assert private_log.read_text(encoding="utf-8") == "sensitive browser diagnostic"
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX TIME_WAIT reuse semantics")

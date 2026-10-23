@@ -1,6 +1,6 @@
 # Muse Console browser extension
 
-English · [简体中文](README.zh-CN.md) · **0.2.0** · Chrome / Edge 132+ · MV3
+English · [简体中文](README.zh-CN.md) · **0.3.0** · Chrome / Edge 132+ · MV3
 
 Log in to Muse as usual and the extension syncs the session to **your own** Muse Console. No more manual cookie exports, and rotated sessions are picked up automatically.
 
@@ -31,7 +31,7 @@ Not yet on a store. Build from source or use the zip attached to a release.
 cd extension
 npm ci
 npm test
-npm run package     # creates dist/ and release/muse-console-extension-0.2.0.zip
+npm run package     # creates dist/ and release/muse-console-extension-0.3.0.zip
 ```
 
 Open `chrome://extensions` (or `edge://extensions`), enable **Developer mode**, click **Load unpacked** and select `extension/dist`.
@@ -48,10 +48,32 @@ MUSE_CONSOLE_CREDENTIAL_INGESTION_ENABLED=true
 MUSE_CONSOLE_CREDENTIAL_SERVER_ORIGIN=https://console.example.com
 ```
 
-1. **Verify the server**: in extension options enter the origin (for example `https://console.example.com`), grant access and compare `server_id` and `fingerprint` with the console.
-2. **Pair**: in the console open _Account pool → Extension device pairing_, generate a one-time challenge and paste it into the extension.
-3. **Enable sync**: tick the consent box and turn on automatic sync.
-4. **Log in to Muse** in that browser. The popup shows “同步正常” (synced) when done.
+### Quick pairing (0.3.0)
+
+> The package contains a **short-lived, sensitive one-time challenge**. Keep it private and clear your clipboard after use. **Prefilled values are not a source of trust**: compare the fetched identity against a console you already trust. Pairing does not authorize Cookie sync.
+
+1. **Generate in your trusted console**: open _Account pool → Extension device pairing_, optionally set a device label and new-account quota, then click **Generate pairing challenge**.
+2. **Copy the package**: click **Copy quick pairing package**. If clipboard access fails, select the read-only JSON package and copy it manually. Do not copy an admin key or send the package to anyone else.
+3. **Paste and prefill**: open extension options, paste the JSON into **Quick pairing package**, then click **Parse and prefill**. This prefills the exact server origin and challenge only; it does not request host access, confirm identity or enable sync. For loopback HTTP development, select development mode **before** parsing.
+4. **Fetch and verify identity**: click **Grant access and check identity** and approve access to the intended target. The extension fetches identity again and refuses pairing if origin, `server_id` or `fingerprint` differs from the package. Independently compare the displayed identity against your trusted console; the application fingerprint is not a TLS certificate pin.
+5. **Explicitly pair**: tick the identity-confirmation box only after that comparison, then click **Redeem challenge and pair**. The extension rechecks identity before exchanging the challenge. Pairing still leaves sync disabled.
+6. **Separately authorize sync**: read and tick the Cookie-sync consent box, then click **Enable automatic sync**. Log in to muse.ai in this browser if needed; the popup reports **Synced** after successful import. If a conflict needs administrator confirmation, follow the status instructions below.
+
+If a package expires or is invalid, generate and copy a new one. A loaded package/challenge is cleared on expiry, target edits, explicit clearing or page close; it is not persisted. **Clear package and challenge** returns to manual pairing. Clearing local input does not revoke a challenge already copied elsewhere.
+
+<details>
+<summary>Alternative: manual origin and one-time challenge</summary>
+
+1. In your trusted console, open _Account pool → Extension device pairing_ and generate a challenge so its origin, `server_id` and `fingerprint` are visible.
+2. In extension options, clear any loaded package, enter that exact origin, and click **Grant access and check identity**. Compare the fetched ID and fingerprint against your trusted console.
+3. Paste only the one-time challenge into its field, explicitly confirm identity, and click **Redeem challenge and pair**. If it expires, generate a new challenge.
+4. Separately tick the Cookie-sync consent box and click **Enable automatic sync**. Pairing alone never enables sync.
+
+</details>
+
+### Package format and limits
+
+The JSON uses `schema: "muse-console-pairing"`, `version: 1`, `origin`, `server_id`, `fingerprint`, `challenge` and Unix-seconds `expires_at`. Input is limited to 8 KiB, exact canonical HTTPS origins (explicit loopback HTTP development mode only), and at most 15 minutes remaining validity. Unknown fields and invalid types are rejected. There is no external messaging, content script or URL auto-authorization.
 
 <p>
   <img src="../docs/images/extension-options.png" alt="Extension options" width="720" />

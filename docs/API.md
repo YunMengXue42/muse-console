@@ -4,7 +4,7 @@
 
 ## API reference and examples
 
-Use `Authorization: Bearer <key>`. `/v1/*` accepts the admin key, the configured legacy API key or a non-revoked client key created in the console. `/admin/*` requires the admin key; ordinary client keys cannot administer the service. Media also supports expiring signed links as described below. 
+Use `Authorization: Bearer <key>`. `/v1/*` accepts the admin key, the configured legacy API key or a non-revoked client key created in the console. `/admin/*` requires the admin key; ordinary client keys cannot administer the service. Media also supports expiring signed links as described below.
 
 Set `KEY` locally to your own key without posting it to logs or issues. These are Bash examples:
 
@@ -113,15 +113,17 @@ Usage is a text-length estimate, not exact tokens or upstream billing, and exclu
 - **Exposure:** keep admin and CDP private. Use trusted TLS and a protected backend; trust only your fixed reverse proxy for forwarded headers, never `forwarded_allow_ips="*"`. The ingestion origin check uses the resulting ASGI origin. No global CORS exception exists: if needed, allow exact client origins for `/v1/*` at the proxy, not wildcard origins or the dashboard. See [Deployment](../docs/DEPLOYMENT.md).
 - **Publication:** never include `.env`, cookies, keys, data directories, browser profiles, conversations/media, backups or unredacted logs/screenshots in Git, archives, issues or CI artifacts. Ignored files and old history still need review. Follow [SECURITY.md](../SECURITY.md) for a suspected leak; deleting a file alone does not revoke a secret.
 
+The image defaults to `browser` and `MUSE_CONSOLE_CHROMIUM_NO_SANDBOX=true`; source defaults remain `mock` and `false`. Browser vulnerabilities may expose container data; container restrictions are not equivalent to Chromium’s sandbox. Container deployments must retain non-root, cap-drop ALL, no-new-privileges, init and loopback publishing; never expose CDP, mount the Docker socket or use privileged mode. Renewal defaults off; its long-term effectiveness remains unverified.
+
 ## Configuration
 
 Use environment variables or `.env`; new deployments should use `MUSE_CONSOLE_`. Core-managed legacy `MUSE2API_` names remain accepted, with the new namespace taking precedence. See [.env.example](../.env.example) and [config.py](../src/muse_console/config.py) for all settings/ranges; deployment guidance is in [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md).
 
 | Variable(s), prefixed `MUSE_CONSOLE_` | Default | Meaning |
 |---|---|---|
-| `DRIVER` | `mock` | `mock` / `browser` / reserved `http` |
-| `HOST`, `PORT` | `127.0.0.1`, `18610` | Listen address/port |
-| `DATA_DIR` | `data` | Private persistence root |
+| `DRIVER` | source `mock`; image `browser` | `mock` / `browser` / reserved `http` |
+| `HOST`, `PORT` | source `127.0.0.1`, image `0.0.0.0`; `18610` | Listen address/port; publish the container port on host loopback only |
+| `DATA_DIR` | source `data`; image `/app/data` | Private persistence root |
 | `API_KEY`, `ADMIN_KEY` | generated, same as API key | Legacy inference key / administrator credential |
 | `PUBLIC_BASE` | empty | Media base URL; otherwise derived from request |
 | `REQUEST_LOG_RETENTION_DAYS`, `MEDIA_RETENTION_DAYS` | `14`, `0` | History retention / optional media cleanup (0 disables) |
@@ -139,7 +141,7 @@ Use environment variables or `.env`; new deployments should use `MUSE_CONSOLE_`.
 | `CREDENTIAL_INGESTION_ENABLED`, `CREDENTIAL_SERVER_ORIGIN` | `false`, empty | Restricted import / exact receiver origin |
 | `CREDENTIAL_ALLOW_LOOPBACK_HTTP` | `false` | Explicit loopback development exception |
 | `CHROMIUM_PATH`, `BROWSER_PROFILE_DIR`, `BROWSER_PROXY` | detected, data-owned profile, empty | Browser executable / profile / browser-only proxy |
-| `CHROMIUM_NO_SANDBOX` | `false` | Weaker isolation; prefer fixing sandbox support |
+| `CHROMIUM_NO_SANDBOX` | source `false`; image `true` | Image disables the sandbox; browser vulnerabilities may expose container data. Container restrictions are not equivalent to the browser sandbox |
 | `CHAT_TIMEOUT`, `IMAGE_TIMEOUT`, `VIDEO_TIMEOUT` | `300`, `240`, `600` | Generation timeouts in seconds |
 | `FIRST_TOKEN_TIMEOUT`, `STREAM_HEARTBEAT_INTERVAL` | `45`, `0` | First output deadline / optional SSE heartbeat seconds |
 | `VIDEO_DEADLINE_CAP`, `VIDEO_TEXT_ONLY_RETRIES` | `600`, `1` | Overall video budget / text-only resubmissions |

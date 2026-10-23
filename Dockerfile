@@ -1,4 +1,5 @@
-FROM node:24-bookworm-slim AS console
+# Frontend assets are platform independent: build once on the native builder.
+FROM --platform=$BUILDPLATFORM node:24-bookworm-slim AS console
 WORKDIR /console
 COPY frontend/package*.json ./
 RUN npm ci
@@ -6,6 +7,10 @@ COPY frontend/ ./
 RUN npm run build
 
 FROM python:3.12-slim
+
+LABEL org.opencontainers.image.source="https://github.com/YunMengXue42/muse-console" \
+      org.opencontainers.image.description="Self-hosted OpenAI-style gateway and console for muse.ai" \
+      org.opencontainers.image.licenses="MIT"
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends chromium fonts-wqy-zenhei ca-certificates \
@@ -24,10 +29,20 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 ENV MUSE_CONSOLE_HOST=0.0.0.0 \
     MUSE_CONSOLE_DATA_DIR=/app/data \
-    MUSE_CONSOLE_CHROMIUM_PATH=/usr/bin/chromium
+    MUSE_CONSOLE_DRIVER=browser \
+    MUSE_CONSOLE_CHROMIUM_PATH=/usr/bin/chromium \
+    MUSE_CONSOLE_CHROMIUM_NO_SANDBOX=true \
+    PYTHONUNBUFFERED=1
+# Container default: Chromium's sandbox is disabled for compatibility.
+# Container hardening is not equivalent: browser exploits may expose container data.
+# Run non-root with --init, cap-drop ALL, no-new-privileges and loopback publishing;
+# never expose CDP, mount the Docker socket or use privileged mode.
 
 RUN mkdir -p /app/data && chown -R muse:muse /app
 USER muse
 
 EXPOSE 18610
+VOLUME ["/app/data"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:18610/healthz', timeout=4)"]
 CMD ["muse-console"]

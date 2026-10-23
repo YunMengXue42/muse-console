@@ -1,4 +1,16 @@
 export const devices: Record<string, string> = {
+  "快速配对包（含一次性挑战，勿外传）":
+    "Quick pairing package (contains a one-time challenge; keep private)",
+  复制快速配对包: "Copy quick pairing package",
+  "配对包已复制。请在扩展粘贴，仍须核对身份并单独同意同步。":
+    "Package copied. Paste it in the extension; verify the identity and separately consent to sync.",
+  "无法访问剪贴板，请选中上方配对包手动复制。":
+    "Clipboard unavailable. Select the package above and copy it manually.",
+  "仅在扩展手动粘贴；不会自动授权或开启同步。本页面不保存配对包，复制后请及时清理剪贴板。":
+    "Paste manually in the extension. This does not authorize access or enable sync. This page does not save the package; clear your clipboard afterwards.",
+  "配对包短期敏感，勿外传。预填不是信任来源，仍须核对可信控制台身份。":
+    "This short-lived package is sensitive; keep it private. Prefilled values are not a source of trust. Still verify the identity against your trusted console.",
+
   "服务未开启凭据导入（404），需管理员开启。账号池其他功能不受影响。":
     "Credential import is disabled (404). Ask an administrator to enable it. Other account pool features are unaffected.",
   "设备列表读取失败，请重试。": "Could not load devices. Please try again.",

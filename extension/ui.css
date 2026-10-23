@@ -90,7 +90,8 @@ strong {
   font-weight: 600;
 }
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 button {
@@ -140,6 +141,7 @@ button.danger:hover:not(:disabled) {
   outline: 3px solid var(--primary);
   outline-offset: 3px;
 }
+textarea,
 input:not([type="checkbox"]) {
   width: 100%;
   min-width: 0;

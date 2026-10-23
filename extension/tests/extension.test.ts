@@ -1,6 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
-import { setImmediate as realImmediate } from "node:timers";
 import { Engine } from "../src/engine";
 import { collect } from "../src/collector";
 import { NAMES, originOf, request } from "../src/policy";
@@ -170,6 +169,43 @@ describe("transport and trust boundary", () => {
       );
     await expect(e.pair("challenge")).rejects.toThrow("invalid_pairing");
   });
+  it("rejects package identity/challenge mismatch before exchange and expiry during identity fetch", async () => {
+    const e = new Engine();
+    await e.init();
+    vi.mocked(fetch).mockResolvedValue(
+      response({ server_id: "a", fingerprint: "fp" }),
+    );
+    await e.inspect("https://receiver.test", false);
+    const p = {
+      schema: "muse-console-pairing",
+      version: 1,
+      origin: "https://receiver.test",
+      server_id: "a",
+      fingerprint: "fp",
+      challenge: "ONETIME",
+      expires_at: Date.now() / 1000 + 300,
+    };
+    for (const bad of [
+      { ...p, server_id: "b" },
+      { ...p, fingerprint: "bad" },
+      { ...p, origin: "https://other.test" },
+      { ...p, challenge: "other" },
+    ]) {
+      await expect(e.pair("ONETIME", JSON.stringify(bad))).rejects.toThrow(
+        "server_changed",
+      );
+    }
+    expect(fetch).toHaveBeenCalledTimes(1);
+    vi.mocked(fetch).mockImplementation(async () => {
+      vi.setSystemTime(Date.now() + 301000);
+      return response({ server_id: "a", fingerprint: "fp" });
+    });
+    await expect(e.pair("ONETIME", JSON.stringify(p))).rejects.toThrow(
+      "expired_pairing_package",
+    );
+    expect(e.meta.pair).toBeUndefined();
+    expect(JSON.stringify({ local, session })).not.toContain("ONETIME");
+  });
   it("stores device token only in trusted local; never stores challenge", async () => {
     const e = new Engine();
     await e.init();
@@ -185,7 +221,21 @@ describe("transport and trust boundary", () => {
         }),
       );
     await e.inspect("https://receiver.test", false);
-    await e.pair("ONETIME_CHALLENGE");
+    await e.pair(
+      "ONETIME_CHALLENGE",
+      JSON.stringify({
+        schema: "muse-console-pairing",
+        version: 1,
+        origin: "https://receiver.test",
+        server_id: "a",
+        fingerprint: "fp",
+        challenge: "ONETIME_CHALLENGE",
+        expires_at: Date.now() / 1000 + 300,
+      }),
+    );
+    expect(JSON.stringify({ local, session })).not.toContain(
+      "muse-console-pairing",
+    );
     expect(local.meta.pair.token).toBe(TOKEN);
     expect(local.meta.enabled).toBe(false);
     expect(JSON.stringify({ local, session })).not.toContain(
@@ -691,6 +741,22 @@ describe("queue lifecycle and privacy", () => {
     expect(JSON.stringify(local)).not.toContain(TOKEN);
   });
 });
+async function workerStatusBarrier(listeners: Record<string, Function>) {
+  // Status is enqueued on the same worker chain after all preceding events.
+  // Its reply proves completion even when crypto/I/O spans event-loop turns;
+  // unlike fixed setImmediate counts, it does not assume a scheduler speed.
+  return new Promise<unknown>((resolve, reject) => {
+    const accepted = listeners.message(
+      { type: "status" },
+      { id: "extension-id", url: "chrome-extension://extension-id/popup.html" },
+      (response: { ok: boolean; data?: unknown }) => {
+        if (!response?.ok) reject(new Error("worker status barrier failed"));
+        else resolve(response.data);
+      },
+    );
+    if (accepted !== true) reject(new Error("worker status barrier rejected"));
+  });
+}
 it("worker debounces cookie bursts, ignores unrelated cookies, and rejects webpage senders", async () => {
   const listeners: Record<string, Function> = {};
   api.cookies.onChanged = {
@@ -721,10 +787,7 @@ it("worker debounces cookie bursts, ignores unrelated cookies, and rejects webpa
   paired(e);
   await e.save();
   await import("../src/worker");
-  const flush = async () => {
-    for (let i = 0; i < 100; i++)
-      await new Promise((resolve) => realImmediate(resolve));
-  };
+  const flush = () => workerStatusBarrier(listeners);
   await flush();
   expect(fetch).toHaveBeenCalledTimes(1);
   api.cookies.getAll.mockClear();
@@ -800,8 +863,7 @@ it("accepts options page opened as a tab and rejects foreign senders", async () 
       respond,
     ),
   ).toBe(true);
-  for (let i = 0; i < 50 && respond.mock.calls.length === 0; i++)
-    await new Promise((resolve) => realImmediate(resolve));
+  await workerStatusBarrier(listeners);
   expect(respond.mock.calls[0][0].ok).toBe(true);
   const rejected = vi.fn();
   expect(

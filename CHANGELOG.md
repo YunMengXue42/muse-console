@@ -2,10 +2,23 @@
 
 All notable changes to Muse Console are listed here. Versions follow [Semantic Versioning](https://semver.org/) while the project is pre-1.0: minor versions may change behavior.
 
-## [Unreleased]
+## [0.4.4] - 2026-10-24
 
 ### Added
+- One-command container start for amd64 and arm64 using `ghcr.io/yunmengxue42/muse-console:0.4.4`; Compose defaults to `0.4.4`. Before use, confirm the corresponding release image workflow passed anonymous pulls and native smoke checks on both architectures; consult the release notes for publication status.
+- First start prints the console URL and the generated key once.
+- Chromium startup failures report only the exit code; raw browser output is not stored or returned.
 - English UI for the console and the browser extension. The console follows the browser language and has a 中文 / English switch in the sidebar and on the login screen; the extension follows the browser language.
+
+### Changed
+- Compose uses a named volume, drops all capabilities and sets `no-new-privileges`. Existing `./data` deployments: set `MUSE_CONSOLE_DATA=./data`.
+- Container defaults: `browser` and `MUSE_CONSOLE_CHROMIUM_NO_SANDBOX=true`, non-root, init, dropped ALL capabilities, no-new-privileges and loopback publishing. No exposed CDP, Docker socket mount or privileged mode. Browser vulnerabilities may expose container data; this is not equivalent to Chromium’s sandbox. Source keeps the sandbox setting `false`; `.env.example` leaves it commented to avoid overriding the image.
+- Container examples use adjustable 4 GiB memory / 512 PID budgets, not a promise of complete isolation. Named-volume migration, Compose project prefixes, rollback and sensitive startup-log warnings are documented.
+- Automatic renewal remains off by default; long-term renewal is unverified.
+- JSON quick pairing: manually copy/paste the origin, server ID, fingerprint, one-use challenge and expiry without automatically enabling synchronization.
+
+### Fixed
+- Graceful shutdown requests owned Chromium to close before exit to avoid residual profile locks on restart. Profile-lock safety checks remain unchanged.
 
 ## [0.4.3] - 2026-10-23
 
@@ -117,6 +130,7 @@ Dashboard, per-client API keys, request log, async image tasks, reference images
 
 Initial layered OpenAI-compatible gateway with pluggable drivers.
 
+[0.4.4]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.4.4
 [0.4.3]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.4.3
 [0.4.2]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.4.2
 [0.4.1]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.4.1

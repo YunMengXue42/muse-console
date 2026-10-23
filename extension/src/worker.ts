@@ -65,7 +65,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       case "inspect":
         return engine.inspect(message.origin, message.development === true);
       case "pair":
-        return engine.pair(message.challenge);
+        return engine.pair(message.challenge, message.pairingPackage);
       case "enable":
         return engine.enable(message.enabled === true);
       case "confirm":

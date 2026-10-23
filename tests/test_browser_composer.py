@@ -82,7 +82,8 @@ def javascript(body):
         text=True,
         encoding="utf-8",
         check=True,
-        timeout=10,
+        # The first node start on a cold Windows runner can take well over 10s.
+        timeout=60,
     )
     return json.loads(result.stdout)
 

@@ -1,4 +1,32 @@
 {
+  "quickPairingLabel": { "message": "快速配对包（短期敏感，勿外传）" },
+  "quickPairingHelp": {
+    "message": "从可信控制台手动复制。预填内容不是信任来源；仍须核对可信控制台身份并单独同意 Cookie 同步。开发 HTTP 须先勾选开发模式。"
+  },
+  "loadQuickPairing": { "message": "解析并预填" },
+  "clearQuickPairing": { "message": "清除配对包与挑战" },
+  "invalidQuickPairing": {
+    "message": "配对包无效或已过期。请检查格式、精确 origin 与开发模式。尚未授权任何访问。"
+  },
+  "quickPairingExpired": { "message": "配对包已过期并清除，请重新生成。" },
+  "quickPairingLoaded": {
+    "message": "仅已预填。请点击授权访问并查询身份，再与可信控制台核对。尚未授权同步。"
+  },
+  "quickPairingCleared": { "message": "已清除配对包与挑战，仍可手动配对。" },
+  "quickPairingIdentityMismatch": {
+    "message": "服务器身份与配对包不一致。已拒绝配对并清除配对包与挑战。"
+  },
+  "operationCompleted": { "message": "操作已完成。" },
+
+  "quickPairingPackage": { "message": "快速配对包" },
+  "loadPairingPackage": { "message": "解析并预填" },
+  "invalidPairingPackage": {
+    "message": "配对包无效或已过期，请从受信控制台重新复制。"
+  },
+  "pairingPackageExpired": { "message": "配对包已过期并清除，请重新获取。" },
+  "pairingPackageLoaded": {
+    "message": "已预填，尚未授权。请点击授权查询身份，核对后确认配对；同步须单独同意。"
+  },
   "extName": {
     "message": "Muse Console",
     "description": "extName UI message."

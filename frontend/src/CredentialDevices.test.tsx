@@ -81,7 +81,7 @@ describe("扩展设备配对", () => {
     await screen.findByRole("button", { name: "撤销设备 device/1" });
     expect(screen.getByText("已撤销")).toBeTruthy();
   });
-  it("只在点击后配对，直接展示规范响应身份且不额外 fetch、不持久化或复制挑战", async () => {
+  it("只在点击后配对，直接展示规范响应身份且不额外 fetch、不持久化或自动复制挑战", async () => {
     const storage = vi.spyOn(Storage.prototype, "setItem");
     const { fetcher, user, view } = setup();
     await screen.findByRole("button", { name: "撤销设备 device/1" });
@@ -103,10 +103,46 @@ describe("扩展设备配对", () => {
       new_account_limit: 1,
     });
     expect(storage).not.toHaveBeenCalled();
-    expect(screen.queryByRole("button", { name: /复制/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "复制快速配对包" })).toBeTruthy();
     view.unmount();
     expect(screen.queryByDisplayValue("one-time-secret")).toBeNull();
   });
+  it.each([true, false])(
+    "仅点击复制，剪贴板失败保留手动选择（成功=%s）",
+    async (success) => {
+      const storage = vi.spyOn(Storage.prototype, "setItem");
+      const { user } = setup();
+      const writeText = vi.fn(async (_text: string) => {
+        if (!success) throw new Error("denied");
+      });
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: { writeText },
+      });
+      await screen.findByRole("button", { name: "撤销设备 device/1" });
+      await user.click(screen.getByRole("button", { name: "生成配对挑战" }));
+      const field = (await screen.findByLabelText(
+        "快速配对包（含一次性挑战，勿外传）",
+      )) as HTMLTextAreaElement;
+      expect(writeText).not.toHaveBeenCalled();
+      await user.click(screen.getByRole("button", { name: "复制快速配对包" }));
+      await screen.findByText(success ? /配对包已复制/ : /无法访问剪贴板/);
+      const pkg = JSON.parse(writeText.mock.calls[0][0]);
+      expect(pkg).toMatchObject({
+        schema: "muse-console-pairing",
+        version: 1,
+        origin: "https://muse.example",
+        challenge: "one-time-secret",
+        server_id: "server-1",
+        fingerprint: "app-fingerprint",
+      });
+      expect(JSON.stringify(pkg)).not.toContain("admin-test");
+      expect(storage).not.toHaveBeenCalled();
+      field.focus();
+      expect(field.selectionStart).toBe(0);
+      expect(field.selectionEnd).toBe(field.value.length);
+    },
+  );
   it("404 友好说明，不影响关闭或生成动作", async () => {
     const { user, close } = setup({ disabled: true });
     await screen.findByText(/需管理员开启/);

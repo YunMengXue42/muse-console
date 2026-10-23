@@ -1,21 +1,37 @@
+# v0.4.4 image publication and anonymous pulls are not yet verified.
+# After publication: docker compose up -d && docker compose logs muse-console
+# The first start prints the console URL and a generated API key.
 services:
   muse-console:
+    image: ghcr.io/yunmengxue42/muse-console:${MUSE_CONSOLE_TAG:-0.4.4}
+    # Build from this checkout instead: docker compose up -d --build
     build: .
-    # Local build tag only; no published registry image is assumed.
-    image: muse-console:local
+    pull_policy: missing
     restart: unless-stopped
+    init: true
     env_file:
       - path: .env
         required: false
+    # The image defaults to the real browser driver; set MUSE_CONSOLE_DRIVER=mock in .env to try it offline.
     environment:
       MUSE_CONSOLE_HOST: 0.0.0.0
       MUSE_CONSOLE_DATA_DIR: /app/data
       MUSE_CONSOLE_CHROMIUM_PATH: /usr/bin/chromium
-      # Explicit opt-in via shell environment for real drivers/renewal.
-      MUSE_CONSOLE_DRIVER: ${MUSE_CONSOLE_DRIVER:-mock}
-      MUSE_CONSOLE_KEEPALIVE_ENABLED: ${MUSE_CONSOLE_KEEPALIVE_ENABLED:-false}
     ports:
+      # Loopback only. Put a reverse proxy with TLS in front for remote access.
       - "127.0.0.1:18610:18610"
     volumes:
-      - ./data:/app/data
+      # Named volume by default. Set MUSE_CONSOLE_DATA=./data to keep a host directory
+      # (owned by UID 1000), e.g. when upgrading a deployment that used ./data.
+      - ${MUSE_CONSOLE_DATA:-muse-data}:/app/data
     shm_size: "1gb"
+    # Starting budgets, not complete isolation; tune for measured browser workloads.
+    mem_limit: 4g
+    pids_limit: 512
+    # Keep the image's non-root user; never expose CDP, mount the Docker socket or use privileged mode.
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  muse-data:

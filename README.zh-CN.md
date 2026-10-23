@@ -6,7 +6,7 @@
 
 <p><strong>把 Muse 网页能力接入现有 AI 工具，用一个控制台管理账号、密钥与生成任务。</strong></p>
 
-<p><a href="README.md">English</a> · 简体中文 · <strong>0.4.3</strong> · Python <strong>3.10+</strong> · <strong>MIT</strong></p>
+<p><a href="README.md">English</a> · 简体中文 · <strong>0.4.4</strong> · Python <strong>3.10+</strong> · <strong>MIT</strong></p>
 
 </div>
 
@@ -47,6 +47,22 @@ Muse Console：鉴权 · 账号调度 · 异步任务 · 媒体访问
 
 ## 快速开始
 
+使用 GHCR 镜像前，请确认对应 Release 的镜像工作流已通过 amd64、arm64 双架构匿名拉取及原生 smoke 检查，包括重启、持久化和权限。发布状态以对应 Release 正文为准；不满足条件时请使用源码构建。
+
+使用已核验发行镜像的一行启动命令：
+
+```bash
+docker run -d --init --name muse-console -p 127.0.0.1:18610:18610 --shm-size 1g --memory 4g --pids-limit 512 --cap-drop ALL --security-opt no-new-privileges -v muse-data:/app/data ghcr.io/yunmengxue42/muse-console:0.4.4
+docker logs muse-console
+```
+
+日志里有控制台地址和自动生成的密钥。打开 `http://127.0.0.1:18610/dashboard`，用密钥登录，再通过网页登录、Cookie 导入或浏览器扩展添加账号。容器发行目标为 amd64 和 arm64。也可用 Compose：`docker compose up -d`（默认标签 `0.4.4`）。
+
+镜像默认 `browser` 和 `MUSE_CONSOLE_CHROMIUM_NO_SANDBOX=true`。上述命令以非 root 运行，移除全部 capability、设置 `no-new-privileges`、使用 `--init` 且端口仅绑定 loopback。禁止暴露 CDP、挂载 Docker socket 或使用 privileged。浏览器漏洞可能暴露容器内数据；这些限制不等价于 Chromium 沙箱。内存/进程预算只是起点，不代表完整隔离。本地构建后可加 `-e MUSE_CONSOLE_DRIVER=mock` 离线试用。启动日志含首次生成的密钥，重启后旧日志仍可能保留，请勿公开。
+
+<details>
+<summary>从源码运行</summary>
+
 准备 **uv 0.12.11、Python 3.12、Node.js 24**，在新目录中执行：
 
 ```bash
@@ -58,11 +74,11 @@ cp .env.example .env
 uv run --no-sync muse-console
 ```
 
-打开 `http://127.0.0.1:18610/dashboard`。首次启动生成的密钥保存在 `data/api_key`。
+源码运行默认是 **Mock 模式**，且 `MUSE_CONSOLE_CHROMIUM_NO_SANDBOX=false`。接入真实 Muse 需安装 Chromium/Chrome 并设置 `MUSE_CONSOLE_DRIVER=browser`。PowerShell 用 `Copy-Item .env.example .env`，前端命令分步执行。
 
-默认使用 **Mock 模式**，无需账号。接入真实 Muse 时，安装 Chromium/Chrome，设置 `MUSE_CONSOLE_DRIVER=browser`，再从控制台网页登录或导入账号。密码、MFA 和验证码须手动完成。
+</details>
 
-PowerShell 用 `Copy-Item .env.example .env`，前端命令分步执行。不要覆盖已有配置或复用生产数据。[详细部署](docs/DEPLOYMENT.zh-CN.md)
+密码、MFA 和验证码须手动完成。端口只绑本机，远程访问请在前面加 TLS 反向代理。[详细部署](docs/DEPLOYMENT.zh-CN.md)
 
 ## 接入示例
 
@@ -80,16 +96,18 @@ curl http://127.0.0.1:18610/v1/chat/completions \
 
 配套的 MV3 扩展让账号接入更省事：在浏览器正常登录 Muse，会话自动同步到已配对的控制台，轮换后也会自动更新。扩展只读 4 个 Muse 会话 Cookie，只发往你授权的单一服务器，设备令牌可随时撤销。
 
-安装与配对见 [扩展说明](extension/README.zh-CN.md)。
+已实现手动复制粘贴的 JSON 快速配对包，包含 origin、服务器 ID、fingerprint、一次性 challenge 和到期时间；粘贴不会自动开启同步，仍需核对身份、授予目标权限并单独同意同步。
+
+凭据导入 **默认关闭**，基础容器命令不会开启扩展导号，关闭时导入端点返回 404。请按[本机扩展导号 Docker 示例](docs/DEPLOYMENT.zh-CN.md#local-extension-import-with-docker)显式启用并指定精确 origin，安装与配对见 [扩展说明](extension/README.zh-CN.md)。
 
 ## 使用边界
 
 - **兼容子集，不是完整 OpenAI 实现。** 模型别名不代表供应商真实模型；不支持工具调用、结构化输出或蒙版重绘。
-- **单进程部署。** 每个数据目录运行一个 worker；自动续期默认关闭，长期续期与多账号负载仍待验收。直连 HTTP 驱动尚未完成。
+- **单进程部署。** 每个数据目录运行一个 worker；自动续期默认关闭，长期效果与多账号负载仍未验证。直连 HTTP 驱动尚未完成。
 - **保护真实凭据。** 使用专属浏览器目录；分享 API 前设置独立管理员密钥，为调用者创建客户端密钥。不要让互不信任的用户共享含私密记忆的上游账号。
 - **完整备份。** 停止全部写入后备份整个数据目录，账号数据库与 `credentials.key` 必须一起保存。远程访问使用可信 TLS，不暴露 CDP。
 
-当前提供源码构建，不提供已发布的 PyPI 包或容器镜像。真实生成依赖上游页面、账号状态与配额。
+未发布 PyPI 包。真实生成依赖上游页面、账号状态与配额。
 
 ## 文档
 

@@ -113,15 +113,17 @@ Usage 按文本长度估算，不是精确 token 或上游计费，且不含图�
 - **暴露面：** 管理面与 CDP 保持私有。使用可信 TLS 和受保护后端；转发头仅信任固定反向代理，不要使用 `forwarded_allow_ips="*"`。凭据接收检查最终 ASGI origin。应用没有全局 CORS 例外；如确有需要，在代理上仅对 `/v1/*` 放行精确客户端 origin，不要使用通配来源或开放控制台。见[部署指南](../docs/DEPLOYMENT.zh-CN.md)。
 - **公开纪律：** 不得将 `.env`、Cookie、密钥、数据目录、浏览器配置、对话/媒体、备份或未脱敏日志/截图放入 Git、交付压缩包、Issue 或 CI 附件。忽略文件和旧历史仍须检查。疑似泄露按 [SECURITY.zh-CN.md](../SECURITY.zh-CN.md) 处理；只删除文件不能撤销秘密。
 
+镜像默认 `browser` 和 `MUSE_CONSOLE_CHROMIUM_NO_SANDBOX=true`；源码默认仍为 `mock` 和 `false`。浏览器漏洞可能暴露容器内数据，容器限制不等价于 Chromium 沙箱。容器方案须保留非 root、cap-drop ALL、no-new-privileges、init 和 loopback 绑定；禁止暴露 CDP、挂载 Docker socket 或 privileged。续期默认关闭，长期效果未验证。
+
 ## 配置
 
 支持环境变量或 `.env`；新部署使用 `MUSE_CONSOLE_`。核心管理的旧 `MUSE2API_` 名称仍可使用，新命名空间优先。全部配置/范围见 [.env.example](../.env.example)、[config.py](../src/muse_console/config.py)，部署说明见 [docs/DEPLOYMENT.zh-CN.md](../docs/DEPLOYMENT.zh-CN.md)。
 
 | 变量（均加 `MUSE_CONSOLE_` 前缀） | 默认值 | 含义 |
 |---|---|---|
-| `DRIVER` | `mock` | `mock` / `browser` / 预留 `http` |
-| `HOST`、`PORT` | `127.0.0.1`、`18610` | 监听地址/端口 |
-| `DATA_DIR` | `data` | 私密持久化根目录 |
+| `DRIVER` | 源码 `mock`；镜像 `browser` | `mock` / `browser` / 预留 `http` |
+| `HOST`、`PORT` | 源码 `127.0.0.1`、镜像 `0.0.0.0`；`18610` | 监听地址/端口；容器端口仅发布至宿主 loopback |
+| `DATA_DIR` | 源码 `data`；镜像 `/app/data` | 私密持久化根目录 |
 | `API_KEY`、`ADMIN_KEY` | 自动生成、同 API 密钥 | 旧式推理密钥 / 管理员凭据 |
 | `PUBLIC_BASE` | 空 | 媒体基础 URL；空时从请求派生 |
 | `REQUEST_LOG_RETENTION_DAYS`、`MEDIA_RETENTION_DAYS` | `14`、`0` | 日志保留 / 可选媒体清理（0 禁用） |
@@ -139,7 +141,7 @@ Usage 按文本长度估算，不是精确 token 或上游计费，且不含图�
 | `CREDENTIAL_INGESTION_ENABLED`、`CREDENTIAL_SERVER_ORIGIN` | `false`、空 | 受限导入 / 精确接收 origin |
 | `CREDENTIAL_ALLOW_LOOPBACK_HTTP` | `false` | 显式回环开发例外 |
 | `CHROMIUM_PATH`、`BROWSER_PROFILE_DIR`、`BROWSER_PROXY` | 自动探测、数据目录内自有配置、空 | 浏览器程序 / 配置目录 / 仅浏览器代理 |
-| `CHROMIUM_NO_SANDBOX` | `false` | 降低隔离强度；优先修复沙箱支持 |
+| `CHROMIUM_NO_SANDBOX` | 源码 `false`；镜像 `true` | 镜像关闭沙箱；浏览器漏洞可能暴露容器内数据，容器限制不等价于浏览器沙箱 |
 | `CHAT_TIMEOUT`、`IMAGE_TIMEOUT`、`VIDEO_TIMEOUT` | `300`、`240`、`600` | 生成超时秒数 |
 | `FIRST_TOKEN_TIMEOUT`、`STREAM_HEARTBEAT_INTERVAL` | `45`、`0` | 首次输出期限 / 可选 SSE 心跳秒数 |
 | `VIDEO_DEADLINE_CAP`、`VIDEO_TEXT_ONLY_RETRIES` | `600`、`1` | 视频总预算 / 仅文本结果重投次数 |

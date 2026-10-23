@@ -2,7 +2,7 @@
 
 English is canonical. [简体中文](DEPLOYMENT.zh-CN.md)
 
-These are deployment instructions and acceptance requirements, not a record of a completed deployment or security audit. Use an authorized checkout, isolated data and synthetic credentials first. No published PyPI release or Docker registry image is assumed or claimed: build the local source. This guide does not authorize publication or pushing.
+These are deployment instructions and acceptance requirements, not a record of a completed deployment or security audit. Use an authorized checkout, isolated data and synthetic credentials first. No PyPI release is published.
 
 ## 1. Local mock baseline
 
@@ -31,27 +31,23 @@ MUSE_CONSOLE_LOGIN_AUTO_COMPLETE_ENABLED=false
 
 Use `http://127.0.0.1:18610/healthz` for liveness, `/readyz` for readiness, and `/dashboard` (also `/admin`) for the console. Check `/admin/status` using the admin Bearer key. A mock result is synthetic and needs no upstream account; health/readiness do not prove real authentication or generation. Protect health endpoints at the proxy if operational metadata should not be public.
 
-## 2. Local container build
+## 2. Container
 
-The Dockerfile builds the frontend, installs the locked Python package, includes LICENSE, runs as UID/GID 1000 and starts one `muse-console` process. Compose builds `muse-console:local`, binds only `127.0.0.1:18610`, mounts `./data` at `/app/data` and sets `shm_size: 1gb`.
-
-Before starting, create a dedicated `./data` owned by the container service identity with restrictive permissions. On POSIX, directories should normally be 0700 and secret files 0600; on Windows apply restrictive ACLs and verify Docker bind-mount access. Do not solve permission failures with world-writable permissions or privileged/root execution. Compose overrides `MUSE_CONSOLE_DATA_DIR` to `/app/data`: the mock source example's `data-mock` does not change the host mount. Use a separate checkout or reviewed local override for an isolated container test, never existing production data.
-
-POSIX shell example, after configuring distinct secrets privately:
+Before using `ghcr.io/yunmengxue42/muse-console`, confirm that the image workflow for the corresponding release has passed anonymous pulls and native smoke checks on both linux/amd64 and linux/arm64, including restart, persistent storage and permissions. GHCR packages default to private on first publication even for public repositories, so public source code alone does not establish anonymous image access. Consult the corresponding release notes for publication status; otherwise build from source. Image tags are `X.Y.Z`, `X.Y` and `latest`; the commands below pin `0.4.4`.
 
 ```bash
-MUSE_CONSOLE_DRIVER=mock MUSE_CONSOLE_KEEPALIVE_ENABLED=false docker compose up -d --build
+docker run -d --init --name muse-console -p 127.0.0.1:18610:18610 --shm-size 1g --memory 4g --pids-limit 512 --cap-drop ALL --security-opt no-new-privileges -v muse-data:/app/data ghcr.io/yunmengxue42/muse-console:0.4.4
+docker logs muse-console   # console URL and first-start key
 ```
 
-PowerShell equivalent:
+Compose does the same: `docker compose up -d` pulls the image; `docker compose up -d --build` builds this checkout instead. The default tag is `0.4.4`; override deliberately with `MUSE_CONSOLE_TAG`.
 
-```powershell
-$env:MUSE_CONSOLE_DRIVER = 'mock'
-$env:MUSE_CONSOLE_KEEPALIVE_ENABLED = 'false'
-docker compose up -d --build
-```
-
-Compose's explicit `environment` entries override `env_file` for the driver and keepalive. A `.env` entry alone is not a reliable opt-in: export the desired shell values explicitly for real-driver use. The image listens on all interfaces **inside** the container; retain the loopback-only host mapping and firewall. Never publish CDP port 19210. Base images/tooling downloads are build dependencies, not a published Muse Console image.
+- The image defaults to `MUSE_CONSOLE_DRIVER=browser` and `MUSE_CONSOLE_CHROMIUM_NO_SANDBOX=true`. Set `MUSE_CONSOLE_DRIVER=mock` for an offline trial.
+- Runs as UID/GID 1000. `docker run` uses the `muse-data` volume; Compose normally prefixes its volume with the project name, so these commands do not automatically share data. Existing `./data` installations must set `MUSE_CONSOLE_DATA=./data` before upgrading; otherwise a new empty pool appears. No data is migrated automatically. Keep a stopped-writer backup and use the same mount to roll back. Host directories must be owned by UID 1000 with mode 0700; never use world-writable permissions.
+- **Container design:** Chromium’s sandbox is disabled for compatibility. Keep the non-root user, `--init` (Compose `init: true`), `cap-drop ALL`, `no-new-privileges` and loopback publishing. Browser vulnerabilities may expose container data, including account credentials; these restrictions are not equivalent to Chromium’s sandbox or complete isolation. Never mount the Docker socket, use privileged mode, add `SYS_ADMIN` or use unconfined seccomp as a shortcut.
+- The first start prints a generated key once and saves it to `/app/data/api_key`. Retained container logs still contain that key after restart; restrict log access and never upload unredacted logs. Set `MUSE_CONSOLE_ADMIN_KEY` to separate admin and client keys.
+- Keep the loopback-only port mapping; put a TLS reverse proxy in front (section 4). Never publish CDP port 19210.
+- `.env` next to `docker-compose.yml` is read if present. Settings under `environment:` win over it. `.env.example` is for source/mock use: copying it selects mock mode. Its commented `CHROMIUM_NO_SANDBOX=false` line preserves the source default `false` and image default `true`. Review all values rather than copying blindly.
 
 ## 3. One worker and a dedicated real browser
 
@@ -61,7 +57,7 @@ Run **one ASGI worker/process and one writer per data directory/profile**. Do no
 
 1. Stop the mock instance. Choose a separate private data directory and a **new empty dedicated profile**. Set `MUSE_CONSOLE_DRIVER=browser` and, if needed, `MUSE_CONSOLE_CHROMIUM_PATH` to the installed Chromium/Chrome executable. Default profile: `data_dir/browser-profile`; override with `MUSE_CONSOLE_BROWSER_PROFILE_DIR` only to another authorized project-only directory.
 2. Never use, copy, mark as owned, or open the files of the user's main/daily browser profile. First startup claims an empty directory with `.muse-console-owned-profile`; a valid legacy `.muse2api-owned-profile` is also recognized. Nonempty unmarked directories are refused. Use a new directory or an explicitly authorized migration, not a fabricated marker. Protected-root and symlink/junction/reparse checks are guards against mistakes, not an OS sandbox.
-3. Run as a dedicated unprivileged OS identity with profile/data access restricted to it. Keep Chromium's sandbox enabled (`MUSE_CONSOLE_CHROMIUM_NO_SANDBOX=false`); fix sandbox/user-namespace support rather than running root or disabling it. The implementation also adds `--no-sandbox` when run as root, so the false setting does not make root safe.
+3. Run as a dedicated unprivileged OS identity with profile/data access restricted to it. For source deployments, keep Chromium's sandbox enabled (container exception: section 2) (`MUSE_CONSOLE_CHROMIUM_NO_SANDBOX=false`); fix sandbox/user-namespace support rather than running root or disabling it. The implementation also adds `--no-sandbox` when run as root, so the false setting does not make root safe.
 4. Log in through the admin console's isolated manual browser session, completing authentication/MFA yourself, then finish verification/import. No password or CAPTCHA automation is promised. Batch cookie import previews structure but does not prove a live upstream session. Treat all imported files as secrets.
 5. Validate login and each required chat/image/video operation separately using authorized accounts and budgets. A previous sample or an offline test is not live acceptance of this revision. Account-level upstream memory can cross conversations: do not share one upstream account among mutually untrusted tenants.
 
@@ -95,9 +91,28 @@ Media lives under `data_dir/media`. `media-owners.db` records key ownership, whi
 
 Ingestion is off by default. Use an explicitly authorized **independent test browser**, never auto-install into or inspect the user's main browser. The extension requires Chrome/Edge-compatible MV3 (manifest minimum Chrome 132).
 
+<a id="local-extension-import-with-docker"></a>
+
+### Local extension import with Docker
+
+The basic one-command start uses the real browser driver but leaves credential ingestion disabled; `/credential-ingestions/*` returns 404 while disabled. Use this **instead of the basic start command** to opt in for same-machine loopback HTTP only:
+
+```bash
+docker run -d --init --name muse-console -p 127.0.0.1:18610:18610 --shm-size 1g --memory 4g --pids-limit 512 --cap-drop ALL --security-opt no-new-privileges -e MUSE_CONSOLE_CREDENTIAL_INGESTION_ENABLED=true -e MUSE_CONSOLE_CREDENTIAL_SERVER_ORIGIN=http://127.0.0.1:18610 -e MUSE_CONSOLE_CREDENTIAL_ALLOW_LOOPBACK_HTTP=true -v muse-data:/app/data ghcr.io/yunmengxue42/muse-console:0.4.4
+docker logs muse-console
+```
+
+If a container named `muse-console` already exists, stop and remove that container first (do not delete the volume), then recreate it with the same data volume. Never run two instances against the same data. For an existing Compose deployment, retain its actual project-prefixed volume name rather than blindly using `muse-data`. This command does not migrate data, pair a device or enable synchronization automatically.
+
+Use the exact origin `http://127.0.0.1:18610` in both the console and extension (no path or trailing slash; `localhost` is a different origin). In the extension, explicitly allow loopback HTTP development mode, grant permission for that target, verify server identity and separately consent to synchronization. Server-side switches do not establish automatic trust; copying pairing JSON does not bypass these checks. Never use this HTTP exception for LAN or public access.
+
+For remote deployments, configure trusted TLS as in section 4, set `MUSE_CONSOLE_CREDENTIAL_SERVER_ORIGIN=https://example.com` and `MUSE_CONSOLE_CREDENTIAL_INGESTION_ENABLED=true`, and retain `MUSE_CONSOLE_CREDENTIAL_ALLOW_LOOPBACK_HTTP=false`. Grant the extension only that same exact HTTPS origin.
+
+### Pairing steps
+
 1. On a separate browser-driver deployment set `MUSE_CONSOLE_CREDENTIAL_INGESTION_ENABLED=true` and the exact `MUSE_CONSOLE_CREDENTIAL_SERVER_ORIGIN=https://example.com`. Use trusted TLS. Only for local development may both sides explicitly allow exact loopback HTTP, e.g. `http://127.0.0.1:18610`, with `MUSE_CONSOLE_CREDENTIAL_ALLOW_LOOPBACK_HTTP=true` server-side. Remote/LAN plain HTTP is not allowed.
 2. Build with `npm ci`, `npm test`, `npm run build` in `extension`. Manually load `extension/dist` only with the user's installation/permission consent. The manifest's optional HTTPS permission range is not blanket authorization to access other servers; grant only the selected target in extension options.
-3. An admin generates a one-use pairing challenge in the console. Enter the same exact origin in extension options, grant that target permission, retrieve server identity and compare **both `server_id` and `fingerprint`** with the console before exchanging the challenge. The fingerprint is an application identity checksum, **not a TLS certificate pin**. Never enter the admin/master/client key into the extension.
+3. An admin generates a one-use pairing challenge in the console. Enter the same exact origin in extension options, grant that target permission, retrieve server identity and compare **both `server_id` and `fingerprint`** with the console before exchanging the challenge. The fingerprint is an application identity checksum, **not a TLS certificate pin**. Never enter the admin/master/client key into the extension. The implemented manually copied JSON quick-pair package carries the origin, server ID, fingerprint, challenge and expiry; it does not grant permissions or enable sync automatically. Treat it as a temporary secret and do not log/share it.
 4. Separately enable synchronization with explicit acknowledgement that Muse session credentials will be sent to that server. Log in to Muse normally. Collection is read-only via the cookies API, limited to `hatch_sess`, `hatch_gw`, `hatch_vml`, `hatch_native_auth_device` and their original scope/store/partition. It does not copy profiles, change cookies or collect identity-provider passwords. The backend probes a fixed session endpoint in an owned temporary browser context before commit, not a generation request; successful import is not proof of generation.
 5. A device's default new-account quota is one. Known upstream subjects may match an existing account, but cookie rotation alone does not establish identity. A missing/conflicting identity or newer server credential version can require admin confirmation of **one exact capture, target account and current credential version**. Verify the current account, confirm that capture and resubmit the original candidate. This is not blanket approval of future account switches; version changes require fresh confirmation, and lost candidates require recapture and reconfirmation.
 6. Pause/forget stops local sync but does not delete server accounts. Revoke the device grant server-side to stop future uploads; device tokens expire and can rotate. They cannot read cookie values, list accounts or invoke admin APIs. Failed validation preserves existing credentials. Raw captures remain transient in trusted extension session storage; the restricted device token persists in trusted local storage. Protect the independent browser too.
@@ -116,9 +131,9 @@ Start conservatively and measure CPU, RAM, disk, temporary storage, queue latenc
 | `MEDIA_MAX_BYTES` / `BROWSER_MEDIA_MAX_BYTES` | 33554432 bytes each |
 | `MEDIA_STORAGE_MAX_BYTES` | 1073741824 bytes |
 
-Login and credential-validation contexts have separate bounds; the generation-tab cap is not a total Chromium memory limit. Add OS/container CPU/memory/process/disk and egress limits; Compose's shared-memory setting is not a RAM cap. Optional matting adds model downloads, storage and CPU/RAM requirements; validate separately. Public-only download validation is defense in depth, not a replacement for egress controls. Limits are process-local, not distributed rate billing or a capacity guarantee. Inspect failures before manually retrying media generation: exactly-once generation and upstream cancellation/refunds are not guaranteed.
+Login and credential-validation contexts have separate bounds; the generation-tab cap is not a total Chromium memory limit. Add OS/container CPU/memory/process/disk and egress limits; Compose's shared-memory setting is not a RAM cap. Optional matting adds model downloads, storage and CPU/RAM requirements; validate separately. Public-only download validation is defense in depth, not a replacement for egress controls. Limits are process-local, not distributed rate billing or a capacity guarantee. Inspect failures before manually retrying media generation: exactly-once generation and upstream cancellation/refunds are not guaranteed. The examples use 4 GiB RAM and 512 PIDs as starting budgets; tune for measured workloads and host capacity, not as a claim of complete isolation.
 
-`MUSE_CONSOLE_KEEPALIVE_ENABLED=false` is the default and should remain off until authorized live acceptance. Scoped credentials use owned-context browser renewal; legacy credentials retain an HTTP renewal path. Neither guarantees portability across devices/IPs or permanent login. Import latency targets, multi-account load and **72-hour renewal remain unverified** by this documentation work. `MUSE_CONSOLE_LOGIN_AUTO_COMPLETE_ENABLED=false` is a separate switch for finishing isolated manual login, not unattended password/MFA automation. Read-only `tools/soak_check.py` health monitoring is not renewal acceptance.
+`MUSE_CONSOLE_KEEPALIVE_ENABLED=false` remains the default. Its long-term effectiveness is unverified. Scoped credentials use owned-context browser renewal; legacy credentials retain an HTTP renewal path. Neither guarantees portability across devices/IPs or permanent login. `MUSE_CONSOLE_LOGIN_AUTO_COMPLETE_ENABLED=false` is a separate switch for finishing isolated manual login, not unattended password/MFA automation. Read-only `tools/soak_check.py` health monitoring is not renewal acceptance.
 
 ## 8. Consistent offline backup and complete restore
 
@@ -135,7 +150,7 @@ uv run --no-sync python tools/backup_restore.py backup --data data --output ../m
 uv run --no-sync python tools/backup_restore.py restore --backup ../muse-backup-001 --output ../muse-restored-001 --stopped
 ```
 
-Replace `data` with the actual stopped host data path (`./data` for the supplied Compose mount). Source and destination cannot be equal or nested; even an empty existing destination is refused. A failed operation retains partial output for private inspection. The tool creates restricted permissions (POSIX 0700/0600 or current-user Windows ACL), copies files and verifies inventory/SHA-256. Hashes detect corruption, **not malicious replacement** of manifest plus payload, and the tool does not encrypt backups. Encrypt and access-control backups separately.
+Replace `data` with the actual stopped host data path (`./data` only if explicitly selected with `MUSE_CONSOLE_DATA=./data`; the default is a named volume, whose mounted contents must be handled with all writers stopped). Source and destination cannot be equal or nested; even an empty existing destination is refused. A failed operation retains partial output for private inspection. The tool creates restricted permissions (POSIX 0700/0600 or current-user Windows ACL), copies files and verifies inventory/SHA-256. Hashes detect corruption, **not malicious replacement** of manifest plus payload, and the tool does not encrypt backups. Encrypt and access-control backups separately.
 
 Restore the entire verified snapshot into a new directory; never merge it into live data or restore only an account database without its keys, ownership and device state. While still stopped, restore matching external configuration/profile, assign the correct service/container ownership and ACLs (the backup operator may differ from UID 1000), then switch the data mount/path to the restored directory. Keep the previous directory private for rollback; never run both against the same profile/data. Start one worker in a restricted environment, check health/readiness, admin/client-key separation, account decryption, device revocation state and media ownership/signatures before reopening traffic. Use only an authorized test account for live checks; offline restores do not prove current upstream validity. A restore rehearsal and full live acceptance have not been performed by writing this guide.
 

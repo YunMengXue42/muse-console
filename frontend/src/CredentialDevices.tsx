@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Api, ApiError, type Account } from "./api";
 import { t, locale } from "./i18n";
 import { Modal } from "./ui";
+import { parsePairingPackage } from "./pairing-package";
 
 type Device = {
   id: string;
@@ -64,6 +65,7 @@ export function CredentialDevices({
       }
   >();
   useEffect(() => {
+    setChallenge(undefined);
     const controller = new AbortController();
     let stopped = false;
     setLoading(true);
@@ -112,6 +114,22 @@ export function CredentialDevices({
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+  const pairingPackage =
+    challenge && expires(challenge.expires_at) > now
+      ? JSON.stringify(
+          {
+            schema: "muse-console-pairing",
+            version: 1,
+            origin: challenge.server_origin,
+            server_id: challenge.server_id,
+            fingerprint: challenge.fingerprint,
+            challenge: challenge.challenge,
+            expires_at: expires(challenge.expires_at) / 1000,
+          },
+          null,
+          2,
+        )
+      : "";
   const activeDevices = devices.filter(
     (d) => !d.revoked && expires(d.expires_at) > now,
   );
@@ -173,6 +191,11 @@ export function CredentialDevices({
           "配对码短时有效、只能用一次，关窗即隐藏。额度＝该设备最多自动新增的账号数。",
         )}
       </p>
+      <p className="fine">
+        {t(
+          "配对包短期敏感，勿外传。预填不是信任来源，仍须核对可信控制台身份。",
+        )}
+      </p>
       <div className="pairing-controls">
         <label>
           {t("配对设备备注（可选）")}
@@ -221,6 +244,20 @@ export function CredentialDevices({
               },
             );
             setNow(Date.now());
+            if (expires(result.expires_at) > Date.now()) {
+              parsePairingPackage(
+                JSON.stringify({
+                  schema: "muse-console-pairing",
+                  version: 1,
+                  origin: result.server_origin,
+                  server_id: result.server_id,
+                  fingerprint: result.fingerprint,
+                  challenge: result.challenge,
+                  expires_at: expires(result.expires_at) / 1000,
+                }),
+                true,
+              );
+            }
             setChallenge(result);
           })
         }
@@ -230,6 +267,37 @@ export function CredentialDevices({
       {challenge &&
         (expires(challenge.expires_at) > now ? (
           <>
+            <label>
+              {t("快速配对包（含一次性挑战，勿外传）")}
+              <textarea
+                readOnly
+                autoComplete="off"
+                spellCheck={false}
+                value={pairingPackage}
+                onFocus={(e) => e.currentTarget.select()}
+              />
+            </label>
+            <button
+              disabled={busy}
+              onClick={async () => {
+                if (expires(challenge.expires_at) <= Date.now()) return;
+                try {
+                  await navigator.clipboard.writeText(pairingPackage);
+                  setMessage(
+                    "配对包已复制。请在扩展粘贴，仍须核对身份并单独同意同步。",
+                  );
+                } catch {
+                  setMessage("无法访问剪贴板，请选中上方配对包手动复制。");
+                }
+              }}
+            >
+              {t("复制快速配对包")}
+            </button>
+            <p className="fine">
+              {t(
+                "仅在扩展手动粘贴；不会自动授权或开启同步。本页面不保存配对包，复制后请及时清理剪贴板。",
+              )}
+            </p>
             <label>
               {t("一次性配对挑战")}
               <input

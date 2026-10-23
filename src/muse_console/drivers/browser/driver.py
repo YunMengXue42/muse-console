@@ -13,6 +13,7 @@ import hashlib
 import json
 import logging
 import re
+import sys
 import time
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
@@ -177,23 +178,52 @@ class BrowserDriver(MuseDriver):
 
     async def _shutdown_locked(self) -> None:
         """close tabs and orphan contexts while preserving process ownership."""
-        try:
+
+        async def dispose_contexts() -> None:
             for tabs in list(self._tabs.values()):
                 for tab in list(tabs):
                     await self._dispose_tab_locked(tab)
             for context_id in set(self._contexts.values()) | self._retired_contexts:
                 await self._dispose_context(context_id)
-            self._contexts.clear()
-            self._retired_contexts.clear()
-            self._fingerprints.clear()
+
+        preserve_connection = False
+        try:
+            # wait_for also cancels/awaits the helper on Python 3.10.
+            # Reserve the rest of the stop budget for Chromium's profile flush.
+            await asyncio.wait_for(dispose_contexts(), 1)
+        except asyncio.TimeoutError:
+            log.warning("code=browser_context_shutdown_timeout")
         finally:
             try:
-                if self._browser:
-                    await self._browser.close()
-            finally:
-                if self._chromium:
+                if isinstance(self._chromium, ChromiumProcess):
+                    # Only this already-owned connection may close the browser.
+                    proc = self._chromium.proc
+                    try:
+                        await self._chromium.stop(self._browser)
+                    finally:
+                        if (
+                            sys.platform == "win32"
+                            and proc is not None
+                            and proc.returncode == 0
+                            and self._browser is not None
+                            and not self._browser.closed
+                        ):
+                            # stop() retains ownership on incomplete shutdown;
+                            # retain the existing connection for its next retry.
+                            preserve_connection = True
+                elif self._chromium:
+                    # Preserve the no-argument stop contract of injected mocks.
                     await self._chromium.stop()
-                self._tab_changed.set()
+            finally:
+                try:
+                    if self._browser and not preserve_connection:
+                        with contextlib.suppress(Exception):
+                            await asyncio.wait_for(self._browser.close(), 1)
+                finally:
+                    self._contexts.clear()
+                    self._retired_contexts.clear()
+                    self._fingerprints.clear()
+                    self._tab_changed.set()
 
     async def health(self) -> dict[str, Any]:
         ok = self._browser is not None and not self._browser.closed
