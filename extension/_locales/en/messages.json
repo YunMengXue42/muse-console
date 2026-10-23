@@ -1,0 +1,370 @@
+{
+  "extName": {
+    "message": "Muse Console",
+    "description": "extName UI message."
+  },
+  "extDescription": {
+    "message": "Sync your Muse login to your own Muse Console after you sign in.",
+    "description": "extDescription UI message."
+  },
+  "actionTitle": {
+    "message": "Muse Console session sync",
+    "description": "actionTitle UI message."
+  },
+  "pairingAndAuthorizationMuseConsole": {
+    "message": "Pairing and authorization · Muse Console",
+    "description": "pairingAndAuthorizationMuseConsole UI message."
+  },
+  "browserExtension": {
+    "message": "Browser extension",
+    "description": "browserExtension UI message."
+  },
+  "sessionSyncSettings": {
+    "message": "Session sync settings",
+    "description": "sessionSyncSettings UI message."
+  },
+  "pairingAndAuthorization": {
+    "message": "Pairing and authorization",
+    "description": "pairingAndAuthorization UI message."
+  },
+  "pairATrustedServerAnd": {
+    "message": "Pair a trusted server and authorize sync when needed.",
+    "description": "pairATrustedServerAnd UI message."
+  },
+  "authorizeTrustedServersOnly": {
+    "message": "Authorize trusted servers only",
+    "description": "authorizeTrustedServersOnly UI message."
+  },
+  "readsOnlyTheFourMuse": {
+    "message": "Reads only the four Muse session cookies. ",
+    "description": "readsOnlyTheFourMuse UI message."
+  },
+  "enablingSyncLetsTheSelected": {
+    "message": "Enabling sync lets the selected server use this Muse session. ",
+    "description": "enablingSyncLetsTheSelected UI message."
+  },
+  "noCollectionFromOtherSites": {
+    "message": "No collection from other sites. No admin keys stored.",
+    "description": "noCollectionFromOtherSites UI message."
+  },
+  "verifyServerIdentity": {
+    "message": "Verify server identity",
+    "description": "verifyServerIdentity UI message."
+  },
+  "checkServerIdAndFingerprint": {
+    "message": "Check server_id and fingerprint in your trusted console. The fingerprint is not a TLS certificate pin.",
+    "description": "checkServerIdAndFingerprint UI message."
+  },
+  "serverOrigin": {
+    "message": "Server origin",
+    "description": "serverOrigin UI message."
+  },
+  "schemeHostAndPortIf": {
+    "message": "Scheme, host, and port (if any), without a path.",
+    "description": "schemeHostAndPortIf UI message."
+  },
+  "developmentModeAllowLocalLoopback": {
+    "message": "Development mode: allow local loopback HTTP (development only)",
+    "description": "developmentModeAllowLocalLoopback UI message."
+  },
+  "grantAccessAndCheckIdentity": {
+    "message": "Grant access and check identity",
+    "description": "grantAccessAndCheckIdentity UI message."
+  },
+  "serverIdentity": {
+    "message": "Server identity",
+    "description": "serverIdentity UI message."
+  },
+  "serverIdentityNotYetVerified": {
+    "message": "Server identity not yet verified",
+    "description": "serverIdentityNotYetVerified UI message."
+  },
+  "redeemChallengeAndPair": {
+    "message": "Redeem challenge and pair",
+    "description": "redeemChallengeAndPair UI message."
+  },
+  "getAOneTimeChallenge": {
+    "message": "Get a one-time challenge from your trusted console.",
+    "description": "getAOneTimeChallenge UI message."
+  },
+  "oneTimeChallengeNotAn": {
+    "message": "One-time challenge (not an admin key)",
+    "description": "oneTimeChallengeNotAn UI message."
+  },
+  "iCheckedServerIdAnd": {
+    "message": "I checked server_id and fingerprint in my trusted console and agree to pair with this exact origin.",
+    "description": "iCheckedServerIdAnd UI message."
+  },
+  "authorizeAutomaticSync": {
+    "message": "Authorize automatic sync",
+    "description": "authorizeAutomaticSync UI message."
+  },
+  "pairingDoesNotAuthorizeSync": {
+    "message": "Pairing does not authorize sync.",
+    "description": "pairingDoesNotAuthorizeSync UI message."
+  },
+  "iAuthorizeAutomaticSendingOf": {
+    "message": "I authorize automatic sending of current and future Muse sessions to the paired server (one new account initially; switching accounts requires admin confirmation).",
+    "description": "iAuthorizeAutomaticSendingOf UI message."
+  },
+  "enableAutomaticSync": {
+    "message": "Enable automatic sync",
+    "description": "enableAutomaticSync UI message."
+  },
+  "pauseAndClearPendingCookies": {
+    "message": "Pause and clear pending cookies",
+    "description": "pauseAndClearPendingCookies UI message."
+  },
+  "candidateConfirmationAndDeviceMaintenance": {
+    "message": "Candidate confirmation and device maintenance",
+    "description": "candidateConfirmationAndDeviceMaintenance UI message."
+  },
+  "forIdentityOrVersionConflicts": {
+    "message": "For identity or version conflicts, an admin must confirm the original capture_id and current credential_version in the console, then resend the original candidate with its payload and base version unchanged. If you see ",
+    "description": "forIdentityOrVersionConflicts UI message."
+  },
+  "captureAgainAndAskAn": {
+    "message": ", capture again and ask an admin to confirm the new capture. Previous confirmation cannot be reused.",
+    "description": "captureAgainAndAskAn UI message."
+  },
+  "resendOriginalCandidateAfterAdmin": {
+    "message": "Resend original candidate after admin confirmation",
+    "description": "resendOriginalCandidateAfterAdmin UI message."
+  },
+  "candidateLostRecaptureAndRequest": {
+    "message": "Candidate lost: recapture and request confirmation again",
+    "description": "candidateLostRecaptureAndRequest UI message."
+  },
+  "deviceTokenAndLocalPairing": {
+    "message": "Device token and local pairing",
+    "description": "deviceTokenAndLocalPairing UI message."
+  },
+  "forgettingLocalPairingDoesNot": {
+    "message": "Forgetting local pairing does not revoke the server token. Revoke the device in the console too.",
+    "description": "forgettingLocalPairingDoesNot UI message."
+  },
+  "rotateDeviceToken": {
+    "message": "Rotate device token",
+    "description": "rotateDeviceToken UI message."
+  },
+  "forgetLocalPairing": {
+    "message": "Forget local pairing",
+    "description": "forgetLocalPairing UI message."
+  },
+  "pairingAndSyncStatus": {
+    "message": "Pairing and sync status",
+    "description": "pairingAndSyncStatus UI message."
+  },
+  "loadingStatus": {
+    "message": "Loading status…",
+    "description": "loadingStatus UI message."
+  },
+  "museConsoleSessionSync": {
+    "message": "Muse Console · Session sync",
+    "description": "museConsoleSessionSync UI message."
+  },
+  "syncStatusMuseConsole": {
+    "message": "Sync status · Muse Console",
+    "description": "syncStatusMuseConsole UI message."
+  },
+  "extension": {
+    "message": "Extension",
+    "description": "extension UI message."
+  },
+  "syncStatus": {
+    "message": "Sync status",
+    "description": "syncStatus UI message."
+  },
+  "devicePairingAndSyncResults": {
+    "message": "Device pairing and sync results",
+    "description": "devicePairingAndSyncResults UI message."
+  },
+  "loading": {
+    "message": "Loading",
+    "description": "loading UI message."
+  },
+  "cookiesAndTokensAreNever": {
+    "message": "Cookies and tokens are never displayed.",
+    "description": "cookiesAndTokensAreNever UI message."
+  },
+  "pairingAndAuthorizationSettings": {
+    "message": "Pairing and authorization settings",
+    "description": "pairingAndAuthorizationSettings UI message."
+  },
+  "museSessionsAreSentAutomatically": {
+    "message": "Muse sessions are sent automatically to the paired server only after authorization.",
+    "description": "museSessionsAreSentAutomatically UI message."
+  },
+  "operationFailedCheckPermissionsAndServer": {
+    "message": "Operation failed. Check permissions and server identity.",
+    "description": "operationFailedCheckPermissionsAndServer UI message."
+  },
+  "operationFailedCheckPermissionsIdentityPairing": {
+    "message": "Operation failed. Check permissions, identity, pairing, and network.",
+    "description": "operationFailedCheckPermissionsIdentityPairing UI message."
+  },
+  "targetChangedCheckTheIdentityAgain": {
+    "message": "Target changed. Check the identity again.",
+    "description": "targetChangedCheckTheIdentityAgain UI message."
+  },
+  "checkTheIdentityInYourTrusted": {
+    "message": "Check the identity in your trusted console.",
+    "description": "checkTheIdentityInYourTrusted UI message."
+  },
+  "unableToReadStatus": {
+    "message": "Unable to read status",
+    "description": "unableToReadStatus UI message."
+  },
+  "operationFailedCheckPermissionsServerIdentity": {
+    "message": "Operation failed. Check permissions, server identity, and pairing expiry.",
+    "description": "operationFailedCheckPermissionsServerIdentity UI message."
+  },
+  "notPaired": {
+    "message": "Not paired",
+    "description": "notPaired UI message."
+  },
+  "paired": {
+    "message": "Paired",
+    "description": "paired UI message."
+  },
+  "pairedSyncNotEnabled": {
+    "message": "Paired, sync not enabled",
+    "description": "pairedSyncNotEnabled UI message."
+  },
+  "syncPaused": {
+    "message": "Sync paused",
+    "description": "syncPaused UI message."
+  },
+  "deviceAuthorizationExpiredPairAgain": {
+    "message": "Device authorization expired. Pair again.",
+    "description": "deviceAuthorizationExpiredPairAgain UI message."
+  },
+  "deviceAuthorizationRevokedPairAgain": {
+    "message": "Device authorization revoked. Pair again.",
+    "description": "deviceAuthorizationRevokedPairAgain UI message."
+  },
+  "waitingForMuseLogin": {
+    "message": "Waiting for Muse login",
+    "description": "waitingForMuseLogin UI message."
+  },
+  "multipleSessionsDetectedSkipped": {
+    "message": "Multiple sessions detected; skipped",
+    "description": "multipleSessionsDetectedSkipped UI message."
+  },
+  "capturedAwaitingUpload": {
+    "message": "Captured, awaiting upload",
+    "description": "capturedAwaitingUpload UI message."
+  },
+  "synced": {
+    "message": "Synced",
+    "description": "synced UI message."
+  },
+  "uploadFailedRetryingLater": {
+    "message": "Upload failed; retrying later",
+    "description": "uploadFailedRetryingLater UI message."
+  },
+  "retriesExhaustedCandidateDiscarded": {
+    "message": "Retries exhausted; candidate discarded",
+    "description": "retriesExhaustedCandidateDiscarded UI message."
+  },
+  "rejectedByServer": {
+    "message": "Rejected by server",
+    "description": "rejectedByServer UI message."
+  },
+  "waitingForAdminToConfirmAccount": {
+    "message": "Waiting for admin to confirm account identity",
+    "description": "waitingForAdminToConfirmAccount UI message."
+  },
+  "versionConflictWaitingForAdminConfirmation": {
+    "message": "Version conflict; waiting for admin confirmation",
+    "description": "versionConflictWaitingForAdminConfirmation UI message."
+  },
+  "waitingForAdminConfirmation": {
+    "message": "Waiting for admin confirmation",
+    "description": "waitingForAdminConfirmation UI message."
+  },
+  "candidateLostRecaptureAndConfirmAgain": {
+    "message": "Candidate lost; recapture and confirm again",
+    "description": "candidateLostRecaptureAndConfirmAgain UI message."
+  },
+  "defaultWindow": {
+    "message": "Default window",
+    "description": "defaultWindow UI message."
+  },
+  "unknownSource": {
+    "message": "Unknown source",
+    "description": "unknownSource UI message."
+  },
+  "on": {
+    "message": "On",
+    "description": "on UI message."
+  },
+  "off": {
+    "message": "Off",
+    "description": "off UI message."
+  },
+  "sessionsNone": {
+    "message": "Sessions: none",
+    "description": "sessionsNone UI message."
+  },
+  "aCandidateNeedsAdminAttention": {
+    "message": "A candidate needs admin attention.",
+    "description": "aCandidateNeedsAdminAttention UI message."
+  },
+  "syncNotEnabled": {
+    "message": "Sync not enabled",
+    "description": "syncNotEnabled UI message."
+  },
+  "uploadProblem": {
+    "message": "Upload problem",
+    "description": "uploadProblem UI message."
+  },
+  "syncHealthy": {
+    "message": "Sync healthy",
+    "description": "syncHealthy UI message."
+  },
+  "syncing": {
+    "message": "Syncing",
+    "description": "syncing UI message."
+  },
+  "identityReadout": {
+    "message": "Server: $1\nserver_id: $2\nfingerprint: $3",
+    "description": "identityReadout UI message."
+  },
+  "cookieStore": {
+    "message": "Cookie store $1",
+    "description": "cookieStore UI message."
+  },
+  "partitionStore": {
+    "message": "$1 (partition $2)",
+    "description": "partitionStore UI message."
+  },
+  "deviceLine": {
+    "message": "Device: $1",
+    "description": "deviceLine UI message."
+  },
+  "serverLine": {
+    "message": "Server: $1",
+    "description": "serverLine UI message."
+  },
+  "syncLine": {
+    "message": "Automatic sync: $1",
+    "description": "syncLine UI message."
+  },
+  "sourceLine": {
+    "message": "$1: $2",
+    "description": "sourceLine UI message."
+  },
+  "captureLine": {
+    "message": "  capture_id $1",
+    "description": "captureLine UI message."
+  },
+  "accountLine": {
+    "message": "  Account $1",
+    "description": "accountLine UI message."
+  },
+  "versionSuffix": {
+    "message": " · credential_version $1",
+    "description": "versionSuffix UI message."
+  }
+}

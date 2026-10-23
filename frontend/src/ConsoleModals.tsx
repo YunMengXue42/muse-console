@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import type { Act, Detail, Key, ModalKind, Pool, Setter } from "./types";
 import type { Account, Api, ImportResult, LoginSession } from "./api";
 import { badge, statusNames } from "./status";
@@ -103,7 +104,7 @@ export function ConsoleModals({
         />
       )}
       {modal === "login" && (
-        <Modal title="连接上游账号" onClose={() => setModal(null)}>
+        <Modal title={t("连接上游账号")} onClose={() => setModal(null)}>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -119,23 +120,25 @@ export function ConsoleModals({
             }}
           >
             <p className="muted">
-              在 muse.ai 网页逐号登录，手动完成验证码；驱动不支持时会报错。
+              {t(
+                "在 muse.ai 网页逐号登录，手动完成验证码；驱动不支持时会报错。",
+              )}
             </p>
             <label>
-              账号备注
+              {t("账号备注")}
               <input
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
-                placeholder="例如：团队主账号"
+                placeholder={t("例如：团队主账号")}
                 maxLength={200}
               />
             </label>
             <footer>
               <button type="button" onClick={() => setModal(null)}>
-                取消
+                {t("取消")}
               </button>
               <button className="primary" disabled={busy}>
-                打开网页登录
+                {t("打开网页登录")}
               </button>
             </footer>
           </form>
@@ -155,7 +158,7 @@ export function ConsoleModals({
       )}
       {modal === "import" && (
         <Modal
-          title="批量导入 Cookie"
+          title={t("批量导入 Cookie")}
           wide
           onClose={() => {
             setModal(null);
@@ -164,10 +167,10 @@ export function ConsoleModals({
           }}
         >
           <p className="muted">
-            支持 JSON 或文本；预览确认后入池。Cookie 不在浏览器持久保存。
+            {t("支持 JSON 或文本；预览确认后入池。Cookie 不在浏览器持久保存。")}
           </p>
           <label>
-            选择文件
+            {t("选择文件")}
             <input
               type="file"
               accept=".json,.txt,application/json,text/plain"
@@ -181,12 +184,12 @@ export function ConsoleModals({
                       setPreview(null);
                       setImported(false);
                     })
-                    .catch(() => notify("文件读取失败"));
+                    .catch(() => notify(t("文件读取失败")));
               }}
             />
           </label>
           <label>
-            Cookie 内容
+            {t("Cookie 内容")}
             <textarea
               rows={7}
               value={content}
@@ -197,7 +200,7 @@ export function ConsoleModals({
                 setPreview(null);
                 setImported(false);
               }}
-              placeholder="粘贴 Cookie JSON 或文本"
+              placeholder={t("粘贴 Cookie JSON 或文本")}
             />
           </label>
           {preview && (
@@ -205,7 +208,7 @@ export function ConsoleModals({
               <div className="import-summary">
                 {Object.entries(preview.summary).map(([name, value]) => (
                   <span className="badge" key={name}>
-                    {statusNames[name] ?? name} {value}
+                    {t(statusNames[name] ?? name)} {value}
                   </span>
                 ))}
               </div>
@@ -229,7 +232,7 @@ export function ConsoleModals({
                 setContent("");
               }}
             >
-              关闭
+              {t("关闭")}
             </button>
             <button
               disabled={busy || !content.trim()}
@@ -246,7 +249,7 @@ export function ConsoleModals({
                 })
               }
             >
-              预览检查
+              {t("预览检查")}
             </button>
             <button
               className="primary"
@@ -262,17 +265,17 @@ export function ConsoleModals({
                   );
                   setImported(true);
                   setContent("");
-                }, "导入已完成，请检查逐条结果")
+                }, t("导入已完成，请检查逐条结果"))
               }
             >
-              确认入池
+              {t("确认入池")}
             </button>
           </footer>
         </Modal>
       )}
       {edit && (
         <Modal
-          title="编辑账号"
+          title={t("编辑账号")}
           onClose={() => {
             setEdit(null);
             setCookies("");
@@ -287,7 +290,7 @@ export function ConsoleModals({
                 try {
                   parsed = cookies.trim() ? JSON.parse(cookies) : undefined;
                 } catch {
-                  throw new Error("Cookie 必须是 JSON 对象。");
+                  throw new Error(t("Cookie 必须是 JSON 对象。"));
                 }
                 if (
                   parsed &&
@@ -295,13 +298,13 @@ export function ConsoleModals({
                     Array.isArray(parsed) ||
                     Object.values(parsed).some((v) => typeof v !== "string"))
                 )
-                  throw new Error("Cookie 必须是名称到字符串的 JSON 对象。");
+                  throw new Error(t("Cookie 必须是名称到字符串的 JSON 对象。"));
                 const trimmedMc = maxConcurrency.trim();
                 let nextMc: number | null | undefined;
                 if (trimmedMc) {
                   const num = Number(trimmedMc);
                   if (!Number.isInteger(num) || num < 1 || num > 16)
-                    throw new Error("单账号并发上限必须是 1 到 16 的整数。");
+                    throw new Error(t("单账号并发上限必须是 1 到 16 的整数。"));
                   if (num !== (edit.max_concurrency ?? null)) nextMc = num;
                 } else if (edit.max_concurrency != null) {
                   nextMc = null;
@@ -314,34 +317,36 @@ export function ConsoleModals({
                 setEdit(null);
                 setCookies("");
                 setMaxConcurrency("");
-              }, "账号已更新");
+              }, t("账号已更新"));
             }}
           >
             <label>
-              账号备注
+              {t("账号备注")}
               <input value={label} onChange={(e) => setLabel(e.target.value)} />
             </label>
             <label>
-              单账号并发上限（可选）
+              {t("单账号并发上限（可选）")}
               <input
                 type="number"
                 min={1}
                 max={16}
                 value={maxConcurrency}
                 onChange={(e) => setMaxConcurrency(e.target.value)}
-                placeholder={`留空使用全局默认（${pool?.max_concurrency ?? 1}）`}
+                placeholder={t("留空使用全局默认（{n}）", {
+                  n: pool?.max_concurrency ?? 1,
+                })}
               />
             </label>
             <label>
-              更新 Cookie（可选）
+              {t("更新 Cookie（可选）")}
               <textarea
                 rows={5}
                 value={cookies}
                 onChange={(e) => setCookies(e.target.value)}
-                placeholder='留空保留现有 Cookie；填写 {"name":"value"}'
+                placeholder={t('留空保留现有 Cookie；填写 {"name":"value"}')}
               />
             </label>
-            <p className="fine">现有 Cookie 不回传到此输入框。</p>
+            <p className="fine">{t("现有 Cookie 不回传到此输入框。")}</p>
             <footer>
               <button
                 type="button"
@@ -351,10 +356,10 @@ export function ConsoleModals({
                   setMaxConcurrency("");
                 }}
               >
-                取消
+                {t("取消")}
               </button>
               <button className="primary" disabled={busy}>
-                保存修改
+                {t("保存修改")}
               </button>
             </footer>
           </form>
@@ -362,7 +367,7 @@ export function ConsoleModals({
       )}
       {mergeSource && (
         <Modal
-          title="合并重复账号"
+          title={t("合并重复账号")}
           onClose={() => {
             setMergeSource(null);
             setMergeTarget("");
@@ -378,22 +383,26 @@ export function ConsoleModals({
                 });
                 setMergeSource(null);
                 setMergeTarget("");
-              }, "账号已合并");
+              }, t("账号已合并"));
             }}
           >
             <p className="muted">
-              将源账号「{mergeSource.label || mergeSource.id}」（
-              <span className="mono">{mergeSource.id}</span>
-              ）合并进目标账号，累计计数与扩展设备绑定将迁移至目标账号，源账号随后移除。
+              {t(
+                "将源账号「{name}」（{id}）合并进目标账号，累计计数与扩展设备绑定将迁移至目标账号，源账号随后移除。",
+                {
+                  name: mergeSource.label || mergeSource.id,
+                  id: mergeSource.id,
+                },
+              )}
             </p>
             <label>
-              目标账号
+              {t("目标账号")}
               <select
                 required
                 value={mergeTarget}
                 onChange={(e) => setMergeTarget(e.target.value)}
               >
-                <option value="">选择保留的目标账号</option>
+                <option value="">{t("选择保留的目标账号")}</option>
                 {accounts
                   .filter((a) => a.id !== mergeSource.id)
                   .map((a) => (
@@ -411,17 +420,17 @@ export function ConsoleModals({
                   setMergeTarget("");
                 }}
               >
-                取消
+                {t("取消")}
               </button>
               <button className="primary" disabled={busy || !mergeTarget}>
-                确认合并
+                {t("确认合并")}
               </button>
             </footer>
           </form>
         </Modal>
       )}
       {modal === "key" && (
-        <Modal title="创建 API 密钥" onClose={() => setModal(null)}>
+        <Modal title={t("创建 API 密钥")} onClose={() => setModal(null)}>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -433,20 +442,20 @@ export function ConsoleModals({
                 );
                 setSecret(result.api_key);
                 setModal(null);
-              }, "密钥已创建");
+              }, t("密钥已创建"));
             }}
           >
             <label>
-              密钥名称
+              {t("密钥名称")}
               <input
                 required
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
-                placeholder="例如：生产应用"
+                placeholder={t("例如：生产应用")}
               />
             </label>
             <label>
-              备注
+              {t("备注")}
               <textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
@@ -455,17 +464,17 @@ export function ConsoleModals({
             </label>
             <footer>
               <button type="button" onClick={() => setModal(null)}>
-                取消
+                {t("取消")}
               </button>
               <button className="primary" disabled={busy || !label.trim()}>
-                创建密钥
+                {t("创建密钥")}
               </button>
             </footer>
           </form>
         </Modal>
       )}
       {keyEdit && (
-        <Modal title="重命名密钥" onClose={() => setKeyEdit(null)}>
+        <Modal title={t("重命名密钥")} onClose={() => setKeyEdit(null)}>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -475,11 +484,11 @@ export function ConsoleModals({
                   ...(note !== (keyEdit.note ?? "") ? { note } : {}),
                 });
                 setKeyEdit(null);
-              }, "密钥信息已更新");
+              }, t("密钥信息已更新"));
             }}
           >
             <label>
-              名称
+              {t("名称")}
               <input
                 required
                 value={label}
@@ -487,7 +496,7 @@ export function ConsoleModals({
               />
             </label>
             <label>
-              备注
+              {t("备注")}
               <textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
@@ -496,32 +505,32 @@ export function ConsoleModals({
             </label>
             <footer>
               <button type="button" onClick={() => setKeyEdit(null)}>
-                取消
+                {t("取消")}
               </button>
               <button className="primary" disabled={busy || !label.trim()}>
-                保存
+                {t("保存")}
               </button>
             </footer>
           </form>
         </Modal>
       )}
       {secret && (
-        <Modal title="保存你的新密钥" onClose={() => setSecret("")}>
+        <Modal title={t("保存你的新密钥")} onClose={() => setSecret("")}>
           <p className="muted">
-            此密钥只显示一次。关闭后无法再次查看，请保存在安全位置。
+            {t("此密钥只显示一次。关闭后无法再次查看，请保存在安全位置。")}
           </p>
           <div className="secret mono">{secret}</div>
           <footer>
-            <button onClick={() => void copy(secret)}>复制密钥</button>
+            <button onClick={() => void copy(secret)}>{t("复制密钥")}</button>
             <button className="primary" onClick={() => setSecret("")}>
-              已安全保存
+              {t("已安全保存")}
             </button>
           </footer>
         </Modal>
       )}
       {confirm && (
         <Modal
-          title="确认操作"
+          title={t("确认操作")}
           onClose={() => {
             if (!busy) setConfirm(null);
           }}
@@ -529,14 +538,14 @@ export function ConsoleModals({
           <p>{confirm.text}</p>
           <footer>
             <button disabled={busy} onClick={() => setConfirm(null)}>
-              取消
+              {t("取消")}
             </button>
             <button
               className="primary"
               disabled={busy}
-              onClick={() => void act(confirm.run, "操作已完成")}
+              onClick={() => void act(confirm.run, t("操作已完成"))}
             >
-              确认
+              {t("确认")}
             </button>
           </footer>
         </Modal>
@@ -562,7 +571,7 @@ export function ConsoleModals({
                     ) : (
                       <img
                         src={item.url}
-                        alt={item.caption || "生成图像预览"}
+                        alt={item.caption || t("生成图像预览")}
                         className="detail-media-image"
                       />
                     )}
@@ -576,7 +585,7 @@ export function ConsoleModals({
                         target="_blank"
                         rel="noreferrer"
                       >
-                        下载 / 新窗口打开
+                        {t("下载 / 新窗口打开")}
                       </a>
                     </figcaption>
                   </figure>
@@ -584,20 +593,20 @@ export function ConsoleModals({
               </div>
             ) : null;
           })()}
-          <pre className="detail">{printable(detail.body) ?? "无结果"}</pre>
+          <pre className="detail">{printable(detail.body) ?? t("无结果")}</pre>
           <footer>
             <button
               type="button"
               onClick={() => void copy(printable(detail.body) ?? "")}
             >
-              复制 JSON
+              {t("复制 JSON")}
             </button>
             <button
               type="button"
               className="primary"
               onClick={() => setDetail(null)}
             >
-              关闭
+              {t("关闭")}
             </button>
           </footer>
         </Modal>

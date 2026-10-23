@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 export const statusNames: Record<string, string> = {
   active: "可用",
   available: "可调度",
@@ -48,7 +49,7 @@ export function badge(value: string) {
   ].includes(value);
   return (
     <span className={`badge ${isBad ? "bad" : isGood ? "good" : ""}`}>
-      {statusNames[value] ?? value}
+      {t(statusNames[value] ?? value)}
     </span>
   );
 }

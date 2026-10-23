@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useEffect, useRef, useState } from "react";
 import type { Status } from "./types";
 import "./instance-status.css";
@@ -36,10 +37,12 @@ export function instanceTone(
 
 function ago(ms: number) {
   const s = Math.max(0, Math.round(ms / 1000));
-  if (s < 5) return "刚刚同步";
-  if (s < 60) return `${s} 秒前同步`;
+  if (s < 5) return t("刚刚同步");
+  if (s < 60) return t("{n} 秒前同步", { n: s });
   const m = Math.floor(s / 60);
-  return m < 60 ? `${m} 分钟前同步` : `${Math.floor(m / 60)} 小时前同步`;
+  return m < 60
+    ? t("{n} 分钟前同步", { n: m })
+    : t("{n} 小时前同步", { n: Math.floor(m / 60) });
 }
 
 /** 侧栏实例状态：一行状态词 + 可用账号数 + 细进度条；细节放悬停提示。 */
@@ -74,7 +77,7 @@ export function InstanceStatus({
   const showCount = !!status && !unreachable && total > 0;
   const ratio = total > 0 ? Math.min(1, available / total) : 0;
   const details = [
-    HINT[tone],
+    t(HINT[tone]),
     status && !unreachable
       ? `${status.driver.driver} · v${status.version}`
       : null,
@@ -96,10 +99,10 @@ export function InstanceStatus({
   const cooling = acc.cooling ?? 0;
   const broken = (acc.invalid ?? 0) + (acc.disabled ?? 0);
   const segments = [
-    { k: "ok", label: "可用", n: available },
-    { k: "busy", label: "占用", n: busy },
-    { k: "cool", label: "冷却", n: cooling },
-    { k: "bad", label: "失效", n: broken },
+    { k: "ok", label: t("可用"), n: available },
+    { k: "busy", label: t("占用"), n: busy },
+    { k: "cool", label: t("冷却"), n: cooling },
+    { k: "bad", label: t("失效"), n: broken },
   ];
   const segTotal = Math.max(
     total,
@@ -119,7 +122,7 @@ export function InstanceStatus({
         <span className="instance-signal" aria-hidden="true">
           <span aria-hidden="true" className={`dot ${dot}`} />
         </span>
-        <span className="instance-state">{LABEL[tone]}</span>
+        <span className="instance-state">{t(LABEL[tone])}</span>
         {showCount && (
           <span className="instance-count">
             <strong>{available}</strong>/{total}
@@ -132,7 +135,7 @@ export function InstanceStatus({
           <div
             className="instance-bar"
             role="progressbar"
-            aria-label="可调度账号比例"
+            aria-label={t("可调度账号比例")}
             aria-valuemin={0}
             aria-valuemax={total}
             aria-valuenow={available}
@@ -148,7 +151,7 @@ export function InstanceStatus({
               ) : null,
             )}
           </div>
-          <ul className="instance-legend" aria-label="账号分布">
+          <ul className="instance-legend" aria-label={t("账号分布")}>
             {segments.map((seg) => (
               <li key={seg.k} className={seg.n ? "" : "is-zero"}>
                 <i className={`seg-${seg.k}`} aria-hidden="true" />
@@ -163,10 +166,10 @@ export function InstanceStatus({
         <div className="instance-tasks">
           <span className={running ? "is-active" : ""}>
             <em aria-hidden="true" />
-            运行 <strong>{running}</strong>
+            {t("运行")} <strong>{running}</strong>
           </span>
           <span>
-            排队 <strong>{pending}</strong>
+            {t("排队")} <strong>{pending}</strong>
           </span>
         </div>
       )}

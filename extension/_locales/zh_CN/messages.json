@@ -1,0 +1,370 @@
+{
+  "extName": {
+    "message": "Muse Console",
+    "description": "extName UI message."
+  },
+  "extDescription": {
+    "message": "登录 Muse 后，把会话安全同步到你自己的 Muse Console。",
+    "description": "extDescription UI message."
+  },
+  "actionTitle": {
+    "message": "Muse Console 会话同步",
+    "description": "actionTitle UI message."
+  },
+  "pairingAndAuthorizationMuseConsole": {
+    "message": "配对与授权 · Muse Console",
+    "description": "pairingAndAuthorizationMuseConsole UI message."
+  },
+  "browserExtension": {
+    "message": "浏览器扩展",
+    "description": "browserExtension UI message."
+  },
+  "sessionSyncSettings": {
+    "message": "会话同步设置",
+    "description": "sessionSyncSettings UI message."
+  },
+  "pairingAndAuthorization": {
+    "message": "配对与授权",
+    "description": "pairingAndAuthorization UI message."
+  },
+  "pairATrustedServerAnd": {
+    "message": "配对受信服务器，按需授权同步。",
+    "description": "pairATrustedServerAnd UI message."
+  },
+  "authorizeTrustedServersOnly": {
+    "message": "仅授权受信服务器",
+    "description": "authorizeTrustedServersOnly UI message."
+  },
+  "readsOnlyTheFourMuse": {
+    "message": "只读采集 Muse 的四个会话 Cookie。",
+    "description": "readsOnlyTheFourMuse UI message."
+  },
+  "enablingSyncLetsTheSelected": {
+    "message": "开启同步后，所选服务器将获得使用该 Muse 会话的能力。",
+    "description": "enablingSyncLetsTheSelected UI message."
+  },
+  "noCollectionFromOtherSites": {
+    "message": "不采集其他站点，不保存管理员密钥。",
+    "description": "noCollectionFromOtherSites UI message."
+  },
+  "verifyServerIdentity": {
+    "message": "验证服务器身份",
+    "description": "verifyServerIdentity UI message."
+  },
+  "checkServerIdAndFingerprint": {
+    "message": "在受信控制台核对 server_id 与 fingerprint；后者不是 TLS 证书 pin。",
+    "description": "checkServerIdAndFingerprint UI message."
+  },
+  "serverOrigin": {
+    "message": "服务器 origin",
+    "description": "serverOrigin UI message."
+  },
+  "schemeHostAndPortIf": {
+    "message": "协议、主机及端口（如有），不含路径。",
+    "description": "schemeHostAndPortIf UI message."
+  },
+  "developmentModeAllowLocalLoopback": {
+    "message": "开发模式：允许本机 loopback HTTP（仅限开发）",
+    "description": "developmentModeAllowLocalLoopback UI message."
+  },
+  "grantAccessAndCheckIdentity": {
+    "message": "授权访问并查询身份",
+    "description": "grantAccessAndCheckIdentity UI message."
+  },
+  "serverIdentity": {
+    "message": "服务器身份",
+    "description": "serverIdentity UI message."
+  },
+  "serverIdentityNotYetVerified": {
+    "message": "尚未验证服务器身份",
+    "description": "serverIdentityNotYetVerified UI message."
+  },
+  "redeemChallengeAndPair": {
+    "message": "兑换挑战并配对",
+    "description": "redeemChallengeAndPair UI message."
+  },
+  "getAOneTimeChallenge": {
+    "message": "从受信控制台获取一次性挑战。",
+    "description": "getAOneTimeChallenge UI message."
+  },
+  "oneTimeChallengeNotAn": {
+    "message": "一次性挑战（非 admin key）",
+    "description": "oneTimeChallengeNotAn UI message."
+  },
+  "iCheckedServerIdAnd": {
+    "message": "我已在受信控制台核对 server_id 与 fingerprint，同意配对此精确 origin",
+    "description": "iCheckedServerIdAnd UI message."
+  },
+  "authorizeAutomaticSync": {
+    "message": "授权自动同步",
+    "description": "authorizeAutomaticSync UI message."
+  },
+  "pairingDoesNotAuthorizeSync": {
+    "message": "配对不等于授权同步。",
+    "description": "pairingDoesNotAuthorizeSync UI message."
+  },
+  "iAuthorizeAutomaticSendingOf": {
+    "message": "我授权将当前及后续 Muse 会话自动发送给配对服务器（首次可新增一个账号，切号须管理员确认）",
+    "description": "iAuthorizeAutomaticSendingOf UI message."
+  },
+  "enableAutomaticSync": {
+    "message": "开启自动同步",
+    "description": "enableAutomaticSync UI message."
+  },
+  "pauseAndClearPendingCookies": {
+    "message": "暂停并清除待传 Cookie",
+    "description": "pauseAndClearPendingCookies UI message."
+  },
+  "candidateConfirmationAndDeviceMaintenance": {
+    "message": "候选确认与设备维护",
+    "description": "candidateConfirmationAndDeviceMaintenance UI message."
+  },
+  "forIdentityOrVersionConflicts": {
+    "message": "身份待确认或版本冲突：管理员须在控制台确认原 capture_id 与当前 credential_version，再重传原候选；原包和 base 版本不变。若显示",
+    "description": "forIdentityOrVersionConflicts UI message."
+  },
+  "captureAgainAndAskAn": {
+    "message": "，须重新采集，新 capture 须管理员重新确认；旧确认不可复用。",
+    "description": "captureAgainAndAskAn UI message."
+  },
+  "resendOriginalCandidateAfterAdmin": {
+    "message": "管理员确认后重传原候选",
+    "description": "resendOriginalCandidateAfterAdmin UI message."
+  },
+  "candidateLostRecaptureAndRequest": {
+    "message": "候选丢失：重采并重新申请确认",
+    "description": "candidateLostRecaptureAndRequest UI message."
+  },
+  "deviceTokenAndLocalPairing": {
+    "message": "设备令牌与本地配对",
+    "description": "deviceTokenAndLocalPairing UI message."
+  },
+  "forgettingLocalPairingDoesNot": {
+    "message": "解除本地配对不撤销服务器令牌；还须在控制台撤销设备。",
+    "description": "forgettingLocalPairingDoesNot UI message."
+  },
+  "rotateDeviceToken": {
+    "message": "轮换设备令牌",
+    "description": "rotateDeviceToken UI message."
+  },
+  "forgetLocalPairing": {
+    "message": "解除本地配对",
+    "description": "forgetLocalPairing UI message."
+  },
+  "pairingAndSyncStatus": {
+    "message": "配对与运行状态",
+    "description": "pairingAndSyncStatus UI message."
+  },
+  "loadingStatus": {
+    "message": "正在读取状态…",
+    "description": "loadingStatus UI message."
+  },
+  "museConsoleSessionSync": {
+    "message": "Muse Console · 会话同步",
+    "description": "museConsoleSessionSync UI message."
+  },
+  "syncStatusMuseConsole": {
+    "message": "同步状态 · Muse Console",
+    "description": "syncStatusMuseConsole UI message."
+  },
+  "extension": {
+    "message": "扩展",
+    "description": "extension UI message."
+  },
+  "syncStatus": {
+    "message": "同步状态",
+    "description": "syncStatus UI message."
+  },
+  "devicePairingAndSyncResults": {
+    "message": "设备配对与同步结果",
+    "description": "devicePairingAndSyncResults UI message."
+  },
+  "loading": {
+    "message": "读取中",
+    "description": "loading UI message."
+  },
+  "cookiesAndTokensAreNever": {
+    "message": "不显示 Cookie 与令牌。",
+    "description": "cookiesAndTokensAreNever UI message."
+  },
+  "pairingAndAuthorizationSettings": {
+    "message": "配对与授权设置",
+    "description": "pairingAndAuthorizationSettings UI message."
+  },
+  "museSessionsAreSentAutomatically": {
+    "message": "授权后，Muse 会话才会自动发送至配对服务器",
+    "description": "museSessionsAreSentAutomatically UI message."
+  },
+  "operationFailedCheckPermissionsAndServer": {
+    "message": "操作失败，请检查权限与服务器身份。",
+    "description": "operationFailedCheckPermissionsAndServer UI message."
+  },
+  "operationFailedCheckPermissionsIdentityPairing": {
+    "message": "操作失败，请检查权限、身份、配对或网络。",
+    "description": "operationFailedCheckPermissionsIdentityPairing UI message."
+  },
+  "targetChangedCheckTheIdentityAgain": {
+    "message": "目标已变，请重新查询身份",
+    "description": "targetChangedCheckTheIdentityAgain UI message."
+  },
+  "checkTheIdentityInYourTrusted": {
+    "message": "请在受信控制台核对身份",
+    "description": "checkTheIdentityInYourTrusted UI message."
+  },
+  "unableToReadStatus": {
+    "message": "无法读取状态",
+    "description": "unableToReadStatus UI message."
+  },
+  "operationFailedCheckPermissionsServerIdentity": {
+    "message": "操作失败：请检查权限、服务器身份和配对有效期。",
+    "description": "operationFailedCheckPermissionsServerIdentity UI message."
+  },
+  "notPaired": {
+    "message": "未配对",
+    "description": "notPaired UI message."
+  },
+  "paired": {
+    "message": "已配对",
+    "description": "paired UI message."
+  },
+  "pairedSyncNotEnabled": {
+    "message": "已配对，未开启同步",
+    "description": "pairedSyncNotEnabled UI message."
+  },
+  "syncPaused": {
+    "message": "同步已暂停",
+    "description": "syncPaused UI message."
+  },
+  "deviceAuthorizationExpiredPairAgain": {
+    "message": "设备授权已过期，请重新配对",
+    "description": "deviceAuthorizationExpiredPairAgain UI message."
+  },
+  "deviceAuthorizationRevokedPairAgain": {
+    "message": "设备授权已撤销，请重新配对",
+    "description": "deviceAuthorizationRevokedPairAgain UI message."
+  },
+  "waitingForMuseLogin": {
+    "message": "等待登录 Muse",
+    "description": "waitingForMuseLogin UI message."
+  },
+  "multipleSessionsDetectedSkipped": {
+    "message": "检测到多组会话，已跳过",
+    "description": "multipleSessionsDetectedSkipped UI message."
+  },
+  "capturedAwaitingUpload": {
+    "message": "已采集，等待上传",
+    "description": "capturedAwaitingUpload UI message."
+  },
+  "synced": {
+    "message": "已同步",
+    "description": "synced UI message."
+  },
+  "uploadFailedRetryingLater": {
+    "message": "上传失败，稍后重试",
+    "description": "uploadFailedRetryingLater UI message."
+  },
+  "retriesExhaustedCandidateDiscarded": {
+    "message": "多次重试失败，已放弃本次候选",
+    "description": "retriesExhaustedCandidateDiscarded UI message."
+  },
+  "rejectedByServer": {
+    "message": "服务器拒绝",
+    "description": "rejectedByServer UI message."
+  },
+  "waitingForAdminToConfirmAccount": {
+    "message": "等待管理员确认账号身份",
+    "description": "waitingForAdminToConfirmAccount UI message."
+  },
+  "versionConflictWaitingForAdminConfirmation": {
+    "message": "版本冲突，等待管理员确认",
+    "description": "versionConflictWaitingForAdminConfirmation UI message."
+  },
+  "waitingForAdminConfirmation": {
+    "message": "等待管理员确认",
+    "description": "waitingForAdminConfirmation UI message."
+  },
+  "candidateLostRecaptureAndConfirmAgain": {
+    "message": "候选已丢失，需重新采集并确认",
+    "description": "candidateLostRecaptureAndConfirmAgain UI message."
+  },
+  "defaultWindow": {
+    "message": "默认窗口",
+    "description": "defaultWindow UI message."
+  },
+  "unknownSource": {
+    "message": "未知来源",
+    "description": "unknownSource UI message."
+  },
+  "on": {
+    "message": "开启",
+    "description": "on UI message."
+  },
+  "off": {
+    "message": "关闭",
+    "description": "off UI message."
+  },
+  "sessionsNone": {
+    "message": "会话：暂无",
+    "description": "sessionsNone UI message."
+  },
+  "aCandidateNeedsAdminAttention": {
+    "message": "有候选等待管理员处理。",
+    "description": "aCandidateNeedsAdminAttention UI message."
+  },
+  "syncNotEnabled": {
+    "message": "同步未开启",
+    "description": "syncNotEnabled UI message."
+  },
+  "uploadProblem": {
+    "message": "上传遇到问题",
+    "description": "uploadProblem UI message."
+  },
+  "syncHealthy": {
+    "message": "同步正常",
+    "description": "syncHealthy UI message."
+  },
+  "syncing": {
+    "message": "正在同步",
+    "description": "syncing UI message."
+  },
+  "identityReadout": {
+    "message": "服务器：$1\nserver_id：$2\nfingerprint：$3",
+    "description": "identityReadout UI message."
+  },
+  "cookieStore": {
+    "message": "Cookie 存储 $1",
+    "description": "cookieStore UI message."
+  },
+  "partitionStore": {
+    "message": "$1（分区 $2）",
+    "description": "partitionStore UI message."
+  },
+  "deviceLine": {
+    "message": "设备：$1",
+    "description": "deviceLine UI message."
+  },
+  "serverLine": {
+    "message": "服务器：$1",
+    "description": "serverLine UI message."
+  },
+  "syncLine": {
+    "message": "自动同步：$1",
+    "description": "syncLine UI message."
+  },
+  "sourceLine": {
+    "message": "$1：$2",
+    "description": "sourceLine UI message."
+  },
+  "captureLine": {
+    "message": "  候选 $1",
+    "description": "captureLine UI message."
+  },
+  "accountLine": {
+    "message": "  账号 $1",
+    "description": "accountLine UI message."
+  },
+  "versionSuffix": {
+    "message": " · 版本 $1",
+    "description": "versionSuffix UI message."
+  }
+}

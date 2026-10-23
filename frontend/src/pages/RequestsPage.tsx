@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { time, type Account } from "../api";
 import type { RequestRow, Key, Setter, Detail } from "../types";
 import { Empty } from "../ui";
@@ -50,12 +51,12 @@ export function RequestsPage({
   return (
     <section className="console-page requests-page panel">
       <header>
-        <h2>请求记录</h2>
-        <span className="badge">{total} 条</span>
+        <h2>{t("请求记录")}</h2>
+        <span className="badge">{t("{n} 条", { n: total })}</span>
       </header>
       <div className="table-tools">
         <label>
-          响应状态
+          {t("响应状态")}
           <select
             value={filter}
             onChange={(e) => {
@@ -63,20 +64,20 @@ export function RequestsPage({
               setOffset(0);
             }}
           >
-            <option value="">全部状态</option>
+            <option value="">{t("全部状态")}</option>
             {["failed", "2xx", "3xx", "4xx", "5xx"].map((s) => (
               <option key={s} value={s}>
-                {s === "failed" ? "全部失败" : s}
+                {s === "failed" ? t("全部失败") : s}
               </option>
             ))}
           </select>
         </label>
         <label>
-          账号 ID
+          {t("账号 ID")}
           <input
             list="request-account-options"
             value={accountFilter}
-            placeholder="按账号 ID 筛选"
+            placeholder={t("按账号 ID 筛选")}
             onChange={(e) => {
               setAccountFilter(e.target.value);
               setOffset(0);
@@ -92,7 +93,7 @@ export function RequestsPage({
         </label>
         {setPathFilter && (
           <label>
-            接口路径
+            {t("接口路径")}
             <select
               value={pathFilter}
               onChange={(e) => {
@@ -100,29 +101,29 @@ export function RequestsPage({
                 setOffset(0);
               }}
             >
-              <option value="">全部接口</option>
+              <option value="">{t("全部接口")}</option>
               <option value="/v1/chat/completions">Chat (/v1/chat)</option>
               <option value="/v1/responses">Responses (/v1/responses)</option>
-              <option value="/v1/images">图像 (/v1/images)</option>
-              <option value="/v1/videos">视频 (/v1/videos)</option>
+              <option value="/v1/images">{t("图像 (/v1/images)")}</option>
+              <option value="/v1/videos">{t("视频 (/v1/videos)")}</option>
             </select>
           </label>
         )}
         {setKeyFilter && (
           <label>
-            应用密钥
+            {t("应用密钥")}
             <input
               list="request-key-options"
               value={keyFilter}
-              placeholder="按密钥 ID 筛选"
+              placeholder={t("按密钥 ID 筛选")}
               onChange={(e) => {
                 setKeyFilter(e.target.value);
                 setOffset(0);
               }}
             />
             <datalist id="request-key-options">
-              <option value="admin">admin（内置管理员）</option>
-              <option value="legacy">legacy（内置默认密钥）</option>
+              <option value="admin">{t("admin（内置管理员）")}</option>
+              <option value="legacy">{t("legacy（内置默认密钥）")}</option>
               {keys.map((k) => (
                 <option key={k.id} value={k.id}>
                   {k.name || k.id}
@@ -140,7 +141,7 @@ export function RequestsPage({
               setOffset(0);
             }}
           />
-          隐藏任务轮询
+          {t("隐藏任务轮询")}
         </label>
         {hasActiveFilter && (
           <button
@@ -154,7 +155,7 @@ export function RequestsPage({
               setOffset(0);
             }}
           >
-            清除筛选
+            {t("清除筛选")}
           </button>
         )}
       </div>
@@ -164,8 +165,8 @@ export function RequestsPage({
             <thead>
               <tr>
                 {["时间", "请求", "模型 / 账号", "状态", "耗时", "详情"].map(
-                  (t) => (
-                    <th key={t}>{t}</th>
+                  (label) => (
+                    <th key={label}>{t(label)}</th>
                   ),
                 )}
               </tr>
@@ -173,8 +174,8 @@ export function RequestsPage({
             <tbody>
               {requests.map((r) => (
                 <tr key={r.id}>
-                  <td data-label="时间">{time(r.ts)}</td>
-                  <td data-label="请求">
+                  <td data-label={t("时间")}>{time(r.ts)}</td>
+                  <td data-label={t("请求")}>
                     <div className="console-identity">
                       <div>
                         <strong>{r.method}</strong>
@@ -188,7 +189,7 @@ export function RequestsPage({
                       )}
                     </div>
                   </td>
-                  <td data-label="模型 / 账号">
+                  <td data-label={t("模型 / 账号")}>
                     <div className="console-identity">
                       {r.model ?? "—"}
                       <small className="mono">
@@ -197,7 +198,7 @@ export function RequestsPage({
                       </small>
                     </div>
                   </td>
-                  <td data-label="状态">
+                  <td data-label={t("状态")}>
                     <div className="console-identity">
                       {badge(
                         r.task_status === "failed"
@@ -206,29 +207,36 @@ export function RequestsPage({
                       )}
                       {r.task_status && r.task_status !== "failed" && (
                         <small className="muted">
-                          任务 {statusNames[r.task_status] ?? r.task_status}
+                          {t("任务 {status}", {
+                            status: t(
+                              statusNames[r.task_status] ?? r.task_status,
+                            ),
+                          })}
                         </small>
                       )}
                     </div>
                   </td>
-                  <td data-label="耗时" className="mono">
+                  <td data-label={t("耗时")} className="mono">
                     <div className="console-identity">
                       <span>{r.latency_ms} ms</span>
                       {r.task_ms != null && (
                         <small className="mono">
-                          任务 {(r.task_ms / 1000).toFixed(1)}s
+                          {t("任务 {n}s", { n: (r.task_ms / 1000).toFixed(1) })}
                         </small>
                       )}
                     </div>
                   </td>
-                  <td data-label="详情">
+                  <td data-label={t("详情")}>
                     <button
                       className="console-action"
                       onClick={() =>
-                        setDetail({ title: `请求 #${r.id}`, body: r })
+                        setDetail({
+                          title: t("请求 #{n}", { n: r.id }),
+                          body: r,
+                        })
                       }
                     >
-                      查看
+                      {t("查看")}
                     </button>
                   </td>
                 </tr>
@@ -237,25 +245,25 @@ export function RequestsPage({
           </table>
         </div>
       ) : (
-        <Empty text="暂无匹配请求" />
+        <Empty text={t("暂无匹配请求")} />
       )}
       <div className="pagination">
         <span>
           {total
             ? `${offset + 1}–${Math.min(offset + 50, total)} / ${total}`
-            : "0 条记录"}
+            : t("0 条记录")}
         </span>
         <button
           disabled={offset === 0 || loading}
           onClick={() => setOffset((v) => Math.max(0, v - 50))}
         >
-          上一页
+          {t("上一页")}
         </button>
         <button
           disabled={offset + 50 >= total || loading}
           onClick={() => setOffset((v) => v + 50)}
         >
-          下一页
+          {t("下一页")}
         </button>
       </div>
     </section>

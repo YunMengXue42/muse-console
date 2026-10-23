@@ -14,6 +14,8 @@ Muse Console 是面向 [muse.ai](https://muse.ai) 的独立、非官方网关，
 
 ![调用概览](docs/images/console-overview.png)
 
+> 截图来自模拟模式。控制台和扩展支持简体中文与英文，可在侧边栏切换。
+
 ## 接入方案
 
 ```text

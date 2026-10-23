@@ -1,5 +1,17 @@
+import { t, locale } from "../i18n";
 import type { Account } from "../api";
 import { time } from "../api";
+
+const ERROR_REASONS: Record<string, string> = {
+  composer_ready_timeout: "上次请求的输入框未能及时就绪，请稍后重试",
+  upstream_timeout: "上次请求等待上游响应超时，请稍后重试",
+  upstream_auth_failed: "上次上游认证失败，请检查或更新账号凭据",
+  upstream_quota_exhausted: "上次请求的上游额度不足，请等待额度恢复",
+  media_missing: "上次请求仅收到文本，未获得所需图片或视频",
+  upstream_refused: "上次上游未返回所需结果，请调整请求后重试",
+  upstream_error: "上次请求发生上游服务错误，请稍后重试",
+  request_failed: "上次请求失败，请检查请求或稍后重试",
+};
 
 const REASONS: Record<string, [string, string]> = {
   composer_ready_timeout: [
@@ -39,9 +51,11 @@ export function AccountIssue({ account }: { account: Account }) {
   const invalid =
     account.status === "invalid" || account.effective_status === "invalid";
   if (invalid)
-    return <span className="account-reauth">登录已失效，请重新登录</span>;
+    return (
+      <span className="account-reauth">{t("登录已失效，请重新登录")}</span>
+    );
   if (!hasIssue) return null;
-  // Older servers expose only a redacted sentence; never render arbitrary error text.
+  // Preserve legacy Chinese redaction; English uses known codes or the supplied legacy text.
   const knownReason =
     code && Object.prototype.hasOwnProperty.call(REASONS, code)
       ? REASONS[code]
@@ -50,6 +64,11 @@ export function AccountIssue({ account }: { account: Account }) {
     "请求失败（未记录具体原因）",
     "旧记录未保存细分原因，可到任务中心或请求日志查看。当前可用性以状态列为准。",
   ];
+  const englishReason =
+    code && Object.prototype.hasOwnProperty.call(ERROR_REASONS, code)
+      ? ERROR_REASONS[code]
+      : account.last_error || reason;
+  const displayedReason = locale() === "en-US" ? t(englishReason) : reason;
   const timestamp = account.last_error_at;
   const date =
     typeof timestamp === "number" && Number.isFinite(timestamp) && timestamp > 0
@@ -57,11 +76,11 @@ export function AccountIssue({ account }: { account: Account }) {
       : null;
   return (
     <details className="account-history">
-      <summary>上次请求：{reason}</summary>
+      <summary>{t("上次请求：{reason}", { reason: displayedReason })}</summary>
       <div className="account-history-detail">
-        {date && <span>发生于 {date}</span>}
-        <span>{hint}</span>
-        <span>仅为上次请求记录，当前可用性看状态列。</span>
+        {date && <span>{t("发生于 {date}", { date })}</span>}
+        <span>{t(hint)}</span>
+        <span>{t("仅为上次请求记录，当前可用性看状态列。")}</span>
       </div>
     </details>
   );

@@ -1,4 +1,6 @@
+import { msg, localizePage } from "./i18n";
 import { describeStatus, headline, type StatusView } from "./status-view";
+localizePage();
 const status = document.getElementById("status")!;
 const badge = document.getElementById("state")!;
 function render(data: StatusView | undefined) {
@@ -10,10 +12,10 @@ function render(data: StatusView | undefined) {
 void chrome.runtime.sendMessage({ type: "status" }).then(
   (response) => {
     if (response?.ok) render(response.data);
-    else status.textContent = "无法读取状态";
+    else status.textContent = msg("unableToReadStatus");
   },
   () => {
-    status.textContent = "无法读取状态";
+    status.textContent = msg("unableToReadStatus");
   },
 );
 document.getElementById("options")!.addEventListener("click", () => {

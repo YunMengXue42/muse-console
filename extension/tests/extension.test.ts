@@ -59,6 +59,11 @@ beforeEach(() => {
   local = {};
   session = {};
   api = {
+    i18n: {
+      getMessage: (key: string) =>
+        JSON.parse(readFileSync("_locales/zh_CN/messages.json", "utf8"))[key]
+          ?.message ?? "",
+    },
     storage: { local: storage(local), session: storage(session) },
     permissions: {
       contains: vi.fn(async () => true),

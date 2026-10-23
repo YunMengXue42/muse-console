@@ -1,0 +1,25 @@
+.language-switch {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+.language-switch button {
+  min-height: 28px;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.language-switch button[aria-pressed="true"] {
+  background: var(--line);
+  color: var(--ink);
+}
+.login-card .language-switch {
+  margin-bottom: 16px;
+}

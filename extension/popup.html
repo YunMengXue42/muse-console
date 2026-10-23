@@ -3,31 +3,54 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>同步状态 · Muse Console</title>
+    <title data-i18n="syncStatusMuseConsole">同步状态 · Muse Console</title>
     <link rel="stylesheet" href="ui.css" />
   </head>
   <body class="popup-page">
     <main class="popup-shell">
       <header class="page-header">
         <div class="brand">Muse <span>Console</span></div>
-        <span class="badge">扩展</span>
+        <span class="badge"><span data-i18n="extension">扩展</span></span>
       </header>
       <section class="panel" aria-labelledby="popup-title">
         <header class="section-heading">
           <div>
-            <h1 id="popup-title">同步状态</h1>
-            <p class="fine">设备配对与同步结果</p>
+            <h1 id="popup-title">
+              <span data-i18n="syncStatus">同步状态</span>
+            </h1>
+            <p class="fine">
+              <span data-i18n="devicePairingAndSyncResults"
+                >设备配对与同步结果</span
+              >
+            </p>
           </div>
-          <span id="state" class="state-pill" data-tone="off">读取中</span>
+          <span id="state" class="state-pill" data-tone="off"
+            ><span data-i18n="loading">读取中</span></span
+          >
         </header>
-        <pre id="status" class="readout" role="status" aria-live="polite">
+        <pre
+          id="status"
+          class="readout"
+          role="status"
+          aria-live="polite"
+          data-i18n="loadingStatus"
+        >
 正在读取状态…</pre>
-        <p class="fine status-note">不显示 Cookie 与令牌。</p>
+        <p class="fine status-note">
+          <span data-i18n="cookiesAndTokensAreNever"
+            >不显示 Cookie 与令牌。</span
+          >
+        </p>
       </section>
       <button id="options" class="primary popup-action">
-        配对与授权设置 <span aria-hidden="true">→</span>
+        <span data-i18n="pairingAndAuthorizationSettings"> 配对与授权设置 </span
+        ><span aria-hidden="true">→</span>
       </button>
-      <p class="fine popup-foot">授权后，Muse 会话才会自动发送至配对服务器</p>
+      <p class="fine popup-foot">
+        <span data-i18n="museSessionsAreSentAutomatically"
+          >授权后，Muse 会话才会自动发送至配对服务器</span
+        >
+      </p>
     </main>
     <script type="module" src="popup.js"></script>
   </body>

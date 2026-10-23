@@ -14,7 +14,7 @@ Muse Console is an independent, unofficial gateway for [muse.ai](https://muse.ai
 
 ![Usage overview](docs/images/console-overview.png)
 
-> Screenshots show the console in mock mode. The console UI is currently in Simplified Chinese.
+> Screenshots show the console in mock mode. The console and extension UI support English and Simplified Chinese; switch in the sidebar.
 
 ## How it works
 

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Muse Console",
+  "name": "__MSG_extName__",
   "short_name": "Muse Console",
-  "description": "登录 Muse 后，把会话安全同步到你自己的 Muse Console。",
+  "description": "__MSG_extDescription__",
   "version": "0.2.0",
   "minimum_chrome_version": "132",
   "icons": {
@@ -24,7 +24,7 @@
   },
   "options_page": "options.html",
   "action": {
-    "default_title": "Muse Console 会话同步",
+    "default_title": "__MSG_actionTitle__",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png"
@@ -34,5 +34,6 @@
   "incognito": "not_allowed",
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'; connect-src https: http://localhost:* http://127.0.0.1:*"
-  }
+  },
+  "default_locale": "zh_CN"
 }

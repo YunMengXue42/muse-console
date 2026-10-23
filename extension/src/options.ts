@@ -1,10 +1,13 @@
+import { msg, localizePage } from "./i18n";
 import { originOf, permission } from "./policy";
 import { describeStatus, type StatusView } from "./status-view";
 const input = (id: string) => document.getElementById(id) as HTMLInputElement;
+localizePage();
 const status = document.getElementById("status")!;
 async function send(type: string, args = {}) {
   const response = await chrome.runtime.sendMessage({ type, ...args });
-  if (!response?.ok) throw new Error("操作失败，请检查权限与服务器身份。");
+  if (!response?.ok)
+    throw new Error(msg("operationFailedCheckPermissionsAndServer"));
   return response.data;
 }
 function show(data: unknown): string {
@@ -20,7 +23,9 @@ function bind(id: string, fn: () => Promise<unknown>) {
         status.textContent = show(data);
       },
       () => {
-        status.textContent = "操作失败，请检查权限、身份、配对或网络。";
+        status.textContent = msg(
+          "operationFailedCheckPermissionsIdentityPairing",
+        );
       },
     );
   });
@@ -28,7 +33,9 @@ function bind(id: string, fn: () => Promise<unknown>) {
 function invalidate() {
   input("pair").disabled = true;
   input("confirmIdentity").checked = false;
-  document.getElementById("identity")!.textContent = "目标已变，请重新查询身份";
+  document.getElementById("identity")!.textContent = msg(
+    "targetChangedCheckTheIdentityAgain",
+  );
 }
 input("origin").addEventListener("input", invalidate);
 input("development").addEventListener("change", invalidate);
@@ -56,11 +63,13 @@ bind("inspect", async () => {
     server_id: string;
     fingerprint: string;
   };
-  document.getElementById("identity")!.textContent = `服务器：${target}
-server_id：${server_id}
-fingerprint：${fingerprint}`;
+  document.getElementById("identity")!.textContent = msg("identityReadout", [
+    target,
+    server_id,
+    fingerprint,
+  ]);
   input("pair").disabled = false;
-  return "请在受信控制台核对身份";
+  return msg("checkTheIdentityInYourTrusted");
 });
 bind("pair", async () => {
   if (!input("confirmIdentity").checked) throw new Error();
@@ -82,6 +91,6 @@ void send("status").then(
     status.textContent = show(data);
   },
   () => {
-    status.textContent = "无法读取状态";
+    status.textContent = msg("unableToReadStatus");
   },
 );

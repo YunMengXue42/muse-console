@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useEffect, useState } from "react";
 import "../pool-design.css";
 import type { Account } from "../api";
@@ -11,10 +12,10 @@ function formatRemaining(untilSec?: number, nowMs = Date.now()): string | null {
   if (!untilSec) return null;
   const diffSec = Math.ceil(untilSec - nowMs / 1000);
   if (diffSec <= 0) return null;
-  if (diffSec < 60) return `${diffSec}s 后恢复`;
+  if (diffSec < 60) return t("{diffSec}s 后恢复", { diffSec });
   const m = Math.floor(diffSec / 60);
   const s = diffSec % 60;
-  return s ? `${m}m ${s}s 后恢复` : `${m}m 后恢复`;
+  return s ? t("{m}m {s}s 后恢复", { m, s }) : t("{m}m 后恢复", { m });
 }
 
 /** 页面只渲染快照并转交操作；轮询由 App 统一负责。 */
@@ -100,7 +101,7 @@ export function PoolPage({
 
   return (
     <div className="pool-page">
-      <div className="pool-metrics" aria-label="账号池概览">
+      <div className="pool-metrics" aria-label={t("账号池概览")}>
         {[
           ["账号总数", metrics?.total, "已接入的上游会话"],
           ["可调度", metrics?.available, "可以接收新请求"],
@@ -108,7 +109,7 @@ export function PoolPage({
             "占用槽位",
             metrics?.inflight,
             metrics?.waiting
-              ? `正在执行 · ${metrics.waiting} 个请求排队中`
+              ? t("正在执行 · {n} 个请求排队中", { n: metrics.waiting })
               : "正在执行的并发请求",
           ],
           [
@@ -122,26 +123,28 @@ export function PoolPage({
           ],
         ].map(([title, value, subtitle]) => (
           <section key={String(title)}>
-            <span>{title}</span>
+            <span>{t(String(title))}</span>
             <strong>{value ?? "—"}</strong>
-            <small>{subtitle}</small>
+            <small>{t(String(subtitle))}</small>
           </section>
         ))}
       </div>
       <div className="pool-layout">
-        <section className="panel pool-accounts" aria-label="上游账号列表">
+        <section className="panel pool-accounts" aria-label={t("上游账号列表")}>
           <header>
             <div>
-              <h2>上游账号</h2>
-              <p className="muted">就绪会话自动参与调度。</p>
+              <h2>{t("上游账号")}</h2>
+              <p className="muted">{t("就绪会话自动参与调度。")}</p>
             </div>
-            <span className="badge">{accounts.length} 个账号</span>
+            <span className="badge">
+              {t("{n} 个账号", { n: accounts.length })}
+            </span>
           </header>
           <div className="pool-toolbar">
             <div
               className="pool-filters"
               role="group"
-              aria-label="账号状态筛选"
+              aria-label={t("账号状态筛选")}
             >
               {filters.map((item) => (
                 <button
@@ -149,21 +152,21 @@ export function PoolPage({
                   aria-pressed={filter === item.value}
                   onClick={() => setFilter(item.value)}
                 >
-                  {item.label} <span>{item.count}</span>
+                  {t(item.label)} <span>{item.count}</span>
                 </button>
               ))}
             </div>
             <div className="table-tools">
               <input
-                aria-label="搜索账号"
-                placeholder="搜索名称或账号 ID"
+                aria-label={t("搜索账号")}
+                placeholder={t("搜索名称或账号 ID")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
               <label className="inline">
-                调度策略
+                {t("调度策略")}
                 <select
-                  aria-label="调度策略"
+                  aria-label={t("调度策略")}
                   value={pool?.strategy ?? "round_robin"}
                   disabled={busy || !pool}
                   onChange={(e) =>
@@ -171,12 +174,12 @@ export function PoolPage({
                       await api.request("/pool", "PATCH", {
                         strategy: e.target.value,
                       });
-                    }, "调度策略已更新")
+                    }, t("调度策略已更新"))
                   }
                 >
-                  <option value="round_robin">轮询</option>
-                  <option value="lru">最少最近使用</option>
-                  <option value="affinity">会话亲和</option>
+                  <option value="round_robin">{t("轮询")}</option>
+                  <option value="lru">{t("最少最近使用")}</option>
+                  <option value="affinity">{t("会话亲和")}</option>
                 </select>
               </label>
             </div>
@@ -186,9 +189,9 @@ export function PoolPage({
               className="pool-table"
               tabIndex={0}
               role="region"
-              aria-label="账号表格，可横向滚动"
+              aria-label={t("账号表格，可横向滚动")}
             >
-              <table aria-label="上游账号">
+              <table aria-label={t("上游账号")}>
                 <thead>
                   <tr>
                     {[
@@ -198,8 +201,8 @@ export function PoolPage({
                       "成功 / 失败",
                       "最近使用",
                       "操作",
-                    ].map((t) => (
-                      <th key={t}>{t}</th>
+                    ].map((label) => (
+                      <th key={label}>{t(label)}</th>
                     ))}
                   </tr>
                 </thead>
@@ -214,10 +217,10 @@ export function PoolPage({
                     const quota = a.meta?.quota;
                     return (
                       <tr key={a.id}>
-                        <td data-label="账号标识">
+                        <td data-label={t("账号标识")}>
                           <div className="pool-identity">
                             <div>
-                              <strong>{a.label || "未命名账号"}</strong>
+                              <strong>{a.label || t("未命名账号")}</strong>
                               <small className="mono">
                                 {a.id}
                                 {a.credential_version
@@ -228,9 +231,13 @@ export function PoolPage({
                                 <small className="muted">
                                   {quota.plan ? `${quota.plan} · ` : ""}
                                   {quota.remaining != null
-                                    ? `余量 ${quota.remaining}`
+                                    ? t("余量 {remaining}", {
+                                        remaining: quota.remaining,
+                                      })
                                     : quota.credits != null
-                                      ? `积分 ${quota.credits}`
+                                      ? t("积分 {credits}", {
+                                          credits: quota.credits,
+                                        })
                                       : ""}
                                 </small>
                               )}
@@ -238,7 +245,7 @@ export function PoolPage({
                             </div>
                           </div>
                         </td>
-                        <td data-label="状态">
+                        <td data-label={t("状态")}>
                           <div className="console-identity">
                             {badge(effStatus)}
                             {cooldownText && (
@@ -248,21 +255,23 @@ export function PoolPage({
                             )}
                           </div>
                         </td>
-                        <td data-label="并发" className="mono">
+                        <td data-label={t("并发")} className="mono">
                           {a.inflight ?? 0} /{" "}
                           {a.effective_max_concurrency ?? "—"}
                           {a.max_concurrency != null && (
-                            <small className="muted">独立上限</small>
+                            <small className="muted">{t("独立上限")}</small>
                           )}
                         </td>
-                        <td data-label="成功 / 失败" className="mono">
+                        <td data-label={t("成功 / 失败")} className="mono">
                           <span className="pool-counts">
                             {a.success_count}{" "}
                             <span className="muted">/ {a.fail_count}</span>
                           </span>
                         </td>
-                        <td data-label="最近使用">{time(a.last_used_at)}</td>
-                        <td data-label="操作">
+                        <td data-label={t("最近使用")}>
+                          {time(a.last_used_at)}
+                        </td>
+                        <td data-label={t("操作")}>
                           <div className="row-actions">
                             <button
                               onClick={() => {
@@ -276,7 +285,7 @@ export function PoolPage({
                                 );
                               }}
                             >
-                              编辑
+                              {t("编辑")}
                             </button>
                             <button
                               disabled={busy}
@@ -289,11 +298,11 @@ export function PoolPage({
                                       { enabled: !a.enabled },
                                     );
                                   },
-                                  a.enabled ? "账号已停用" : "账号已启用",
+                                  a.enabled ? t("账号已停用") : t("账号已启用"),
                                 )
                               }
                             >
-                              {a.enabled ? "停用" : "启用"}
+                              {a.enabled ? t("停用") : t("启用")}
                             </button>
                             <button
                               disabled={
@@ -301,7 +310,7 @@ export function PoolPage({
                               }
                               title={
                                 capabilities?.renew_session === false
-                                  ? "当前驱动不支持会话保活"
+                                  ? t("当前驱动不支持会话保活")
                                   : undefined
                               }
                               onClick={() =>
@@ -310,10 +319,10 @@ export function PoolPage({
                                     `/accounts/${a.id}/renew`,
                                     "POST",
                                   );
-                                }, "保活请求已完成")
+                                }, t("保活请求已完成"))
                               }
                             >
-                              保活
+                              {t("保活")}
                             </button>
                             <button
                               disabled={busy}
@@ -323,30 +332,32 @@ export function PoolPage({
                                     `/accounts/${a.id}/reset`,
                                     "POST",
                                   );
-                                }, "状态已重置")
+                                }, t("状态已重置"))
                               }
                             >
-                              重置
+                              {t("重置")}
                             </button>
                             {setMergeSource && accounts.length > 1 && (
                               <button
                                 disabled={busy}
                                 onClick={() => setMergeSource(a)}
                               >
-                                合并
+                                {t("合并")}
                               </button>
                             )}
                             <button
                               className="danger-text"
                               onClick={() =>
                                 ask(
-                                  `删除账号「${a.label || a.id}」？此操作不可撤销。`,
+                                  t("删除账号「{n}」？此操作不可撤销。", {
+                                    n: a.label || a.id,
+                                  }),
                                   () =>
                                     api.request(`/accounts/${a.id}`, "DELETE"),
                                 )
                               }
                             >
-                              删除
+                              {t("删除")}
                             </button>
                           </div>
                         </td>
@@ -357,41 +368,48 @@ export function PoolPage({
               </table>
               {!visibleAccounts.length && (
                 <div role="status">
-                  <Empty text="没有匹配的账号">
-                    <p className="muted">更换名称、ID 或清除筛选。</p>
+                  <Empty text={t("没有匹配的账号")}>
+                    <p className="muted">{t("更换名称、ID 或清除筛选。")}</p>
                     <button
                       onClick={() => {
                         setSearch("");
                         setFilter("all");
                       }}
                     >
-                      清除筛选
+                      {t("清除筛选")}
                     </button>
                   </Empty>
                 </div>
               )}
             </div>
           ) : (
-            <Empty text="暂无账号">
+            <Empty text={t("暂无账号")}>
               <button className="primary" onClick={() => openModal("login")}>
-                登录上游账号
+                {t("登录上游账号")}
               </button>
             </Empty>
           )}
           <div className="panel-foot">
             <span aria-live="polite">
-              显示 {visibleAccounts.length} / {accounts.length} 个账号
+              {t("显示 {visible} / {total} 个账号", {
+                visible: visibleAccounts.length,
+                total: accounts.length,
+              })}
             </span>
             <span>
               {pool
-                ? `并发上限 ${pool.max_concurrency} · 冷却 ${pool.cooldown}s · 获取超时 ${pool.acquire_timeout}s`
-                : "调度配置等待同步"}
+                ? t("并发上限 {n} · 冷却 {n1}s · 获取超时 {n2}s", {
+                    n: pool.max_concurrency,
+                    n1: pool.cooldown,
+                    n2: pool.acquire_timeout,
+                  })
+                : t("调度配置等待同步")}
             </span>
           </div>
         </section>
         <details className="pool-guide">
           <summary>
-            接入说明 <span>连接账号 → 验证会话 → 分配密钥</span>
+            {t("接入说明")} <span>{t("连接账号 → 验证会话 → 分配密钥")}</span>
           </summary>
           <div className="pool-guide-steps">
             {[
@@ -402,16 +420,16 @@ export function PoolPage({
               <div className="step" key={title}>
                 <span>{String(i + 1).padStart(2, "0")}</span>
                 <div>
-                  <h3>{title}</h3>
-                  <p>{body}</p>
+                  <h3>{t(title)}</h3>
+                  <p>{t(body)}</p>
                 </div>
               </div>
             ))}
           </div>
           <div className="pool-guide-foot">
-            <button onClick={() => setPage(4)}>管理 API 密钥 →</button>
+            <button onClick={() => setPage(4)}>{t("管理 API 密钥 →")}</button>
             <p className="fine">
-              仅接入有权使用的账号；Cookie 是敏感凭据，勿公开分享。
+              {t("仅接入有权使用的账号；Cookie 是敏感凭据，勿公开分享。")}
             </p>
           </div>
         </details>
