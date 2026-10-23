@@ -8,7 +8,7 @@ Log in to Muse as usual and the extension syncs the session to **your own** Muse
   <img src="../docs/images/extension-popup.png" alt="Extension popup" width="300" />
 </p>
 
-> The extension UI is currently in Simplified Chinese.
+> The extension follows your browser language (Chinese or English).
 
 ## How it works
 
@@ -49,7 +49,7 @@ MUSE_CONSOLE_CREDENTIAL_SERVER_ORIGIN=https://console.example.com
 ```
 
 1. **Verify the server**: in extension options enter the origin (for example `https://console.example.com`), grant access and compare `server_id` and `fingerprint` with the console.
-2. **Pair**: in the console open *Account pool → Extension device pairing*, generate a one-time challenge and paste it into the extension.
+2. **Pair**: in the console open _Account pool → Extension device pairing_, generate a one-time challenge and paste it into the extension.
 3. **Enable sync**: tick the consent box and turn on automatic sync.
 4. **Log in to Muse** in that browser. The popup shows “同步正常” (synced) when done.
 
@@ -57,17 +57,17 @@ MUSE_CONSOLE_CREDENTIAL_SERVER_ORIGIN=https://console.example.com
   <img src="../docs/images/extension-options.png" alt="Extension options" width="720" />
 </p>
 
-For local development, tick *development mode* to reach `http://127.0.0.1:18610` and set `MUSE_CONSOLE_CREDENTIAL_ALLOW_LOOPBACK_HTTP=true` on the server. Remote targets must use HTTPS.
+For local development, tick _development mode_ to reach `http://127.0.0.1:18610` and set `MUSE_CONSOLE_CREDENTIAL_ALLOW_LOOPBACK_HTTP=true` on the server. Remote targets must use HTTPS.
 
 ## Status
 
-| Popup | Meaning | Action |
-|---|---|---|
-| 同步正常 · Synced | Session stored in the pool | None |
-| 等待登录 Muse · Waiting for login | No valid session found | Log in to muse.ai in this browser |
-| 等待管理员确认 · Needs admin | Unknown identity or version conflict | Confirm the candidate in the console, then resend it from options |
-| 上传遇到问题 · Upload problem | Network/server error; retried with backoff | Check server and network |
-| 设备授权已撤销/已过期 · Revoked/expired | Token no longer valid | Pair again |
+| Popup                                   | Meaning                                    | Action                                                            |
+| --------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------- |
+| 同步正常 · Synced                       | Session stored in the pool                 | None                                                              |
+| 等待登录 Muse · Waiting for login       | No valid session found                     | Log in to muse.ai in this browser                                 |
+| 等待管理员确认 · Needs admin            | Unknown identity or version conflict       | Confirm the candidate in the console, then resend it from options |
+| 上传遇到问题 · Upload problem           | Network/server error; retried with backoff | Check server and network                                          |
+| 设备授权已撤销/已过期 · Revoked/expired | Token no longer valid                      | Pair again                                                        |
 
 Each device may add one new account by default. Later updates for the same account merge automatically; switching to another account requires admin confirmation.
 
@@ -79,13 +79,13 @@ Each device may add one new account by default. Later updates for the same accou
 
 ## Permissions
 
-| Permission | Purpose |
-|---|---|
-| `cookies` + `https://muse.ai/*` | Read Muse session cookies |
-| `webNavigation` | Trigger capture after Muse pages load |
-| `alarms` | Debounce and retries |
-| `storage` | Pairing data; raw captures stay in session storage and clear when the browser closes |
-| Optional host access | Only for the server origin you grant in options |
+| Permission                      | Purpose                                                                              |
+| ------------------------------- | ------------------------------------------------------------------------------------ |
+| `cookies` + `https://muse.ai/*` | Read Muse session cookies                                                            |
+| `webNavigation`                 | Trigger capture after Muse pages load                                                |
+| `alarms`                        | Debounce and retries                                                                 |
+| `storage`                       | Pairing data; raw captures stay in session storage and clear when the browser closes |
+| Optional host access            | Only for the server origin you grant in options                                      |
 
 No `tabs`, `scripting`, content scripts or external messaging. Disabled in incognito.
 

@@ -1,3 +1,5 @@
+import { LanguageSwitch } from "./LanguageSwitch";
+import { t, useLang } from "./i18n";
 import type { Key, Task, RequestRow, Status, Pool } from "./types";
 import { PoolPage } from "./pages/PoolPage";
 import { OverviewPage } from "./pages/OverviewPage";
@@ -36,6 +38,7 @@ const descriptions = [
 
 /** 全部页面共用认证、操作反馈与顺序轮询；输入草稿独立于服务器快照。 */
 export default function App() {
+  useLang();
   const initialRoute = useMemo(() => {
     const saved = sessionStorage.getItem("muse.console.key") ?? "";
     return saved ? parseConsoleHash(window.location.hash) : { page: 0 };
@@ -158,7 +161,7 @@ export default function App() {
     () =>
       new Api(key, () => {
         logout();
-        setLoginError("会话已失效，请重新输入管理员 Key。");
+        setLoginError(t("会话已失效，请重新输入管理员 Key。"));
       }),
     [key, logout],
   );
@@ -387,7 +390,7 @@ export default function App() {
     } catch (e) {
       setLoginError(
         e instanceof ApiError && e.status === 401
-          ? "管理员 Key 不正确。"
+          ? t("管理员 Key 不正确。")
           : (e as Error).message,
       );
     } finally {
@@ -414,9 +417,9 @@ export default function App() {
   async function copy(value: string) {
     try {
       await navigator.clipboard.writeText(value);
-      notify("已复制到剪贴板");
+      notify(t("已复制到剪贴板"));
     } catch {
-      notify("复制失败，请手动选中并复制。");
+      notify(t("复制失败，请手动选中并复制。"));
     }
   }
   const themeCord = (
@@ -424,7 +427,7 @@ export default function App() {
       className={key ? "console-pullcord" : "console-pullcord is-login"}
       onPull={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
       pulled={theme === "light"}
-      ariaLabel="切换主题"
+      ariaLabel={t("切换主题")}
     />
   );
   if (!key)
@@ -439,10 +442,11 @@ export default function App() {
           }}
         >
           <h1>Muse Console</h1>
+          <LanguageSwitch />
           <label>
             <input
-              aria-label="管理员 Key"
-              placeholder="管理员 Key"
+              aria-label={t("管理员 Key")}
+              placeholder={t("管理员 Key")}
               required
               type="password"
               autoComplete="off"
@@ -459,9 +463,9 @@ export default function App() {
             className="primary full"
             disabled={authenticating || !draft.trim()}
           >
-            {authenticating ? "验证中…" : "进入控制台"}
+            {authenticating ? t("验证中…") : t("进入控制台")}
           </button>
-          <p className="fine login-caption">管理账号与 API 调用</p>
+          <p className="fine login-caption">{t("管理账号与 API 调用")}</p>
         </form>
       </div>
     );
@@ -470,16 +474,20 @@ export default function App() {
     <div className="shell">
       {themeCord}
       <aside className="sidebar">
-        <a className="brand" href="/dashboard" aria-label="Muse Console 首页">
+        <a
+          className="brand"
+          href="/dashboard"
+          aria-label={t("Muse Console 首页")}
+        >
           <span className="brand-wordmark">
             Muse<span>Console</span>
           </span>
         </a>
-        <nav aria-label="主导航">
+        <nav aria-label={t("主导航")}>
           {pages.map((name, i) => (
             <button
               className={page === i ? "selected" : ""}
-              key={name}
+              key={t(name)}
               aria-current={page === i ? "page" : undefined}
               onClick={() => {
                 setPage(i);
@@ -487,7 +495,7 @@ export default function App() {
               }}
             >
               <Icon index={i} />
-              {name}
+              {t(name)}
               {i === 0 && metrics && (
                 <span className="nav-count">{metrics.total}</span>
               )}
@@ -497,7 +505,8 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <div className="side-bottom" aria-label="实例与偏好">
+        <div className="side-bottom" aria-label={t("实例与偏好")}>
+          <LanguageSwitch />
           <InstanceStatus
             status={status}
             unreachable={statusFailed}
@@ -518,32 +527,34 @@ export default function App() {
             <div className="eyebrow">
               {page === 0 ? "ACCOUNT MANAGEMENT" : "MUSE CONSOLE"}
             </div>
-            <h1>{pages[page]}</h1>
-            <p className="muted">{descriptions[page]}</p>
+            <h1>{t(pages[page])}</h1>
+            <p className="muted">{t(descriptions[page])}</p>
             {status?.driver.driver === "mock" && (
-              <span className="environment-label">演示环境 · 模拟数据</span>
+              <span className="environment-label">
+                {t("演示环境 · 模拟数据")}
+              </span>
             )}
           </div>
           <div className="toolbar">
             <button onClick={() => setRefresh((v) => v + 1)} disabled={loading}>
-              {loading ? "同步中…" : "刷新数据"}
+              {loading ? t("同步中…") : t("刷新数据")}
             </button>
             {page === 0 && (
               <>
                 <button onClick={() => setDevicesOpen(true)}>
-                  扩展设备配对
+                  {t("扩展设备配对")}
                 </button>
                 <button onClick={() => openModal("import")}>
-                  批量导入 Cookie
+                  {t("批量导入 Cookie")}
                 </button>
                 <button className="primary" onClick={() => openModal("login")}>
-                  ＋ 网页登录
+                  {t("＋ 网页登录")}
                 </button>
               </>
             )}
             {page === 4 && (
               <button className="primary" onClick={() => openModal("key")}>
-                ＋ 创建密钥
+                {t("＋ 创建密钥")}
               </button>
             )}
           </div>
@@ -551,12 +562,14 @@ export default function App() {
         {error && (
           <div className="error-banner" role="alert">
             <span>{error}</span>
-            <button onClick={() => setRefresh((v) => v + 1)}>重试</button>
+            <button onClick={() => setRefresh((v) => v + 1)}>
+              {t("重试")}
+            </button>
           </div>
         )}
         {loading && (
           <div className="loading" role="status">
-            正在同步数据…
+            {t("正在同步数据…")}
           </div>
         )}
         {page === 0 && (
@@ -692,7 +705,7 @@ export default function App() {
       {toast && (
         <div className="toast" role="status">
           {toast}
-          <button aria-label="关闭通知" onClick={() => setToast("")}>
+          <button aria-label={t("关闭通知")} onClick={() => setToast("")}>
             ×
           </button>
         </div>

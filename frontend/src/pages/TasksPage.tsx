@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useState } from "react";
 import { Api, time } from "../api";
 import type { Task, Setter, Detail, Ask } from "../types";
@@ -65,11 +66,15 @@ export function TasksPage({
   return (
     <section className="console-page tasks-page panel">
       <header>
-        <h2>最近任务</h2>
-        <span className="muted">自动同步 · 最多 100 条</span>
+        <h2>{t("最近任务")}</h2>
+        <span className="muted">{t("自动同步 · 最多 100 条")}</span>
       </header>
       {tasks.length > 0 && (
-        <div className="pool-filters" role="group" aria-label="任务状态筛选">
+        <div
+          className="pool-filters"
+          role="group"
+          aria-label={t("任务状态筛选")}
+        >
           {[
             { value: "all", label: "全部", count: counts.all },
             { value: "active", label: "进行中", count: counts.active },
@@ -82,7 +87,7 @@ export function TasksPage({
               aria-pressed={statusFilter === item.value}
               onClick={() => setStatusFilter(item.value)}
             >
-              {item.label} <span>{item.count}</span>
+              {t(item.label)} <span>{item.count}</span>
             </button>
           ))}
         </div>
@@ -98,8 +103,8 @@ export function TasksPage({
                   "状态 / 进度",
                   "时间 / 耗时",
                   "操作",
-                ].map((t) => (
-                  <th key={t}>{t}</th>
+                ].map((label) => (
+                  <th key={label}>{t(label)}</th>
                 ))}
               </tr>
             </thead>
@@ -120,7 +125,7 @@ export function TasksPage({
                   .join(" · ");
                 return (
                   <tr key={task.id}>
-                    <td data-label="任务 ID">
+                    <td data-label={t("任务 ID")}>
                       <div className="console-identity">
                         <strong className="mono">{task.id}</strong>
                         {prompt && (
@@ -133,13 +138,13 @@ export function TasksPage({
                         )}
                       </div>
                     </td>
-                    <td data-label="类型 / 规格">
+                    <td data-label={t("类型 / 规格")}>
                       <div className="console-identity">
                         <span>{task.kind}</span>
                         {specs && <small className="mono">{specs}</small>}
                       </div>
                     </td>
-                    <td data-label="状态 / 进度">
+                    <td data-label={t("状态 / 进度")}>
                       <div className="task-status-cell">
                         {badge(task.status)}
                         {typeof task.progress === "number" &&
@@ -150,21 +155,23 @@ export function TasksPage({
                           )}
                       </div>
                     </td>
-                    <td data-label="时间 / 耗时">
+                    <td data-label={t("时间 / 耗时")}>
                       <div className="console-identity">
                         <span>{time(task.created_at)}</span>
                         {elapsed && (
-                          <small className="mono">耗时 {elapsed}</small>
+                          <small className="mono">
+                            {t("耗时 {elapsed}", { elapsed })}
+                          </small>
                         )}
                       </div>
                     </td>
-                    <td data-label="操作">
+                    <td data-label={t("操作")}>
                       <div className="row-actions">
                         <button
                           className="console-action"
                           onClick={() =>
                             setDetail({
-                              title: `任务 ${task.id}`,
+                              title: t("任务 {n}", { n: task.id }),
                               body: {
                                 ...(task.request
                                   ? { request: task.request }
@@ -175,25 +182,28 @@ export function TasksPage({
                             })
                           }
                         >
-                          结果详情
+                          {t("结果详情")}
                         </button>
                         {isRunning(task.status) && (
                           <button
                             className="console-caution"
                             disabled={busy}
                             onClick={() =>
-                              ask(`取消任务 ${task.id}？`, async () => {
-                                const result = await api.request<{
-                                  cancelled: boolean;
-                                }>(`/tasks/${task.id}/cancel`, "POST");
-                                if (!result.cancelled)
-                                  throw new Error(
-                                    "任务未取消，可能已结束，请刷新查看。",
-                                  );
-                              })
+                              ask(
+                                t("取消任务 {n}？", { n: task.id }),
+                                async () => {
+                                  const result = await api.request<{
+                                    cancelled: boolean;
+                                  }>(`/tasks/${task.id}/cancel`, "POST");
+                                  if (!result.cancelled)
+                                    throw new Error(
+                                      t("任务未取消，可能已结束，请刷新查看。"),
+                                    );
+                                },
+                              )
                             }
                           >
-                            取消任务
+                            {t("取消任务")}
                           </button>
                         )}
                       </div>
@@ -204,15 +214,15 @@ export function TasksPage({
             </tbody>
           </table>
           {!visibleTasks.length && (
-            <Empty text="当前筛选下无任务">
+            <Empty text={t("当前筛选下无任务")}>
               <button type="button" onClick={() => setStatusFilter("all")}>
-                查看全部任务
+                {t("查看全部任务")}
               </button>
             </Empty>
           )}
         </div>
       ) : (
-        <Empty text="暂无任务" />
+        <Empty text={t("暂无任务")} />
       )}
     </section>
   );

@@ -7,6 +7,10 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: { input: "dashboard.html" },
   },
-  test: { environment: "jsdom", restoreMocks: true },
+  test: {
+    environment: "jsdom",
+    restoreMocks: true,
+    setupFiles: ["./src/test-setup.ts"],
+  },
   server: { proxy: { "/admin": "http://127.0.0.1:18610" } },
 });

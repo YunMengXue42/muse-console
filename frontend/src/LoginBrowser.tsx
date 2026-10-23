@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useEffect, useRef, useState } from "react";
 import { Api, ApiError, framePoint, time, type LoginSession } from "./api";
 import { Modal } from "./ui";
@@ -31,7 +32,7 @@ export function LoginBrowser({
   function finish() {
     if (done.current) return;
     done.current = true;
-    callbacks.current.notify("已验证登录并加入账号池");
+    callbacks.current.notify(t("已验证登录并加入账号池"));
     callbacks.current.onComplete();
   }
   const expiry =
@@ -163,12 +164,12 @@ export function LoginBrowser({
     }
   }
   const statusText = expired
-    ? "已过期"
-    : (STATUS_LABEL[current.status] ?? current.status);
+    ? t("已过期")
+    : t(STATUS_LABEL[current.status] ?? current.status);
   const low = !expired && remainingSec <= 60;
   return (
     <Modal
-      title="上游真实网页登录"
+      title={t("上游真实网页登录")}
       wide
       className="login-browser"
       onClose={onClose}
@@ -177,13 +178,13 @@ export function LoginBrowser({
         <div className="lb-stage">
           {expired ? (
             <p role="alert" className="error">
-              登录会话已过期，请关闭并重新发起登录。
+              {t("登录会话已过期，请关闭并重新发起登录。")}
             </p>
           ) : image ? (
             <img
               className="browser-frame"
               src={image}
-              alt="muse.ai 登录页面实时截图，点击转发到真实页面"
+              alt={t("muse.ai 登录页面实时截图，点击转发到真实页面")}
               draggable={false}
               onClick={(e) =>
                 void input({
@@ -206,7 +207,7 @@ export function LoginBrowser({
               }}
             />
           ) : (
-            <div className="empty">正在获取上游页面截图…</div>
+            <div className="empty">{t("正在获取上游页面截图…")}</div>
           )}
         </div>
         <aside className="lb-panel">
@@ -216,15 +217,15 @@ export function LoginBrowser({
             </span>
             <span
               className={`lb-timer ${low ? "low" : ""}`}
-              title={`到期 ${time(current.expires_at)}`}
+              title={t("到期 {time}", { time: time(current.expires_at) })}
             >
               {expired ? "--:--" : clock(remainingSec)}
             </span>
           </div>
           <ol className="lb-steps">
-            <li>点截图里的输入框</li>
-            <li>在下方输入并发送</li>
-            <li>登录成功后点「完成验证并入池」</li>
+            <li>{t("点截图里的输入框")}</li>
+            <li>{t("在下方输入并发送")}</li>
+            <li>{t("登录成功后点「完成验证并入池」")}</li>
           </ol>
           {error && (
             <p role="alert" className="error">
@@ -241,13 +242,13 @@ export function LoginBrowser({
             }}
           >
             <input
-              aria-label="发送到上游页面的文本"
+              aria-label={t("发送到上游页面的文本")}
               type={masked ? "password" : "text"}
               autoComplete="off"
               value={text}
               disabled={expired}
               onChange={(e) => setText(e.target.value)}
-              placeholder="邮箱、手机号或验证码"
+              placeholder={t("邮箱、手机号或验证码")}
             />
             <div className="lb-row">
               <button
@@ -255,14 +256,14 @@ export function LoginBrowser({
                 onClick={() => setMasked((v) => !v)}
                 aria-pressed={!masked}
               >
-                {masked ? "显示文本" : "隐藏文本"}
+                {masked ? t("显示文本") : t("隐藏文本")}
               </button>
               <button className="primary" disabled={busy || !text || expired}>
-                发送到页面
+                {t("发送到页面")}
               </button>
             </div>
           </form>
-          <div className="lb-keys" aria-label="按键">
+          <div className="lb-keys" aria-label={t("按键")}>
             {KEYS.map(([key, label]) => (
               <button
                 key={key}
@@ -270,39 +271,39 @@ export function LoginBrowser({
                 disabled={busy || expired}
                 onClick={() => void input({ type: "key", key })}
               >
-                {label}
+                {t(label)}
               </button>
             ))}
             <button
               type="button"
-              aria-label="向上滚动"
-              title="向上滚动"
+              aria-label={t("向上滚动")}
+              title={t("向上滚动")}
               disabled={busy || expired}
               onClick={() => void input({ type: "scroll", delta_y: -500 })}
             >
-              上翻
+              {t("上翻")}
             </button>
             <button
               type="button"
-              aria-label="向下滚动"
-              title="向下滚动"
+              aria-label={t("向下滚动")}
+              title={t("向下滚动")}
               disabled={busy || expired}
               onClick={() => void input({ type: "scroll", delta_y: 500 })}
             >
-              下翻
+              {t("下翻")}
             </button>
           </div>
           <p className="lb-note">
-            输入只转发、不在本地保存。截图上可滚轮翻页。
+            {t("输入只转发、不在本地保存。截图上可滚轮翻页。")}
           </p>
           <footer>
-            <button onClick={onClose}>取消登录</button>
+            <button onClick={onClose}>{t("取消登录")}</button>
             <button
               className="primary"
               disabled={busy || expired || current.status === "completed"}
               onClick={() => void complete()}
             >
-              {busy ? "处理中…" : "完成验证并入池"}
+              {busy ? t("处理中…") : t("完成验证并入池")}
             </button>
           </footer>
         </aside>

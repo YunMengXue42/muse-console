@@ -1,4 +1,23 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
+import zh from "../_locales/zh_CN/messages.json";
+import en from "../_locales/en/messages.json";
+import { msg } from "../src/i18n";
+
+function useMessages(messages: Record<string, { message: string }>) {
+  vi.stubGlobal("chrome", {
+    i18n: {
+      getMessage(key: string, subs: string | string[] = []) {
+        const values = typeof subs === "string" ? [subs] : subs;
+        return (messages[key]?.message ?? "").replace(
+          /\$(\d+)/g,
+          (_, n) => values[Number(n) - 1] ?? "",
+        );
+      },
+    },
+  });
+}
+beforeEach(() => useMessages(zh));
+afterEach(() => vi.unstubAllGlobals());
 import { existsSync, readFileSync } from "node:fs";
 import { describeStatus, headline } from "../src/status-view";
 
@@ -91,4 +110,42 @@ it("development loopback excludes IPv6, which extension CSP cannot allow", async
   expect(() => originOf("http://[::1]:18610", true)).toThrow();
   const manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
   expect(JSON.stringify(manifest)).not.toContain("[::1]");
+});
+
+it("renders English unpaired and sync headlines", () => {
+  useMessages(en);
+  expect(describeStatus({ paired: false })).toBe(
+    "Device: Not paired\nAutomatic sync: Off\nSessions: none",
+  );
+  expect(
+    headline({
+      paired: true,
+      enabled: true,
+      sources: [{ state: "committed" }],
+    }),
+  ).toEqual({ text: "Sync healthy", tone: "ok" });
+  expect(msg("missingKey")).toBe("missingKey");
+});
+it("renders English partition and version substitutions", () => {
+  useMessages(en);
+  const text = describeStatus({
+    paired: true,
+    enabled: true,
+    state: "paired",
+    sources: [
+      {
+        source: JSON.stringify(["1", { topLevelSite: "https://example.org" }]),
+        state: "committed",
+        capture_id: "cap-1",
+        account_id: "acc-1",
+        credential_version: 3,
+      },
+    ],
+  });
+  expect(text).toContain(
+    "Cookie store 1 (partition https://example.org): Synced",
+  );
+  expect(text).toContain("capture_id cap-1");
+  expect(text).toContain("Account acc-1 · credential_version 3");
+  expect(text).not.toMatch(/[\u4e00-\u9fff]/);
 });

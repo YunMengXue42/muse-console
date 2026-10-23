@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useEffect, useRef, type ReactNode } from "react";
 /** 模态框锁定背景焦点，支持 Escape 并将焦点归还触发控件。 */
 export function Modal({
@@ -26,7 +27,7 @@ export function Modal({
   }, []);
   return (
     <div
-      className={`veil ${title === "扩展设备配对" ? "device-pairing" : ""}`}
+      className={`veil ${title === t("扩展设备配对") ? "device-pairing" : ""}`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -69,7 +70,7 @@ export function Modal({
       >
         <header>
           <h2>{title}</h2>
-          <button className="icon" aria-label="关闭" onClick={onClose}>
+          <button className="icon" aria-label={t("关闭")} onClick={onClose}>
             ×
           </button>
         </header>
@@ -80,7 +81,7 @@ export function Modal({
 }
 /** 未收到真实数据时明确显示空状态。 */
 export function Empty({
-  text = "暂无记录",
+  text = t("暂无记录"),
   children,
 }: {
   text?: string;
@@ -89,8 +90,8 @@ export function Empty({
   return (
     <div className="empty">
       <span className="empty-mark">—</span>
-      <h3>{text}</h3>
-      <p>当前无可显示内容。</p>
+      <h3>{t(text)}</h3>
+      <p>{t("当前无可显示内容。")}</p>
       {children}
     </div>
   );

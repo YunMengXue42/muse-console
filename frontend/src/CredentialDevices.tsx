@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Api, ApiError, time, type Account } from "./api";
+import { Api, ApiError, type Account } from "./api";
+import { t, locale } from "./i18n";
 import { Modal } from "./ui";
 
 type Device = {
@@ -22,6 +23,12 @@ const disabledMessage =
   "服务未开启凭据导入（404），需管理员开启。账号池其他功能不受影响。";
 function expires(value: number | string) {
   return typeof value === "number" ? value * 1000 : Date.parse(value);
+}
+
+function time(value: number | string) {
+  return new Date(
+    typeof value === "number" ? value * 1000 : value,
+  ).toLocaleString(locale(), { hour12: false });
 }
 
 /** 独立管理入口：挑战只留在当前弹窗内存，不接触上游会话内容。 */
@@ -128,53 +135,58 @@ export function CredentialDevices({
   }
   return (
     <Modal
-      title="扩展设备配对"
+      title={t("扩展设备配对")}
       wide
       onClose={() => {
         if (!busy) onClose();
       }}
     >
       <p className="muted">
-        扩展会把浏览器里的 Muse
-        登录交给本服务器。授权前核对下面三项与扩展一致；扩展拿不到管理员 Key。
+        {t(
+          "扩展会把浏览器里的 Muse 登录交给本服务器。授权前核对下面三项与扩展一致；扩展拿不到管理员 Key。",
+        )}
       </p>
       <dl>
-        <dt>服务地址</dt>
+        <dt>{t("服务地址")}</dt>
         <dd className="mono">
-          {challenge?.server_origin ?? "生成配对挑战后显示"}
+          {challenge?.server_origin ?? t("生成配对挑战后显示")}
         </dd>
-        <dt>服务器 ID</dt>
-        <dd className="mono">{challenge?.server_id ?? "生成配对挑战后显示"}</dd>
-        <dt>应用指纹（非 TLS 证书指纹）</dt>
+        <dt>{t("服务器 ID")}</dt>
         <dd className="mono">
-          {challenge?.fingerprint ?? "生成配对挑战后显示"}
+          {challenge?.server_id ?? t("生成配对挑战后显示")}
+        </dd>
+        <dt>{t("应用指纹（非 TLS 证书指纹）")}</dt>
+        <dd className="mono">
+          {challenge?.fingerprint ?? t("生成配对挑战后显示")}
         </dd>
       </dl>
-      <p className="fine">指纹不能代替 HTTPS 证书校验。</p>
+      <p className="fine">{t("指纹不能代替 HTTPS 证书校验。")}</p>
       {error && (
         <p role="alert" className="error">
-          {error}
+          {t(error)}
         </p>
       )}
-      {message && <p role="status">{message}</p>}
-      <h3>一次性配对</h3>
+      {message && <p role="status">{t(message)}</p>}
+      <h3>{t("一次性配对")}</h3>
       <p className="fine">
-        配对码短时有效、只能用一次，关窗即隐藏。额度＝该设备最多自动新增的账号数。
+        {t(
+          "配对码短时有效、只能用一次，关窗即隐藏。额度＝该设备最多自动新增的账号数。",
+        )}
       </p>
       <div className="pairing-controls">
         <label>
-          配对设备备注（可选）
+          {t("配对设备备注（可选）")}
           <input
             maxLength={100}
             autoComplete="off"
             value={pairingLabel}
             disabled={busy || loading}
-            placeholder="例如：办公主力浏览器"
+            placeholder={t("例如：办公主力浏览器")}
             onChange={(e) => setPairingLabel(e.target.value)}
           />
         </label>
         <label>
-          自动新增账号额度（0–10）
+          {t("自动新增账号额度（0–10）")}
           <input
             type="number"
             min={0}
@@ -213,13 +225,13 @@ export function CredentialDevices({
           })
         }
       >
-        生成配对挑战
+        {t("生成配对挑战")}
       </button>
       {challenge &&
         (expires(challenge.expires_at) > now ? (
           <>
             <label>
-              一次性配对挑战
+              {t("一次性配对挑战")}
               <input
                 readOnly
                 autoComplete="off"
@@ -229,18 +241,19 @@ export function CredentialDevices({
               />
             </label>
             <p className="fine">
-              剩余{" "}
-              {Math.max(
-                0,
-                Math.ceil((expires(challenge.expires_at) - now) / 1000),
-              )}
-              s（{time(challenge.expires_at)} 到期）。手动填入扩展，勿外传。
+              {t("剩余 {seconds}s（{expiry} 到期）。手动填入扩展，勿外传。", {
+                seconds: Math.max(
+                  0,
+                  Math.ceil((expires(challenge.expires_at) - now) / 1000),
+                ),
+                expiry: time(challenge.expires_at),
+              })}
             </p>
           </>
         ) : (
-          <p role="status">配对挑战已过期，请重新生成。</p>
+          <p role="status">{t("配对挑战已过期，请重新生成。")}</p>
         ))}
-      <h3>已配对设备</h3>
+      <h3>{t("已配对设备")}</h3>
       <button
         disabled={busy || loading}
         onClick={() => {
@@ -248,23 +261,23 @@ export function CredentialDevices({
           setRevision((v) => v + 1);
         }}
       >
-        刷新设备列表
+        {t("刷新设备列表")}
       </button>
       {loading ? (
-        <p role="status">正在读取设备…</p>
+        <p role="status">{t("正在读取设备…")}</p>
       ) : !error && devices.length === 0 ? (
-        <p className="muted">暂无已配对设备。</p>
+        <p className="muted">{t("暂无已配对设备。")}</p>
       ) : null}
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>设备 ID</th>
-              <th>备注</th>
-              <th>到期时间</th>
-              <th>状态</th>
-              <th>新增账号额度</th>
-              <th>操作</th>
+              <th>{t("设备 ID")}</th>
+              <th>{t("备注")}</th>
+              <th>{t("到期时间")}</th>
+              <th>{t("状态")}</th>
+              <th>{t("新增账号额度")}</th>
+              <th>{t("操作")}</th>
             </tr>
           </thead>
           <tbody>
@@ -275,12 +288,12 @@ export function CredentialDevices({
                 <td>{time(device.expires_at)}</td>
                 <td>
                   {device.revoked
-                    ? "已撤销"
+                    ? t("已撤销")
                     : expires(device.expires_at) <= now
-                      ? "已过期"
-                      : "有效"}
+                      ? t("已过期")
+                      : t("有效")}
                 </td>
-                <td>{device.new_account_limit ?? "未提供"}</td>
+                <td>{device.new_account_limit ?? t("未提供")}</td>
                 <td>
                   <button
                     disabled={busy || device.revoked}
@@ -288,7 +301,7 @@ export function CredentialDevices({
                       setPending({ kind: "revoke", id: device.id })
                     }
                   >
-                    撤销设备 {device.id}
+                    {t("撤销设备 {id}", { id: device.id })}
                   </button>
                 </td>
               </tr>
@@ -296,10 +309,11 @@ export function CredentialDevices({
           </tbody>
         </table>
       </div>
-      <h3>身份冲突确认</h3>
+      <h3>{t("身份冲突确认")}</h3>
       <p className="fine">
-        扩展提示冲突时使用：填它给的
-        capture_id，选设备和目标账号。只对这一次生效。
+        {t(
+          "扩展提示冲突时使用：填它给的 capture_id，选设备和目标账号。只对这一次生效。",
+        )}
       </p>
       <form
         onSubmit={(event) => {
@@ -318,7 +332,7 @@ export function CredentialDevices({
         }}
       >
         <label>
-          设备 device_id
+          {t("设备 device_id")}
           <select
             required
             value={deviceId}
@@ -328,7 +342,7 @@ export function CredentialDevices({
               setPending(undefined);
             }}
           >
-            <option value="">选择有效设备</option>
+            <option value="">{t("选择有效设备")}</option>
             {activeDevices.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.label ? `${d.id} (${d.label})` : d.id}
@@ -337,7 +351,7 @@ export function CredentialDevices({
           </select>
         </label>
         <label>
-          候选 capture_id
+          {t("候选 capture_id")}
           <input
             required
             maxLength={200}
@@ -351,7 +365,7 @@ export function CredentialDevices({
           />
         </label>
         <label>
-          目标 account_id
+          {t("目标 account_id")}
           <select
             required
             value={accountId}
@@ -361,7 +375,7 @@ export function CredentialDevices({
               setPending(undefined);
             }}
           >
-            <option value="">选择现有账号</option>
+            <option value="">{t("选择现有账号")}</option>
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.label ? `${a.id} (${a.label})` : a.id}
@@ -379,18 +393,22 @@ export function CredentialDevices({
             !accounts.some((a) => a.id === accountId)
           }
         >
-          核对本次候选
+          {t("核对本次候选")}
         </button>
       </form>
       {pending && (
-        <section aria-label="操作确认">
+        <section aria-label={t("操作确认")}>
           <h3>
             {pending.kind === "revoke"
-              ? "确认撤销设备？"
-              : "确认本次身份冲突？"}
+              ? t("确认撤销设备？")
+              : t("确认本次身份冲突？")}
           </h3>
           {pending.kind === "revoke" ? (
-            <p>设备 {pending.id} 将不能继续提交凭据；不会删除已入池账号。</p>
+            <p>
+              {t("设备 {id} 将不能继续提交凭据；不会删除已入池账号。", {
+                id: pending.id,
+              })}
+            </p>
           ) : (
             <p className="mono">
               device_id: {pending.device_id}
@@ -399,11 +417,13 @@ export function CredentialDevices({
               <br />
               account_id: {pending.account_id}
               <br />
-              请确认浏览器当前登录的就是该账号。只对本次候选生效，账号版本再变需重新确认。
+              {t(
+                "请确认浏览器当前登录的就是该账号。只对本次候选生效，账号版本再变需重新确认。",
+              )}
             </p>
           )}
           <button disabled={busy} onClick={() => setPending(undefined)}>
-            取消操作
+            {t("取消操作")}
           </button>
           <button
             className="primary"
@@ -437,13 +457,13 @@ export function CredentialDevices({
               })
             }
           >
-            {pending.kind === "revoke" ? "确认撤销" : "仅确认本次候选"}
+            {pending.kind === "revoke" ? t("确认撤销") : t("仅确认本次候选")}
           </button>
         </section>
       )}
       <footer>
         <button disabled={busy} onClick={onClose}>
-          关闭配对窗口
+          {t("关闭配对窗口")}
         </button>
       </footer>
     </Modal>

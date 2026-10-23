@@ -1,3 +1,4 @@
+import { t, locale } from "./i18n";
 /** 管理接口错误保留 HTTP 状态，以区分认证失效与未实现功能。 */
 export class ApiError extends Error {
   constructor(
@@ -39,10 +40,10 @@ export class Api {
       throw new ApiError(
         response.status,
         typeof detail === "string"
-          ? detail
+          ? t(detail)
           : response.status === 501
-            ? "当前驱动不支持此功能，请切换真实浏览器驱动。"
-            : `请求失败（${response.status}）`,
+            ? t("当前驱动不支持此功能，请切换真实浏览器驱动。")
+            : t("请求失败（{status}）", { status: response.status }),
       );
     }
     return data as T;
@@ -57,7 +58,10 @@ export class Api {
     });
     if (!response.ok) {
       if (response.status === 401) this.unauthorized();
-      throw new ApiError(response.status, `请求失败（${response.status}）`);
+      throw new ApiError(
+        response.status,
+        t("请求失败（{status}）", { status: response.status }),
+      );
     }
     return response.text();
   }
@@ -139,10 +143,10 @@ export interface LoginSession {
 }
 /** 时间戳接受 API 的秒级数字与 ISO 字符串。 */
 export function time(value: number | string | null | undefined) {
-  if (!value) return "从未";
+  if (!value) return t("从未");
   return new Date(
     typeof value === "number" ? value * 1000 : value,
-  ).toLocaleString("zh-CN", { hour12: false });
+  ).toLocaleString(locale(), { hour12: false });
 }
 /** 图片显示坐标映射到上游浏览器真实视口。 */
 export function framePoint(

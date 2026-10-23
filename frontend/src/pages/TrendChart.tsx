@@ -1,9 +1,10 @@
+import { t, locale } from "../i18n";
 import { useState, type CSSProperties } from "react";
 import type { Stats } from "../api";
 import "./trend-chart.css";
 
 function stamp(t: number, detailed = false, days = false) {
-  return new Date(t * 1000).toLocaleString("zh-CN", {
+  return new Date(t * 1000).toLocaleString(locale(), {
     ...(days || detailed ? { month: "2-digit", day: "2-digit" } : {}),
     hour: "2-digit",
     minute: "2-digit",
@@ -40,8 +41,8 @@ export function TrendChart({
     interval === null
       ? ""
       : interval >= 60
-        ? `${interval / 60} 小时 / 格`
-        : `${interval} 分钟 / 格`;
+        ? t("{hours} 小时 / 格", { hours: interval / 60 })
+        : t("{interval} 分钟 / 格", { interval });
 
   return (
     <div className="trend-chart">
@@ -53,29 +54,29 @@ export function TrendChart({
                 {stamp(active.t, true)}
               </time>
               <span>
-                请求 <strong>{active.count}</strong>
+                {t("请求")} <strong>{active.count}</strong>
               </span>
               <span>
-                错误 <strong>{active.errors}</strong>
+                {t("错误")} <strong>{active.errors}</strong>
               </span>
             </>
           ) : (
             <>
               <span>
-                单格峰值 <strong>{peak}</strong>
+                {t("单格峰值")} <strong>{peak}</strong>
               </span>
               <span className="muted">{intervalLabel}</span>
             </>
           )}
         </div>
-        <div className="trend-legend" aria-label="图例">
+        <div className="trend-legend" aria-label={t("图例")}>
           <span>
             <i className="trend-request-key" />
-            请求
+            {t("请求")}
           </span>
           <span>
             <i className="trend-error-key" />
-            错误
+            {t("错误")}
           </span>
         </div>
       </div>
@@ -88,7 +89,7 @@ export function TrendChart({
         <div
           className="trend-canvas"
           role="group"
-          aria-label="请求与错误数量趋势，左右方向键查看各时段"
+          aria-label={t("请求与错误数量趋势，左右方向键查看各时段")}
           tabIndex={0}
           onBlur={() => setSelected(null)}
           onPointerLeave={() => setSelected(null)}

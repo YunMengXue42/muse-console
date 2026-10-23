@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useState } from "react";
 import { Api, time } from "../api";
 import type { Key, Setter, Ask, ModalKind } from "../types";
@@ -45,31 +46,31 @@ export function KeysPage({
           aria-labelledby="api-endpoint-title"
         >
           <div className="api-endpoint-copy">
-            <h2 id="api-endpoint-title">调用地址</h2>
+            <h2 id="api-endpoint-title">{t("调用地址")}</h2>
             <span className="muted">Base URL</span>
           </div>
           <div className="api-endpoint-field">
             <input
-              aria-label="调用地址"
+              aria-label={t("调用地址")}
               value={baseUrl}
               readOnly
               spellCheck={false}
               onFocus={(event) => event.currentTarget.select()}
             />
             <button className="console-action" onClick={copyAddress}>
-              {copyState === "copied" ? "已复制" : "复制地址"}
+              {copyState === "copied" ? t("已复制") : t("复制地址")}
             </button>
           </div>
           <span className="api-endpoint-feedback" role="status">
-            {copyState === "failed" ? "复制失败，请选中地址复制" : ""}
+            {copyState === "failed" ? t("复制失败，请选中地址复制") : ""}
           </span>
         </section>
         <section
           className="panel keys-builtin"
           aria-labelledby="keys-builtin-title"
         >
-          <h2 id="keys-builtin-title" title="由服务配置管理，此处不可修改">
-            内置身份
+          <h2 id="keys-builtin-title" title={t("由服务配置管理，此处不可修改")}>
+            {t("内置身份")}
           </h2>
           {builtin.length ? (
             <ul>
@@ -78,30 +79,32 @@ export function KeysPage({
                   key={k.id}
                   title={
                     k.usage.last_request_at
-                      ? `最近 ${time(k.usage.last_request_at)}`
-                      : "暂无调用"
+                      ? t("最近 {n}", { n: time(k.usage.last_request_at) })
+                      : t("暂无调用")
                   }
                 >
                   <strong>{k.name}</strong>
                   <span>
                     24h {k.usage.requests_24h}
                     {k.usage.errors_24h ? (
-                      <em> / {k.usage.errors_24h} 错</em>
+                      <em>{t(" / {n} 错", { n: k.usage.errors_24h })}</em>
                     ) : null}
                   </span>
-                  <small>共 {k.usage.total}</small>
+                  <small>{t("共 {n}", { n: k.usage.total })}</small>
                 </li>
               ))}
             </ul>
           ) : (
-            <span className="muted">无</span>
+            <span className="muted">{t("无")}</span>
           )}
         </section>
       </div>
       <section className="panel keys-list">
         <header>
-          <h2>应用密钥</h2>
-          <span className="muted console-key-hint">明文仅在创建时显示一次</span>
+          <h2>{t("应用密钥")}</h2>
+          <span className="muted console-key-hint">
+            {t("明文仅在创建时显示一次")}
+          </span>
         </header>
         {keys.length ? (
           <div className="table-wrap">
@@ -114,16 +117,16 @@ export function KeysPage({
                     "总调用",
                     "24h 请求 / 错误",
                     "操作",
-                  ].map((t) => (
+                  ].map((label) => (
                     <th
-                      key={t}
+                      key={label}
                       className={
-                        ["总调用", "24h 请求 / 错误"].includes(t)
+                        ["总调用", "24h 请求 / 错误"].includes(label)
                           ? "console-number"
                           : undefined
                       }
                     >
-                      {t}
+                      {t(label)}
                     </th>
                   ))}
                 </tr>
@@ -133,33 +136,33 @@ export function KeysPage({
                   const lastUsed = k.usage.last_request_at ?? k.last_used_at;
                   return (
                     <tr key={k.id}>
-                      <td data-label="名称 / 前缀">
+                      <td data-label={t("名称 / 前缀")}>
                         <div className="console-identity">
-                          <strong>{k.name || "未命名密钥"}</strong>
+                          <strong>{k.name || t("未命名密钥")}</strong>
                           <small className="mono">{k.prefix}…</small>
                           {k.note && <small className="muted">{k.note}</small>}
                         </div>
                       </td>
-                      <td data-label="状态">
+                      <td data-label={t("状态")}>
                         {badge(k.revoked ? "disabled" : "active")}
                       </td>
-                      <td data-label="总调用" className="console-number">
+                      <td data-label={t("总调用")} className="console-number">
                         <div className="console-identity">
                           <span>{k.usage.total}</span>
                           {lastUsed ? (
                             <small className="muted">
-                              最近 {time(lastUsed)}
+                              {t("最近 {date}", { date: time(lastUsed) })}
                             </small>
                           ) : null}
                         </div>
                       </td>
                       <td
-                        data-label="24h 请求 / 错误"
+                        data-label={t("24h 请求 / 错误")}
                         className="console-number"
                       >
                         {k.usage.requests_24h} / {k.usage.errors_24h}
                       </td>
-                      <td data-label="操作">
+                      <td data-label={t("操作")}>
                         <div className="row-actions">
                           <button
                             className="console-action"
@@ -169,7 +172,7 @@ export function KeysPage({
                               setNote?.(k.note ?? "");
                             }}
                           >
-                            重命名
+                            {t("重命名")}
                           </button>
                           <button
                             className={
@@ -177,7 +180,12 @@ export function KeysPage({
                             }
                             onClick={() =>
                               ask(
-                                `${k.revoked ? "恢复" : "吊销"}密钥「${k.name}」？${k.revoked ? "" : "现有应用将立即失去访问权限。"}`,
+                                k.revoked
+                                  ? t("恢复密钥「{name}」？", { name: k.name })
+                                  : t(
+                                      "吊销密钥「{name}」？现有应用将立即失去访问权限。",
+                                      { name: k.name },
+                                    ),
                                 () =>
                                   api.request(`/keys/${k.id}`, "PATCH", {
                                     revoked: !k.revoked,
@@ -185,18 +193,20 @@ export function KeysPage({
                               )
                             }
                           >
-                            {k.revoked ? "恢复" : "吊销"}
+                            {k.revoked ? t("恢复") : t("吊销")}
                           </button>
                           <button
                             className="danger-text"
                             onClick={() =>
                               ask(
-                                `永久删除密钥「${k.name}」？此操作不可撤销。`,
+                                t("永久删除密钥「{n}」？此操作不可撤销。", {
+                                  n: k.name,
+                                }),
                                 () => api.request(`/keys/${k.id}`, "DELETE"),
                               )
                             }
                           >
-                            删除
+                            {t("删除")}
                           </button>
                         </div>
                       </td>
@@ -207,9 +217,9 @@ export function KeysPage({
             </table>
           </div>
         ) : (
-          <Empty text="暂无应用密钥">
+          <Empty text={t("暂无应用密钥")}>
             <button className="primary" onClick={() => openModal("key")}>
-              创建首个密钥
+              {t("创建首个密钥")}
             </button>
           </Empty>
         )}

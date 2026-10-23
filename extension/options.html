@@ -3,27 +3,47 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>配对与授权 · Muse Console</title>
+    <title data-i18n="pairingAndAuthorizationMuseConsole">
+      配对与授权 · Muse Console
+    </title>
     <link rel="stylesheet" href="ui.css" />
   </head>
   <body class="options-page">
     <div class="options-shell">
       <header class="page-header">
         <div class="brand">Muse <span>Console</span></div>
-        <span class="badge">浏览器扩展</span>
+        <span class="badge"
+          ><span data-i18n="browserExtension">浏览器扩展</span></span
+        >
       </header>
       <main>
         <div class="page-intro">
-          <p class="eyebrow">会话同步设置</p>
-          <h1>配对与授权</h1>
-          <p class="muted">配对受信服务器，按需授权同步。</p>
+          <p class="eyebrow">
+            <span data-i18n="sessionSyncSettings">会话同步设置</span>
+          </p>
+          <h1><span data-i18n="pairingAndAuthorization">配对与授权</span></h1>
+          <p class="muted">
+            <span data-i18n="pairATrustedServerAnd"
+              >配对受信服务器，按需授权同步。</span
+            >
+          </p>
         </div>
         <aside class="notice" aria-labelledby="authorization-title">
-          <h2 id="authorization-title">仅授权受信服务器</h2>
+          <h2 id="authorization-title">
+            <span data-i18n="authorizeTrustedServersOnly"
+              >仅授权受信服务器</span
+            >
+          </h2>
           <p>
-            只读采集 Muse 的四个会话 Cookie。<strong
-              >开启同步后，所选服务器将获得使用该 Muse 会话的能力。</strong
-            >不采集其他站点，不保存管理员密钥。
+            <span data-i18n="readsOnlyTheFourMuse">
+              只读采集 Muse 的四个会话 Cookie。</span
+            ><strong
+              ><span data-i18n="enablingSyncLetsTheSelected"
+                >开启同步后，所选服务器将获得使用该 Muse 会话的能力。</span
+              ></strong
+            ><span data-i18n="noCollectionFromOtherSites"
+              >不采集其他站点，不保存管理员密钥。
+            </span>
           </p>
         </aside>
         <div class="settings-layout">
@@ -32,16 +52,20 @@
               <header class="section-heading">
                 <span class="step" aria-hidden="true">01</span>
                 <div>
-                  <h2 id="server-title">验证服务器身份</h2>
+                  <h2 id="server-title">
+                    <span data-i18n="verifyServerIdentity">验证服务器身份</span>
+                  </h2>
                   <p class="fine">
-                    在受信控制台核对 server_id 与 fingerprint；后者不是 TLS 证书
-                    pin。
+                    <span data-i18n="checkServerIdAndFingerprint">
+                      在受信控制台核对 server_id 与 fingerprint；后者不是 TLS
+                      证书 pin。
+                    </span>
                   </p>
                 </div>
               </header>
               <label class="field" for="origin"
-                >服务器 origin
-                <input
+                ><span data-i18n="serverOrigin">服务器 origin </span
+                ><input
                   id="origin"
                   placeholder="https://api.example.com"
                   autocomplete="off"
@@ -50,41 +74,71 @@
                 />
               </label>
               <p id="origin-help" class="fine field-help">
-                协议、主机及端口（如有），不含路径。
+                <span data-i18n="schemeHostAndPortIf">
+                  协议、主机及端口（如有），不含路径。
+                </span>
               </p>
               <label class="check-row" for="development">
                 <input type="checkbox" id="development" />
-                <span>开发模式：允许本机 loopback HTTP（仅限开发）</span>
+                <span
+                  ><span data-i18n="developmentModeAllowLocalLoopback"
+                    >开发模式：允许本机 loopback HTTP（仅限开发）</span
+                  ></span
+                >
               </label>
               <div class="actions">
-                <button id="inspect">授权访问并查询身份</button>
+                <button id="inspect">
+                  <span data-i18n="grantAccessAndCheckIdentity"
+                    >授权访问并查询身份</span
+                  >
+                </button>
               </div>
-              <div class="readout-label">服务器身份</div>
-              <pre id="identity" class="readout" role="status">
+              <div class="readout-label">
+                <span data-i18n="serverIdentity">服务器身份</span>
+              </div>
+              <pre
+                id="identity"
+                class="readout"
+                role="status"
+                data-i18n="serverIdentityNotYetVerified"
+              >
 尚未验证服务器身份</pre>
             </section>
             <section class="panel" aria-labelledby="pair-title">
               <header class="section-heading">
                 <span class="step" aria-hidden="true">02</span>
                 <div>
-                  <h2 id="pair-title">兑换挑战并配对</h2>
-                  <p class="fine">从受信控制台获取一次性挑战。</p>
+                  <h2 id="pair-title">
+                    <span data-i18n="redeemChallengeAndPair"
+                      >兑换挑战并配对</span
+                    >
+                  </h2>
+                  <p class="fine">
+                    <span data-i18n="getAOneTimeChallenge"
+                      >从受信控制台获取一次性挑战。</span
+                    >
+                  </p>
                 </div>
               </header>
               <label class="field" for="challenge"
-                >一次性挑战（非 admin key）
-                <input id="challenge" type="password" autocomplete="off" />
+                ><span data-i18n="oneTimeChallengeNotAn"
+                  >一次性挑战（非 admin key） </span
+                ><input id="challenge" type="password" autocomplete="off" />
               </label>
               <label class="check-row" for="confirmIdentity">
                 <input id="confirmIdentity" type="checkbox" />
                 <span
-                  >我已在受信控制台核对 server_id 与 fingerprint，同意配对此精确
-                  origin</span
+                  ><span data-i18n="iCheckedServerIdAnd"
+                    >我已在受信控制台核对 server_id 与
+                    fingerprint，同意配对此精确 origin</span
+                  ></span
                 >
               </label>
               <div class="actions">
                 <button id="pair" class="primary" disabled>
-                  兑换挑战并配对
+                  <span data-i18n="redeemChallengeAndPair">
+                    兑换挑战并配对
+                  </span>
                 </button>
               </div>
             </section>
@@ -92,46 +146,85 @@
               <header class="section-heading">
                 <span class="step" aria-hidden="true">03</span>
                 <div>
-                  <h2 id="sync-title">授权自动同步</h2>
-                  <p class="fine">配对不等于授权同步。</p>
+                  <h2 id="sync-title">
+                    <span data-i18n="authorizeAutomaticSync">授权自动同步</span>
+                  </h2>
+                  <p class="fine">
+                    <span data-i18n="pairingDoesNotAuthorizeSync"
+                      >配对不等于授权同步。</span
+                    >
+                  </p>
                 </div>
               </header>
               <label class="check-row consent" for="consent">
                 <input id="consent" type="checkbox" />
                 <span
-                  >我授权将当前及后续 Muse
-                  会话自动发送给配对服务器（首次可新增一个账号，切号须管理员确认）</span
+                  ><span data-i18n="iAuthorizeAutomaticSendingOf"
+                    >我授权将当前及后续 Muse
+                    会话自动发送给配对服务器（首次可新增一个账号，切号须管理员确认）</span
+                  ></span
                 >
               </label>
               <div class="actions">
-                <button id="enable" class="primary">开启自动同步</button>
-                <button id="pause">暂停并清除待传 Cookie</button>
+                <button id="enable" class="primary">
+                  <span data-i18n="enableAutomaticSync">开启自动同步</span>
+                </button>
+                <button id="pause">
+                  <span data-i18n="pauseAndClearPendingCookies"
+                    >暂停并清除待传 Cookie</span
+                  >
+                </button>
               </div>
             </section>
             <section class="panel" aria-labelledby="device-title">
               <header class="section-heading">
                 <div>
-                  <h2 id="device-title">候选确认与设备维护</h2>
+                  <h2 id="device-title">
+                    <span data-i18n="candidateConfirmationAndDeviceMaintenance"
+                      >候选确认与设备维护</span
+                    >
+                  </h2>
                 </div>
               </header>
               <p class="support-copy">
-                身份待确认或版本冲突：管理员须在控制台确认原 capture_id 与当前
-                credential_version，再重传原候选；原包和 base 版本不变。若显示
-                <code>candidate_lost_new_capture_requires_confirmation</code
-                >，须重新采集，新 capture 须管理员重新确认；旧确认不可复用。
+                <span data-i18n="forIdentityOrVersionConflicts">
+                  身份待确认或版本冲突：管理员须在控制台确认原 capture_id 与当前
+                  credential_version，再重传原候选；原包和 base 版本不变。若显示 </span
+                ><code>candidate_lost_new_capture_requires_confirmation</code
+                ><span data-i18n="captureAgainAndAskAn"
+                  >，须重新采集，新 capture 须管理员重新确认；旧确认不可复用。
+                </span>
               </p>
               <div class="actions">
-                <button id="confirm">管理员确认后重传原候选</button>
-                <button id="recaptureLost">候选丢失：重采并重新申请确认</button>
+                <button id="confirm">
+                  <span data-i18n="resendOriginalCandidateAfterAdmin"
+                    >管理员确认后重传原候选</span
+                  >
+                </button>
+                <button id="recaptureLost">
+                  <span data-i18n="candidateLostRecaptureAndRequest"
+                    >候选丢失：重采并重新申请确认</span
+                  >
+                </button>
               </div>
               <div class="section-divider">
-                <h3>设备令牌与本地配对</h3>
+                <h3>
+                  <span data-i18n="deviceTokenAndLocalPairing"
+                    >设备令牌与本地配对</span
+                  >
+                </h3>
                 <p class="support-copy">
-                  解除本地配对不撤销服务器令牌；还须在控制台撤销设备。
+                  <span data-i18n="forgettingLocalPairingDoesNot">
+                    解除本地配对不撤销服务器令牌；还须在控制台撤销设备。
+                  </span>
                 </p>
                 <div class="actions">
-                  <button id="rotate">轮换设备令牌</button>
-                  <button id="forget" class="danger">解除本地配对</button>
+                  <button id="rotate">
+                    <span data-i18n="rotateDeviceToken">轮换设备令牌</span>
+                  </button>
+                  <button id="forget" class="danger">
+                    <span data-i18n="forgetLocalPairing">解除本地配对</span>
+                  </button>
                 </div>
               </div>
             </section>
@@ -139,15 +232,25 @@
           <aside class="panel status-panel" aria-labelledby="status-title">
             <header class="section-heading">
               <div>
-                <h2 id="status-title">配对与运行状态</h2>
+                <h2 id="status-title">
+                  <span data-i18n="pairingAndSyncStatus">配对与运行状态</span>
+                </h2>
               </div>
             </header>
-            <pre id="status" class="readout" role="status" aria-live="polite">
+            <pre
+              id="status"
+              class="readout"
+              role="status"
+              aria-live="polite"
+              data-i18n="loadingStatus"
+            >
 正在读取状态…</pre>
           </aside>
         </div>
       </main>
-      <footer class="page-footer">Muse Console · 会话同步</footer>
+      <footer class="page-footer">
+        <span data-i18n="museConsoleSessionSync">Muse Console · 会话同步</span>
+      </footer>
     </div>
     <script type="module" src="options.js"></script>
   </body>

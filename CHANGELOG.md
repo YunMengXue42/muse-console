@@ -2,6 +2,11 @@
 
 All notable changes to Muse Console are listed here. Versions follow [Semantic Versioning](https://semver.org/) while the project is pre-1.0: minor versions may change behavior.
 
+## [Unreleased]
+
+### Added
+- English UI for the console and the browser extension. The console follows the browser language and has a 中文 / English switch in the sidebar and on the login screen; the extension follows the browser language.
+
 ## [0.4.3] - 2026-10-23
 
 ### Added

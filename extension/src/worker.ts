@@ -1,3 +1,4 @@
+import { msg } from "./i18n";
 import { Engine } from "./engine";
 import { allowedCookie, museURL } from "./policy";
 const engine = new Engine();
@@ -83,7 +84,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     () =>
       respond({
         ok: false,
-        error: "操作失败：请检查权限、服务器身份和配对有效期。",
+        error: msg("operationFailedCheckPermissionsServerIdentity"),
       }),
   );
   return true;

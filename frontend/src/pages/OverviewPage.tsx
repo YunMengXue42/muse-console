@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { CSSProperties, ReactNode } from "react";
 import type { Account, Stats } from "../api";
 import { TrendChart } from "./TrendChart";
@@ -88,24 +89,30 @@ export function OverviewPage({
             ? `${firstToken.avgSeconds.toFixed(2)} s`
             : "—",
           firstToken?.totalCount
-            ? `累计 ${firstToken.totalCount} 次流式首字采样`
+            ? t("累计 {totalCount} 次流式首字采样", {
+                totalCount: firstToken.totalCount,
+              })
             : "进程启动后尚无采样",
         ],
         [
           "图像生成均耗",
           imageOkGen ? `${imageOkGen.avgSeconds.toFixed(1)} s` : "—",
-          imageOkGen ? `成功 ${imageOkGen.count} 次` : "进程启动后尚无采样",
+          imageOkGen
+            ? t("成功 {count} 次", { count: imageOkGen.count })
+            : "进程启动后尚无采样",
         ],
         [
           "视频生成均耗",
           videoOkGen ? `${videoOkGen.avgSeconds.toFixed(1)} s` : "—",
-          videoOkGen ? `成功 ${videoOkGen.count} 次` : "进程启动后尚无采样",
+          videoOkGen
+            ? t("成功 {count} 次", { count: videoOkGen.count })
+            : "进程启动后尚无采样",
         ],
         [
           "只回文本自动重投",
           textOnlyRetries,
           retrySuccesses > 0
-            ? `重投后成功 ${retrySuccesses} 次`
+            ? t("重投后成功 {retrySuccesses} 次", { retrySuccesses })
             : "MediaWait 状态机累计触发",
         ],
       ]
@@ -114,19 +121,19 @@ export function OverviewPage({
   return (
     <div className="console-page overview-page">
       <div className="toolbar section-controls">
-        <span className="muted">统计窗口</span>
+        <span className="muted">{t("统计窗口")}</span>
         {[
           ["1h", "近 1 小时"],
           ["24h", "近 24 小时"],
           ["7d", "近 7 天"],
-        ].map(([v, t]) => (
+        ].map(([v, label]) => (
           <button
             className={windowValue === v ? "primary" : ""}
             aria-pressed={windowValue === v}
             key={v}
             onClick={() => setWindowValue(v)}
           >
-            {t}
+            {t(label)}
           </button>
         ))}
         {promMetrics?.raw && setDetail && (
@@ -135,12 +142,12 @@ export function OverviewPage({
             className="console-action prom-raw-button"
             onClick={() =>
               setDetail({
-                title: "Prometheus 指标 (/admin/metrics)",
+                title: t("Prometheus 指标 (/admin/metrics)"),
                 body: promMetrics.raw,
               })
             }
           >
-            查看 Prometheus 指标
+            {t("查看 Prometheus 指标")}
           </button>
         )}
       </div>
@@ -153,7 +160,7 @@ export function OverviewPage({
             "失败请求",
             stats?.errors,
             stats?.server_errors != null
-              ? `5xx 错误 ${stats.server_errors} 次`
+              ? t("5xx 错误 {n} 次", { n: stats.server_errors })
               : "不含任务轮询请求",
           ],
           [
@@ -167,35 +174,37 @@ export function OverviewPage({
             `P50 ${stats?.latency_ms.p50 ?? "—"} ms`,
           ],
           ...liveMetrics,
-        ].map(([t, v, sub]) => (
-          <section key={String(t)}>
-            <span>{t}</span>
+        ].map(([label, v, sub]) => (
+          <section key={String(label)}>
+            <span>{t(String(label))}</span>
             <strong>{v ?? "—"}</strong>
-            <small>{sub}</small>
+            <small>{t(String(sub))}</small>
           </section>
         ))}
       </div>
       <div className="overview-main">
         <section className="panel overview-trend">
           <header>
-            <h2>调用趋势</h2>
+            <h2>{t("调用趋势")}</h2>
           </header>
           {stats?.series.length && stats.total > 0 ? (
             <TrendChart series={stats.series} windowValue={windowValue} />
           ) : (
-            <Empty text="当前窗口暂无调用" />
+            <Empty text={t("当前窗口暂无调用")} />
           )}
         </section>
         <section className="panel">
           <header>
-            <h2>模型</h2>
-            <span className="muted">{stats?.by_model.length ?? 0} 个</span>
+            <h2>{t("模型")}</h2>
+            <span className="muted">
+              {t("{n} 个", { n: stats?.by_model.length ?? 0 })}
+            </span>
           </header>
           <BarList
-            empty="暂无模型记录"
+            empty={t("暂无模型记录")}
             rows={(stats?.by_model ?? []).map((m) => ({
               key: m.model ?? "unknown",
-              label: m.model ?? "未指定模型",
+              label: m.model ?? t("未指定模型"),
               count: m.count,
               errors: m.errors,
             }))}
@@ -205,11 +214,13 @@ export function OverviewPage({
       <div className={`overview-grid${hasPromData ? " has-live" : ""}`}>
         <section className="panel">
           <header>
-            <h2>账号调度</h2>
-            <span className="muted">{byAccount.length} 个</span>
+            <h2>{t("账号调度")}</h2>
+            <span className="muted">
+              {t("{n} 个", { n: byAccount.length })}
+            </span>
           </header>
           <BarList
-            empty="暂无账号调用记录"
+            empty={t("暂无账号调用记录")}
             rows={byAccount.map((item) => {
               const id = item.account_id;
               const label = (id && accountLabels.get(id)) || id;
@@ -226,7 +237,7 @@ export function OverviewPage({
                       {label}
                     </button>
                   ) : (
-                    (label ?? "未分配账号")
+                    (label ?? t("未分配账号"))
                   ),
                 count: item.count,
                 errors: item.errors,
@@ -236,13 +247,13 @@ export function OverviewPage({
         </section>
         <section className="panel">
           <header>
-            <h2>密钥排行</h2>
-            <span className="muted">{byKey.length} 个</span>
+            <h2>{t("密钥排行")}</h2>
+            <span className="muted">{t("{n} 个", { n: byKey.length })}</span>
           </header>
           <BarList
-            empty="暂无密钥调用记录"
+            empty={t("暂无密钥调用记录")}
             rows={byKey.map((item, idx) => {
-              const name = item.key_name || item.key_id || "未记录身份";
+              const name = item.key_name || item.key_id || t("未记录身份");
               return {
                 key: `${item.key_id ?? "anon"}-${idx}`,
                 label:
@@ -268,10 +279,10 @@ export function OverviewPage({
         </section>
         <section className="panel">
           <header>
-            <h2>状态码</h2>
+            <h2>{t("状态码")}</h2>
           </header>
           <BarList
-            empty="暂无状态码记录"
+            empty={t("暂无状态码记录")}
             rows={byStatus.map((item) => ({
               key: String(item.status_code),
               label: badge(String(item.status_code)),
@@ -283,14 +294,14 @@ export function OverviewPage({
         {hasPromData && (
           <section className="panel">
             <header>
-              <h2>进程内累计</h2>
-              <span className="muted">自启动起</span>
+              <h2>{t("进程内累计")}</h2>
+              <span className="muted">{t("自启动起")}</span>
             </header>
             <div className="bar-scroll">
-              <h3 className="bar-group">上游调用</h3>
+              <h3 className="bar-group">{t("上游调用")}</h3>
               <BarList
                 bare
-                empty="暂无网关上游记录"
+                empty={t("暂无网关上游记录")}
                 rows={upstreamByAccount.map((row) => ({
                   key: row.account,
                   label: accountLabels.get(row.account) || row.account,
@@ -301,10 +312,10 @@ export function OverviewPage({
                   errors: row.failed,
                 }))}
               />
-              <h3 className="bar-group">媒体等待</h3>
+              <h3 className="bar-group">{t("媒体等待")}</h3>
               <BarList
                 bare
-                empty="暂无媒体状态机事件"
+                empty={t("暂无媒体状态机事件")}
                 rows={mediaOutcomes.map((item) => ({
                   key: `${item.kind}-${item.outcome}`,
                   label: (
@@ -357,7 +368,9 @@ function BarList({
             <span className="bar-label">{r.label}</span>
             <span className="bar-count">
               {r.count}
-              {r.errors ? <em className="bar-errors">{r.errors} 错</em> : null}
+              {r.errors ? (
+                <em className="bar-errors">{t("{n} 错", { n: r.errors })}</em>
+              ) : null}
             </span>
           </div>
           <div className="bar-track" aria-hidden="true">
