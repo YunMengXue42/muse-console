@@ -1,6 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
-import { setImmediate as realImmediate } from "node:timers";
 import { Engine } from "../src/engine";
 import { collect } from "../src/collector";
 import { NAMES, originOf, request } from "../src/policy";
@@ -742,6 +741,22 @@ describe("queue lifecycle and privacy", () => {
     expect(JSON.stringify(local)).not.toContain(TOKEN);
   });
 });
+async function workerStatusBarrier(listeners: Record<string, Function>) {
+  // Status is enqueued on the same worker chain after all preceding events.
+  // Its reply proves completion even when crypto/I/O spans event-loop turns;
+  // unlike fixed setImmediate counts, it does not assume a scheduler speed.
+  return new Promise<unknown>((resolve, reject) => {
+    const accepted = listeners.message(
+      { type: "status" },
+      { id: "extension-id", url: "chrome-extension://extension-id/popup.html" },
+      (response: { ok: boolean; data?: unknown }) => {
+        if (!response?.ok) reject(new Error("worker status barrier failed"));
+        else resolve(response.data);
+      },
+    );
+    if (accepted !== true) reject(new Error("worker status barrier rejected"));
+  });
+}
 it("worker debounces cookie bursts, ignores unrelated cookies, and rejects webpage senders", async () => {
   const listeners: Record<string, Function> = {};
   api.cookies.onChanged = {
@@ -772,10 +787,7 @@ it("worker debounces cookie bursts, ignores unrelated cookies, and rejects webpa
   paired(e);
   await e.save();
   await import("../src/worker");
-  const flush = async () => {
-    for (let i = 0; i < 100; i++)
-      await new Promise((resolve) => realImmediate(resolve));
-  };
+  const flush = () => workerStatusBarrier(listeners);
   await flush();
   expect(fetch).toHaveBeenCalledTimes(1);
   api.cookies.getAll.mockClear();
@@ -851,8 +863,7 @@ it("accepts options page opened as a tab and rejects foreign senders", async () 
       respond,
     ),
   ).toBe(true);
-  for (let i = 0; i < 50 && respond.mock.calls.length === 0; i++)
-    await new Promise((resolve) => realImmediate(resolve));
+  await workerStatusBarrier(listeners);
   expect(respond.mock.calls[0][0].ok).toBe(true);
   const rejected = vi.fn();
   expect(

@@ -269,10 +269,32 @@ def check_logs(name: str, since: str, fingerprint: str, *, first: bool) -> None:
             raise SmokeFailure("LOG_KEY_REPRINTED")
 
 
-def stop_diagnostic(name: str, state: dict) -> str:
-    """Whitelist stop evidence only; this does not decide whether a stop passes."""
-    if not isinstance(state, dict):
-        return "state=invalid"
+SHUTDOWN_MARKERS = {
+    "shutdown_started": "INFO:     Shutting down",
+    "shutdown_complete": "INFO:     Application shutdown complete.",
+    "shutdown_failed": "ERROR:    Application shutdown failed. Exiting.",
+    "server_finished": "INFO:     Finished server process [",
+}
+
+
+def shutdown_evidence(name: str, state: dict) -> dict:
+    since = state.get("StartedAt")
+    if not isinstance(since, str) or not re.fullmatch(r"[0-9T:.Z+-]+", since):
+        raise SmokeFailure("STATE_TIMESTAMP_INVALID")
+    logs = docker("logs", "--since", since, name).decode("utf-8", errors="replace")
+    evidence = {
+        label: any(line.startswith(marker) for line in logs.splitlines())
+        for label, marker in SHUTDOWN_MARKERS.items()
+    }
+    evidence["known_errors"] = any(
+        phrase in logs for _, phrases in LOG_ERROR_CATEGORIES for phrase in phrases
+    )
+    return evidence
+
+
+def check_clean_stop(name: str, state: dict) -> None:
+    """Uvicorn re-raises SIGTERM after shutdown; 143 alone is never sufficient."""
+    evidence = shutdown_evidence(name, state)
     fields = []
     for label, field in (("running", "Running"), ("oom", "OOMKilled"), ("dead", "Dead")):
         value = state.get(field)
@@ -282,33 +304,80 @@ def stop_diagnostic(name: str, state: dict) -> str:
         f"exit={exit_code if type(exit_code) is int and 0 <= exit_code <= 255 else 'invalid'}"
     )
     fields.append(f"exited={str(state.get('Status') == 'exited').lower()}")
-    try:
-        since = state.get("StartedAt")
-        if not isinstance(since, str) or not re.fullmatch(r"[0-9T:.Z+-]+", since):
-            raise SmokeFailure("STATE_TIMESTAMP_INVALID")
-        logs = docker("logs", "--since", since, name).decode("utf-8", errors="replace")
-        # Match fixed Uvicorn log records, never return their dynamic PID suffix.
-        for label, marker in (
-            ("shutdown_started", "INFO:     Shutting down"),
-            ("shutdown_complete", "INFO:     Application shutdown complete."),
-            ("shutdown_failed", "ERROR:    Application shutdown failed. Exiting."),
-            ("server_finished", "INFO:     Finished server process ["),
-        ):
-            fields.append(
-                f"{label}={str(any(line.startswith(marker) for line in logs.splitlines())).lower()}"
-            )
-        categories = (
-            "+".join(
-                category
-                for category, phrases in LOG_ERROR_CATEGORIES
-                if any(phrase in logs for phrase in phrases)
-            )
-            or "NO_KNOWN_ERROR"
+    fields.extend(f"{key}={str(value).lower()}" for key, value in evidence.items())
+    print("DIAG: stage=recreate.stopped " + " ".join(fields), flush=True)
+    if not (
+        state.get("Running") is False
+        and state.get("Status") == "exited"
+        and state.get("Dead") is False
+        and state.get("OOMKilled") is False
+        and type(exit_code) is int
+        and exit_code in (0, 143)
+        and evidence["shutdown_started"]
+        and evidence["shutdown_complete"]
+        and evidence["server_finished"]
+        and not evidence["shutdown_failed"]
+        and not evidence["known_errors"]
+    ):
+        raise SmokeFailure("GRACEFUL_STOP_NOT_CLEAN")
+
+
+# Inspect fixed owned paths without following even dangling Singleton symlinks.
+LOCK_PROBE = r"""
+import json
+import os
+from pathlib import Path
+import stat
+assert os.geteuid() != 0
+for directory in ("/app", "/app/data", "/app/data/browser-profile"):
+    assert stat.S_ISDIR(os.lstat(directory).st_mode)
+profile = Path("/app/data/browser-profile")
+print(json.dumps({name: os.path.lexists(profile / name)
+                  for name in ("SingletonLock", "SingletonSocket", "SingletonCookie")}))
+"""
+
+
+def check_profile_unlocked(image: str, volume: str, helper: str) -> None:
+    result = json.loads(
+        docker(
+            "run",
+            "--name",
+            helper,
+            "--network",
+            "none",
+            "--read-only",
+            "--cap-drop",
+            "ALL",
+            "--security-opt",
+            "no-new-privileges",
+            "--memory",
+            "128m",
+            "--pids-limit",
+            "32",
+            "--mount",
+            f"type=volume,source={volume},target=/app/data,readonly",
+            "--entrypoint",
+            "python",
+            image,
+            "-c",
+            LOCK_PROBE,
         )
-        fields.append(f"errors={categories}")
-    except SmokeFailure:
-        fields.append("logs=unavailable")
-    return " ".join(fields)
+    )
+    names = {"SingletonLock", "SingletonSocket", "SingletonCookie"}
+    if (
+        not isinstance(result, dict)
+        or set(result) != names
+        or any(type(value) is not bool for value in result.values())
+    ):
+        raise SmokeFailure("PROFILE_LOCK_PROBE_INVALID")
+    print(
+        "DIAG: stage=recreate.locks "
+        + " ".join(f"{name}={str(result[name]).lower()}" for name in sorted(names)),
+        flush=True,
+    )
+    if any(result.values()):
+        raise SmokeFailure("PROFILE_LOCKS_REMAIN")
+    docker("rm", helper)
 
 
 def run_smoke(image: str, arch: str) -> None:
@@ -316,6 +385,8 @@ def run_smoke(image: str, arch: str) -> None:
     name = "muse-smoke-" + suffix
     volume = "muse-smoke-data-" + suffix
     volume_created = False
+    helper = name + "-lock-check"
+    helper_pending = False
     stage = "image.inspect"
     try:
         metadata = json.loads(docker("image", "inspect", image))[0]
@@ -336,19 +407,12 @@ def run_smoke(image: str, arch: str) -> None:
                     docker("stop", "--time", "20", name)
                     stage = "recreate.stopped"
                     state = inspect_container(name)["State"]
-                    print(
-                        "DIAG: stage=recreate.stopped " + stop_diagnostic(name, state),
-                        flush=True,
-                    )
-                    if not (
-                        state.get("Running") is False
-                        and state.get("Status") == "exited"
-                        and type(state.get("ExitCode")) is int
-                        and state["ExitCode"] == 0
-                        and state.get("OOMKilled") is False
-                    ):
-                        raise SmokeFailure("GRACEFUL_STOP_NOT_CLEAN")
-                    print("PASS: recreate stopped running=false exit=0 oom=false", flush=True)
+                    check_clean_stop(name, state)
+                    stage = "recreate.locks"
+                    helper_pending = True
+                    check_profile_unlocked(image, volume, helper)
+                    helper_pending = False
+                    print("PASS: clean shutdown and all singleton locks absent", flush=True)
                     stage = "recreate.remove"
                     docker("rm", name)
                     stage = "recreate.start"
@@ -399,7 +463,10 @@ def run_smoke(image: str, arch: str) -> None:
     finally:
         # Attempt both operations even if the first cleanup fails; report leaks.
         cleaned = True
-        for args in (("rm", "--force", name), ("volume", "rm", volume)):
+        cleanup = [("rm", "--force", name), ("volume", "rm", volume)]
+        if helper_pending:
+            cleanup.insert(0, ("rm", "--force", helper))
+        for args in cleanup:
             if args[0] == "volume" and not volume_created:
                 continue
             try:
