@@ -98,7 +98,7 @@ uv run --no-sync python tools/check_publication.py --history
 uv run --no-sync python -m pip wheel . --no-deps -w dist
 ```
 
-此命令要求该解释器已安装 pip；若没有，请使用含 pip 的独立 Python 打包环境。检查 wheel 是否含 `muse_console/web/dashboard.html`、引用资源、CLI 入口和 MIT 许可声明。这些是验收要求，不代表某次发行已经通过。不预设或宣称有已发布的 PyPI 版本或 Docker registry 镜像，使用本地源码构建。
+此命令要求该解释器已安装 pip；若没有，请使用含 pip 的独立 Python 打包环境。检查 wheel 是否含 `muse_console/web/dashboard.html`、引用资源、CLI 入口和 MIT 许可声明。这些是验收要求，不代表某次发行已经通过。未发布 PyPI 包；容器镜像由 GHCR 工作流发布。
 
 Muse Console 派生自 [www222fff/muse2api](https://github.com/www222fff/muse2api)。副本/实质部分、包及容器镜像必须保留 [LICENSE](LICENSE) 的 `Copyright (c) 2026 www222fff` 与 MIT 许可声明，并保留 README 上游归属。改名不转移版权、不表示上游背书，也不能将上游 stars、发行版和维护者当作本项目的。交付归档排除所有凭据、数据、profile、虚拟环境及 `node_modules`。
 

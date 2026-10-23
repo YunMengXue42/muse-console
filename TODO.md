@@ -18,7 +18,7 @@ Priorities: **P0** must be done first · **P1** core feature · **P2** better ex
 | A2 | Test the browser driver with real accounts | P0 | `drivers/browser/` | | Previous single-account sample passed; hardening revision and multi-account load pending |
 | A3 | Verify how image/video generation is triggered | P0 | `drivers/browser/driver.py` | | Previous image/video sample passed; bounded downloader live regression pending |
 | A4 | Verify session renewal | P0 | `upstream/muse.py` | | Not started |
-| A5 | Verify the Docker image builds and runs | P1 | `Dockerfile` | | CI mock smoke job exists; real-driver container not verified |
+| A5 | Verify the Docker image builds and runs | P1 | `Dockerfile` | | Done: image workflow starts the browser driver in the container (non-root, caps dropped, no network) |
 | A6 | Enable GitHub Actions CI | P1 | `.github/workflows/ci.yml` | | Hosted CI passes for v0.4.2; publication changes need their own run |
 | B1 | Direct HTTP protocol driver | P1 | `drivers/http/` | | Not started |
 | B2 | Reuse conversation threads to cut first-token latency | P2 | `drivers/browser/` | | Done |
@@ -71,9 +71,9 @@ Earlier rebuild notes record local offline regressions, frontend checks and a mo
 - **Done when**: with keepalive enabled, an account stays usable for three days or more.
 
 ### A5 Verify the Docker image builds and runs · P1
-- In a separately authorized test environment, verify `docker compose up -d --build` builds the local `muse-console:local` image and starts the `muse-console` CLI, and the browser driver can start Chromium inside the container. This migration does not run Docker or production services.
-- Inspect the image and wheel for the retained MIT LICENSE/copyright and `muse_console/web` assets; no published registry/PyPI identity is assumed.
-- Check whether Chromium's sandbox flags need adjusting when the container runs as a non-root user.
+- Done (0.4.4): `.github/workflows/image.yml` builds amd64/arm64, starts the image with no network, all capabilities dropped and `no-new-privileges`, and requires the browser driver to report ready.
+- Chromium's own sandbox cannot start under Docker's default seccomp profile, so the image sets `MUSE_CONSOLE_CHROMIUM_NO_SANDBOX=true` and relies on the container boundary.
+- Still open: a real-account run inside the container (login, chat, image, video).
 
 ### A6 Enable GitHub Actions CI · P1
 - The repository already contains `.github/workflows/ci.yml` (lint and tests on Python 3.10 / 3.12).

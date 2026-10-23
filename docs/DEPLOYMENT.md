@@ -2,7 +2,7 @@
 
 English is canonical. [简体中文](DEPLOYMENT.zh-CN.md)
 
-These are deployment instructions and acceptance requirements, not a record of a completed deployment or security audit. Use an authorized checkout, isolated data and synthetic credentials first. No published PyPI release or Docker registry image is assumed or claimed: build the local source. This guide does not authorize publication or pushing.
+These are deployment instructions and acceptance requirements, not a record of a completed deployment or security audit. Use an authorized checkout, isolated data and synthetic credentials first. Container images are published to GHCR; no PyPI release is published.
 
 ## 1. Local mock baseline
 
@@ -31,27 +31,23 @@ MUSE_CONSOLE_LOGIN_AUTO_COMPLETE_ENABLED=false
 
 Use `http://127.0.0.1:18610/healthz` for liveness, `/readyz` for readiness, and `/dashboard` (also `/admin`) for the console. Check `/admin/status` using the admin Bearer key. A mock result is synthetic and needs no upstream account; health/readiness do not prove real authentication or generation. Protect health endpoints at the proxy if operational metadata should not be public.
 
-## 2. Local container build
+## 2. Container
 
-The Dockerfile builds the frontend, installs the locked Python package, includes LICENSE, runs as UID/GID 1000 and starts one `muse-console` process. Compose builds `muse-console:local`, binds only `127.0.0.1:18610`, mounts `./data` at `/app/data` and sets `shm_size: 1gb`.
-
-Before starting, create a dedicated `./data` owned by the container service identity with restrictive permissions. On POSIX, directories should normally be 0700 and secret files 0600; on Windows apply restrictive ACLs and verify Docker bind-mount access. Do not solve permission failures with world-writable permissions or privileged/root execution. Compose overrides `MUSE_CONSOLE_DATA_DIR` to `/app/data`: the mock source example's `data-mock` does not change the host mount. Use a separate checkout or reviewed local override for an isolated container test, never existing production data.
-
-POSIX shell example, after configuring distinct secrets privately:
+Images are published to `ghcr.io/yunmengxue42/muse-console` for linux/amd64 and linux/arm64 on each release tag (`X.Y.Z`, `X.Y`, `latest`). They are built from this repository by `.github/workflows/image.yml`, which also starts each image without network and checks the browser driver comes up.
 
 ```bash
-MUSE_CONSOLE_DRIVER=mock MUSE_CONSOLE_KEEPALIVE_ENABLED=false docker compose up -d --build
+docker run -d --name muse-console -p 127.0.0.1:18610:18610 --shm-size 1g   --cap-drop ALL --security-opt no-new-privileges   -v muse-data:/app/data ghcr.io/yunmengxue42/muse-console:latest
+docker logs muse-console   # console URL and first-start key
 ```
 
-PowerShell equivalent:
+Compose does the same: `docker compose up -d` pulls the image; `docker compose up -d --build` builds this checkout instead. Pin a release with `MUSE_CONSOLE_TAG=0.4.4`.
 
-```powershell
-$env:MUSE_CONSOLE_DRIVER = 'mock'
-$env:MUSE_CONSOLE_KEEPALIVE_ENABLED = 'false'
-docker compose up -d --build
-```
-
-Compose's explicit `environment` entries override `env_file` for the driver and keepalive. A `.env` entry alone is not a reliable opt-in: export the desired shell values explicitly for real-driver use. The image listens on all interfaces **inside** the container; retain the loopback-only host mapping and firewall. Never publish CDP port 19210. Base images/tooling downloads are build dependencies, not a published Muse Console image.
+- The image defaults to `MUSE_CONSOLE_DRIVER=browser`. Set `MUSE_CONSOLE_DRIVER=mock` for an offline trial.
+- Runs as UID/GID 1000. Data lives in the `muse-data` named volume. To use a host directory, set `MUSE_CONSOLE_DATA=./data` and make it owned by UID 1000 with mode 0700; never use world-writable permissions or root.
+- Chromium's own sandbox needs namespaces that Docker's default seccomp profile blocks, so the image sets `MUSE_CONSOLE_CHROMIUM_NO_SANDBOX=true`. The container is the isolation boundary: non-root, all capabilities dropped, `no-new-privileges`. Outside Docker, keep the sandbox on (section 3).
+- The first start prints a generated key once and saves it to `/app/data/api_key`. Set `MUSE_CONSOLE_ADMIN_KEY` to separate admin and client keys.
+- Keep the loopback-only port mapping; put a TLS reverse proxy in front (section 4). Never publish CDP port 19210.
+- `.env` next to `docker-compose.yml` is read if present. Settings under `environment:` in the compose file win over it.
 
 ## 3. One worker and a dedicated real browser
 

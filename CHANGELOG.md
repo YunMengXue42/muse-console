@@ -5,7 +5,14 @@ All notable changes to Muse Console are listed here. Versions follow [Semantic V
 ## [Unreleased]
 
 ### Added
+- One-command start: multi-arch images (amd64, arm64) published to `ghcr.io/yunmengxue42/muse-console` on each release; `docker compose up -d` pulls it. The image defaults to the browser driver.
+- First start prints the console URL and the generated key once.
+- Chromium startup failures report the exit code and the last stderr lines.
 - English UI for the console and the browser extension. The console follows the browser language and has a 中文 / English switch in the sidebar and on the login screen; the extension follows the browser language.
+
+### Changed
+- Compose uses a named volume, drops all capabilities and sets `no-new-privileges`. Existing `./data` deployments: set `MUSE_CONSOLE_DATA=./data`.
+- In the container image Chromium runs without its own sandbox (Docker's default seccomp blocks it); the non-root, capability-free container is the boundary.
 
 ## [0.4.3] - 2026-10-23
 

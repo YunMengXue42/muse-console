@@ -47,6 +47,20 @@ Muse Console：鉴权 · 账号调度 · 异步任务 · 媒体访问
 
 ## 快速开始
 
+用 Docker，一行命令：
+
+```bash
+docker run -d --name muse-console -p 127.0.0.1:18610:18610 --shm-size 1g   -v muse-data:/app/data ghcr.io/yunmengxue42/muse-console:latest
+docker logs muse-console
+```
+
+日志里有控制台地址和自动生成的密钥。打开 `http://127.0.0.1:18610/dashboard`，用密钥登录，再通过网页登录、Cookie 导入或浏览器扩展添加账号。镜像支持 amd64 和 arm64。用 Compose：`docker compose up -d`。
+
+镜像默认使用真实浏览器驱动。没有账号想先试用，加 `-e MUSE_CONSOLE_DRIVER=mock`。
+
+<details>
+<summary>从源码运行</summary>
+
 准备 **uv 0.12.11、Python 3.12、Node.js 24**，在新目录中执行：
 
 ```bash
@@ -58,11 +72,11 @@ cp .env.example .env
 uv run --no-sync muse-console
 ```
 
-打开 `http://127.0.0.1:18610/dashboard`。首次启动生成的密钥保存在 `data/api_key`。
+源码运行默认是 **Mock 模式**。接入真实 Muse 需安装 Chromium/Chrome 并设置 `MUSE_CONSOLE_DRIVER=browser`。PowerShell 用 `Copy-Item .env.example .env`，前端命令分步执行。
 
-默认使用 **Mock 模式**，无需账号。接入真实 Muse 时，安装 Chromium/Chrome，设置 `MUSE_CONSOLE_DRIVER=browser`，再从控制台网页登录或导入账号。密码、MFA 和验证码须手动完成。
+</details>
 
-PowerShell 用 `Copy-Item .env.example .env`，前端命令分步执行。不要覆盖已有配置或复用生产数据。[详细部署](docs/DEPLOYMENT.zh-CN.md)
+密码、MFA 和验证码须手动完成。端口只绑本机，远程访问请在前面加 TLS 反向代理。[详细部署](docs/DEPLOYMENT.zh-CN.md)
 
 ## 接入示例
 

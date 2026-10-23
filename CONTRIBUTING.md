@@ -98,7 +98,7 @@ After the frontend build, a local wheel can be built with:
 uv run --no-sync python -m pip wheel . --no-deps -w dist
 ```
 
-This command requires pip in that interpreter; if unavailable, use a separate Python packaging environment with pip. Inspect the wheel for `muse_console/web/dashboard.html`, referenced assets, the CLI entry point and the MIT license notice. These are verification requirements, not a claim that a release passed them. Use local-source builds: no published PyPI release or Docker registry image is assumed or claimed.
+This command requires pip in that interpreter; if unavailable, use a separate Python packaging environment with pip. Inspect the wheel for `muse_console/web/dashboard.html`, referenced assets, the CLI entry point and the MIT license notice. These are verification requirements, not a claim that a release passed them. No PyPI release is published; container images come from the GHCR workflow.
 
 Muse Console derives from [www222fff/muse2api](https://github.com/www222fff/muse2api). Preserve [LICENSE](LICENSE), including `Copyright (c) 2026 www222fff` and the MIT permission notice, in copies/substantial portions, packages and container images; retain the README upstream attribution. Renaming does not transfer copyright, imply upstream endorsement, or make upstream stars/releases/maintainers those of Muse Console. Keep all secrets, data, profiles, virtualenvs and `node_modules` out of delivery archives.
 

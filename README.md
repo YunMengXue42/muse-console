@@ -47,6 +47,20 @@ Call the API from your tools and maintain the service through a web console. Cli
 
 ## Quick start
 
+With Docker, one command:
+
+```bash
+docker run -d --name muse-console -p 127.0.0.1:18610:18610 --shm-size 1g   -v muse-data:/app/data ghcr.io/yunmengxue42/muse-console:latest
+docker logs muse-console
+```
+
+The log shows the console URL and a generated key. Open `http://127.0.0.1:18610/dashboard`, sign in with the key, then add accounts by web login, cookie import or the browser extension. Images are published for amd64 and arm64. With Compose: `docker compose up -d`.
+
+The image runs the real browser driver. To try it without an account, add `-e MUSE_CONSOLE_DRIVER=mock`.
+
+<details>
+<summary>From source</summary>
+
 Install **uv 0.12.11, Python 3.12 and Node.js 24**, then run in a fresh directory:
 
 ```bash
@@ -58,11 +72,11 @@ cp .env.example .env
 uv run --no-sync muse-console
 ```
 
-Open `http://127.0.0.1:18610/dashboard`. The first generated key is saved in `data/api_key`.
+Source runs default to **mock mode**. For real Muse access, install Chromium/Chrome and set `MUSE_CONSOLE_DRIVER=browser`. In PowerShell, use `Copy-Item .env.example .env` and run the frontend commands separately.
 
-The default **mock mode** needs no account. For real Muse access, install Chromium/Chrome, set `MUSE_CONSOLE_DRIVER=browser`, then log in or import accounts through the console. Passwords, MFA and CAPTCHA require manual completion.
+</details>
 
-In PowerShell, use `Copy-Item .env.example .env` and run the frontend commands separately. Do not overwrite existing configuration or reuse production data. [Deployment guide](docs/DEPLOYMENT.md)
+Passwords, MFA and CAPTCHA require manual completion. Keep the port on loopback and put a TLS reverse proxy in front for remote access. [Deployment guide](docs/DEPLOYMENT.md)
 
 ## API example
 

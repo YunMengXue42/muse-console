@@ -2,7 +2,7 @@
 
 [English（canonical，权威版本）](DEPLOYMENT.md) | 简体中文译文；如有歧义，以英文为准。
 
-本文是部署操作与验收要求，不代表已经完成部署或安全审计。先用获授权的源码副本、隔离数据和合成凭据。不预设或宣称有已发布的 PyPI 版本或 Docker registry 镜像，请本地构建源码。本文不授权公开或推送。
+本文是部署操作与验收要求，不代表已经完成部署或安全审计。先用获授权的源码副本、隔离数据和合成凭据。容器镜像发布在 GHCR；未发布 PyPI 包。
 
 ## 1. 本地 mock 基线
 
@@ -31,27 +31,23 @@ MUSE_CONSOLE_LOGIN_AUTO_COMPLETE_ENABLED=false
 
 通过 `http://127.0.0.1:18610/healthz` 检查存活，`/readyz` 检查就绪，`/dashboard`（也可 `/admin`）访问控制台。使用管理 Bearer key 检查 `/admin/status`。Mock 结果是合成数据，无需上游账号；健康/就绪不证明真实认证或生成成功。若运行元数据不应公开，在代理限制健康端点访问。
 
-## 2. 本地容器构建
+## 2. 容器
 
-Dockerfile 构建前端、安装锁定的 Python 包、包含 LICENSE，以 UID/GID 1000 运行并启动一个 `muse-console` 进程。Compose 构建 `muse-console:local`，仅绑定宿主机 `127.0.0.1:18610`，将 `./data` 挂载到 `/app/data`，并设置 `shm_size: 1gb`。
-
-启动前创建专用 `./data`，所有者为容器服务身份，权限严格限制。POSIX 目录通常为 0700，秘密文件为 0600；Windows 应配置严格 ACL 并核验 Docker 挂载访问。不要用全员可写、特权或 root 运行解决权限问题。Compose 将 `MUSE_CONSOLE_DATA_DIR` 覆盖为 `/app/data`，源码 mock 示例中的 `data-mock` 不会改变宿主机挂载。隔离容器测试应使用独立源码目录或审阅过的本地 override，不能复用生产数据。
-
-私下配置不同的秘密 key 后，POSIX shell 示例：
+每个版本标签都会把镜像发布到 `ghcr.io/yunmengxue42/muse-console`，支持 linux/amd64 和 linux/arm64（标签 `X.Y.Z`、`X.Y`、`latest`）。镜像由本仓库 `.github/workflows/image.yml` 构建，并在断网条件下启动、确认浏览器驱动可用。
 
 ```bash
-MUSE_CONSOLE_DRIVER=mock MUSE_CONSOLE_KEEPALIVE_ENABLED=false docker compose up -d --build
+docker run -d --name muse-console -p 127.0.0.1:18610:18610 --shm-size 1g   --cap-drop ALL --security-opt no-new-privileges   -v muse-data:/app/data ghcr.io/yunmengxue42/muse-console:latest
+docker logs muse-console   # 控制台地址和首次启动密钥
 ```
 
-PowerShell 对应命令：
+Compose 等价：`docker compose up -d` 拉取镜像；`docker compose up -d --build` 改为构建当前源码。用 `MUSE_CONSOLE_TAG=0.4.4` 固定版本。
 
-```powershell
-$env:MUSE_CONSOLE_DRIVER = 'mock'
-$env:MUSE_CONSOLE_KEEPALIVE_ENABLED = 'false'
-docker compose up -d --build
-```
-
-Compose 显式 `environment` 项会覆盖 `env_file` 中的 driver 和 keepalive。不能仅靠 `.env` 作为可靠的启用方式；真实 driver 需要显式导出所需 shell 值。镜像在**容器内部**监听所有接口，仍须保留宿主机 loopback 端口映射和防火墙。绝不发布 CDP 19210 端口。构建时下载基础镜像/工具不等于存在已发布的 Muse Console 镜像。
+- 镜像默认 `MUSE_CONSOLE_DRIVER=browser`。离线试用设 `MUSE_CONSOLE_DRIVER=mock`。
+- 以 UID/GID 1000 运行，数据在命名卷 `muse-data`。改用宿主机目录时设 `MUSE_CONSOLE_DATA=./data`，目录属主 UID 1000、权限 0700；不要用全员可写或 root。
+- Chromium 自带沙箱需要的命名空间被 Docker 默认 seccomp 拦截，所以镜像设 `MUSE_CONSOLE_CHROMIUM_NO_SANDBOX=true`，由容器负责隔离：非 root、去掉全部 capability、`no-new-privileges`。不在 Docker 里运行时保持沙箱开启（第 3 节）。
+- 首次启动打印一次自动生成的密钥，并保存到 `/app/data/api_key`。设置 `MUSE_CONSOLE_ADMIN_KEY` 可分离管理与调用密钥。
+- 保持端口只绑本机，前面加 TLS 反向代理（第 4 节）。不要暴露 CDP 端口 19210。
+- `docker-compose.yml` 同目录的 `.env` 会被读取；compose 文件 `environment:` 中的设置优先。
 
 ## 3. 单 worker 与专属真实浏览器
 
