@@ -2,7 +2,7 @@
 
 **把 Muse 网页能力接入现有 AI 工具，用一个控制台管理账号、密钥与生成任务。**
 
-[English](README.md) · 简体中文 · **0.4.2** · Python **3.10+** · **MIT**
+[English](README.md) · 简体中文 · **0.4.3** · Python **3.10+** · **MIT**
 
 Muse Console 是面向 [muse.ai](https://muse.ai) 的独立、非官方网关，将聊天、图像和视频生成封装为 OpenAI 风格 API 子集。自托管，数据留在自己的服务器上。
 

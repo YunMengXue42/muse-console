@@ -2,11 +2,12 @@
 
 All notable changes to Muse Console are listed here. Versions follow [Semantic Versioning](https://semver.org/) while the project is pre-1.0: minor versions may change behavior.
 
-## [Unreleased]
+## [0.4.3] - 2026-10-23
 
 ### Added
 - Browser extension 0.2.0: icons, readable status in popup and options (headline badge plus per-session state instead of raw JSON), `npm run package` producing a reproducible zip with SHA-256, bilingual extension README.
 - README screenshots from mock mode and a browser extension section.
+- The extension zip is attached to GitHub releases (`muse-console-extension-<version>.zip` with SHA-256).
 
 ### Fixed
 - Extension development mode no longer offers IPv6 loopback (`http://[::1]`): Chrome rejects it in extension CSP, so pairing could never connect. Use `127.0.0.1` or `localhost`.
@@ -111,6 +112,8 @@ Dashboard, per-client API keys, request log, async image tasks, reference images
 
 Initial layered OpenAI-compatible gateway with pluggable drivers.
 
+[0.4.3]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.4.3
+[0.4.2]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.4.2
 [0.4.1]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.4.1
 [0.4.0]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.4.0
 [0.3.10]: https://github.com/YunMengXue42/muse-console/releases/tag/v0.3.10
