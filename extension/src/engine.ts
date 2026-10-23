@@ -1,3 +1,4 @@
+import { parsePairingPackage, matchesPairingIdentity } from "./pairing-package";
 import { collect } from "./collector";
 import {
   originOf,
@@ -94,6 +95,7 @@ export class Engine {
     };
   }
   async inspect(input: string, development: boolean) {
+    delete this.session.inspected;
     const origin = originOf(input, development);
     if (!(await chrome.permissions.contains({ origins: [permission(origin)] })))
       throw new Error("permission_required");
@@ -117,10 +119,20 @@ export class Engine {
     await this.save();
     return { server_id: data.server_id, fingerprint: data.fingerprint, origin };
   }
-  async pair(challenge: string) {
+  async pair(challenge: string, pairingPackage?: string) {
     const target = this.session.inspected;
     if (!target || !challenge || challenge.length > 4096)
       throw new Error("inspect_first");
+    const expected =
+      pairingPackage === undefined
+        ? undefined
+        : parsePairingPackage(pairingPackage, target.development);
+    if (
+      expected &&
+      (!matchesPairingIdentity(expected, target) ||
+        expected.challenge !== challenge)
+    )
+      throw new Error("server_changed");
     // Recheck the displayed identity immediately before exchanging the one-time challenge.
     const identity = (await request(
       target.origin,
@@ -131,6 +143,7 @@ export class Engine {
       identity.fingerprint !== target.fingerprint
     )
       throw new Error("server_changed");
+    if (expected) parsePairingPackage(pairingPackage!, target.development);
     const p = (await request(target.origin, "/credential-ingestions/pair", {
       challenge,
       server_id: target.server_id,

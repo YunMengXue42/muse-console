@@ -1,6 +1,6 @@
 # Muse Console 浏览器扩展
 
-[English](README.md) · 简体中文 · **0.2.0** · Chrome / Edge 132+ · MV3
+[English](README.md) · 简体中文 · **0.3.0** · Chrome / Edge 132+ · MV3
 
 在浏览器里正常登录 Muse，扩展会把会话同步到**你自己部署**的 Muse Console。不用再手动导出 Cookie，会话轮换后也会自动更新。
 
@@ -31,7 +31,7 @@
 cd extension
 npm ci
 npm test
-npm run package     # 生成 dist/ 与 release/muse-console-extension-0.2.0.zip
+npm run package     # 生成 dist/ 与 release/muse-console-extension-0.3.0.zip
 ```
 
 打开 `chrome://extensions`（Edge 为 `edge://extensions`），开启**开发者模式**，点击**加载已解压的扩展程序**，选择 `extension/dist`。
@@ -48,10 +48,32 @@ MUSE_CONSOLE_CREDENTIAL_INGESTION_ENABLED=true
 MUSE_CONSOLE_CREDENTIAL_SERVER_ORIGIN=https://console.example.com
 ```
 
-1. **验证服务器**：打开扩展设置页，填写服务器 origin（如 `https://console.example.com`），点击“授权访问并查询身份”，在控制台核对 `server_id` 与 `fingerprint`。
-2. **配对**：在控制台“账号池 → 扩展设备配对”生成一次性挑战，粘贴到扩展并确认。
-3. **开启同步**：勾选授权说明，点击“开启自动同步”。
-4. **登录 Muse**：在该浏览器正常登录 muse.ai。弹出面板显示“同步正常”即完成。
+### 快速配对（0.3.0）
+
+> 配对包含有**短期敏感的一次性挑战，勿外传**，使用后请清理剪贴板。**预填不是信任来源**：仍须与已经信任的控制台核对查询到的身份。配对不代表同意 Cookie 同步。
+
+1. **在可信控制台生成**：打开“账号池 → 扩展设备配对”，按需填写设备备注与新增账号额度，然后点击“生成配对挑战”。
+2. **复制配对包**：点击“复制快速配对包”。剪贴板访问失败时，选中只读 JSON 配对包并手动复制。不要复制管理员 Key，也不要把配对包发给他人。
+3. **粘贴并预填**：打开扩展设置，在“快速配对包”中粘贴 JSON，点击“解析并预填”。此动作仅预填精确服务器 origin 与挑战，不请求主机权限、不确认身份，也不开启同步。本机 loopback HTTP 开发目标须在解析**之前**勾选开发模式。
+4. **重新查询并核对身份**：点击“授权访问并查询身份”，确认授权的是预期目标。扩展重新查询身份；origin、`server_id` 或 `fingerprint` 与包不符时拒绝配对。用户仍须独立核对显示的身份与可信控制台一致；应用指纹不是 TLS 证书 pin。
+5. **明确确认并配对**：完成核对后才勾选身份确认，点击“兑换挑战并配对”。扩展在兑换挑战前再次核对身份。配对成功后同步仍关闭。
+6. **单独授权同步**：阅读并勾选 Cookie 同步同意说明，点击“开启自动同步”。如有需要，在该浏览器登录 muse.ai；成功导入后弹出面板显示“同步正常”。如遇身份冲突需管理员确认，按下方状态说明处理。
+
+配对包过期或无效时，请重新生成并复制。已加载的包与挑战在过期、修改目标、主动清除或关闭页面时清除，不持久化。“清除配对包与挑战”可返回手动配对。清除本地输入不撤销已经复制到其他位置的挑战。
+
+<details>
+<summary>备选方式：手动填写 origin 与一次性挑战</summary>
+
+1. 在可信控制台打开“账号池 → 扩展设备配对”并生成挑战，查看其 origin、`server_id` 和 `fingerprint`。
+2. 在扩展设置清除已加载的配对包，填写该精确 origin，点击“授权访问并查询身份”，与可信控制台核对查询到的 ID 与指纹。
+3. 仅将一次性挑战粘贴到挑战输入框，明确确认身份后点击“兑换挑战并配对”。挑战过期须重新生成。
+4. 单独勾选 Cookie 同步同意说明并点击“开启自动同步”。仅配对不会开启同步。
+
+</details>
+
+### 配对包格式与限制
+
+JSON 为 `schema: "muse-console-pairing"`、`version: 1`，包含 `origin`、`server_id`、`fingerprint`、`challenge` 与 Unix 秒数 `expires_at`。输入限制为 8 KiB、规范精确 HTTPS origin（仅显式开发模式允许 loopback HTTP）和最多 15 分钟剩余有效期；拒绝额外字段及错误类型。不使用外部消息、content scripts 或 URL 自动授权。
 
 <p>
   <img src="../docs/images/extension-options.png" alt="扩展设置页" width="720" />

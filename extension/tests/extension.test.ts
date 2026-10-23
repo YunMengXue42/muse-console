@@ -170,6 +170,43 @@ describe("transport and trust boundary", () => {
       );
     await expect(e.pair("challenge")).rejects.toThrow("invalid_pairing");
   });
+  it("rejects package identity/challenge mismatch before exchange and expiry during identity fetch", async () => {
+    const e = new Engine();
+    await e.init();
+    vi.mocked(fetch).mockResolvedValue(
+      response({ server_id: "a", fingerprint: "fp" }),
+    );
+    await e.inspect("https://receiver.test", false);
+    const p = {
+      schema: "muse-console-pairing",
+      version: 1,
+      origin: "https://receiver.test",
+      server_id: "a",
+      fingerprint: "fp",
+      challenge: "ONETIME",
+      expires_at: Date.now() / 1000 + 300,
+    };
+    for (const bad of [
+      { ...p, server_id: "b" },
+      { ...p, fingerprint: "bad" },
+      { ...p, origin: "https://other.test" },
+      { ...p, challenge: "other" },
+    ]) {
+      await expect(e.pair("ONETIME", JSON.stringify(bad))).rejects.toThrow(
+        "server_changed",
+      );
+    }
+    expect(fetch).toHaveBeenCalledTimes(1);
+    vi.mocked(fetch).mockImplementation(async () => {
+      vi.setSystemTime(Date.now() + 301000);
+      return response({ server_id: "a", fingerprint: "fp" });
+    });
+    await expect(e.pair("ONETIME", JSON.stringify(p))).rejects.toThrow(
+      "expired_pairing_package",
+    );
+    expect(e.meta.pair).toBeUndefined();
+    expect(JSON.stringify({ local, session })).not.toContain("ONETIME");
+  });
   it("stores device token only in trusted local; never stores challenge", async () => {
     const e = new Engine();
     await e.init();
@@ -185,7 +222,21 @@ describe("transport and trust boundary", () => {
         }),
       );
     await e.inspect("https://receiver.test", false);
-    await e.pair("ONETIME_CHALLENGE");
+    await e.pair(
+      "ONETIME_CHALLENGE",
+      JSON.stringify({
+        schema: "muse-console-pairing",
+        version: 1,
+        origin: "https://receiver.test",
+        server_id: "a",
+        fingerprint: "fp",
+        challenge: "ONETIME_CHALLENGE",
+        expires_at: Date.now() / 1000 + 300,
+      }),
+    );
+    expect(JSON.stringify({ local, session })).not.toContain(
+      "muse-console-pairing",
+    );
     expect(local.meta.pair.token).toBe(TOKEN);
     expect(local.meta.enabled).toBe(false);
     expect(JSON.stringify({ local, session })).not.toContain(

@@ -2,7 +2,7 @@
 
 [English（canonical，权威版本）](DEPLOYMENT.md) | 简体中文译文；如有歧义，以英文为准。
 
-本文是部署操作与验收要求，不代表已经完成部署或安全审计。先用获授权的源码副本、隔离数据和合成凭据。容器镜像发布在 GHCR；未发布 PyPI 包。
+本文是部署操作与验收要求，不代表已经完成部署或安全审计。先用获授权的源码副本、隔离数据和合成凭据。未发布 PyPI 包。
 
 ## 1. 本地 mock 基线
 
@@ -33,21 +33,21 @@ MUSE_CONSOLE_LOGIN_AUTO_COMPLETE_ENABLED=false
 
 ## 2. 容器
 
-每个版本标签都会把镜像发布到 `ghcr.io/yunmengxue42/muse-console`，支持 linux/amd64 和 linux/arm64（标签 `X.Y.Z`、`X.Y`、`latest`）。镜像由本仓库 `.github/workflows/image.yml` 构建，并在断网条件下启动、确认浏览器驱动可用。
+v0.4.4 GHCR 镜像尚未发布，包可见性与匿名拉取尚未核验；GHCR 包首次发布默认 private，即使仓库公开也不例外。正式发布前请使用源码构建。容器目标为 `ghcr.io/yunmengxue42/muse-console`，支持 linux/amd64 和 linux/arm64（标签 `X.Y.Z`、`X.Y`、`latest`）。
 
 ```bash
-docker run -d --name muse-console -p 127.0.0.1:18610:18610 --shm-size 1g   --cap-drop ALL --security-opt no-new-privileges   -v muse-data:/app/data ghcr.io/yunmengxue42/muse-console:latest
+docker run -d --init --name muse-console -p 127.0.0.1:18610:18610 --shm-size 1g --memory 4g --pids-limit 512 --cap-drop ALL --security-opt no-new-privileges -v muse-data:/app/data ghcr.io/yunmengxue42/muse-console:0.4.4
 docker logs muse-console   # 控制台地址和首次启动密钥
 ```
 
-Compose 等价：`docker compose up -d` 拉取镜像；`docker compose up -d --build` 改为构建当前源码。用 `MUSE_CONSOLE_TAG=0.4.4` 固定版本。
+Compose 等价：`docker compose up -d` 拉取镜像；`docker compose up -d --build` 改为构建当前源码。默认标签为 `0.4.4`，可用 `MUSE_CONSOLE_TAG` 有意覆盖。
 
-- 镜像默认 `MUSE_CONSOLE_DRIVER=browser`。离线试用设 `MUSE_CONSOLE_DRIVER=mock`。
-- 以 UID/GID 1000 运行，数据在命名卷 `muse-data`。改用宿主机目录时设 `MUSE_CONSOLE_DATA=./data`，目录属主 UID 1000、权限 0700；不要用全员可写或 root。
-- Chromium 自带沙箱需要的命名空间被 Docker 默认 seccomp 拦截，所以镜像设 `MUSE_CONSOLE_CHROMIUM_NO_SANDBOX=true`，由容器负责隔离：非 root、去掉全部 capability、`no-new-privileges`。不在 Docker 里运行时保持沙箱开启（第 3 节）。
-- 首次启动打印一次自动生成的密钥，并保存到 `/app/data/api_key`。设置 `MUSE_CONSOLE_ADMIN_KEY` 可分离管理与调用密钥。
+- 镜像默认 `MUSE_CONSOLE_DRIVER=browser` 和 `MUSE_CONSOLE_CHROMIUM_NO_SANDBOX=true`。离线试用设 `MUSE_CONSOLE_DRIVER=mock`。
+- 以 UID/GID 1000 运行。`docker run` 使用 `muse-data` 卷，Compose 通常给卷名加项目名前缀，两种启动方式不会自动共用数据。原先使用 `./data` 的部署须在升级前设 `MUSE_CONSOLE_DATA=./data`，否则会显示新的空账号池；不会自动迁移数据。停写后完整备份，回滚时保持同一挂载。宿主目录属主须为 UID 1000、权限 0700，不要全员可写。
+- **容器方案：**为兼容性关闭 Chromium 沙箱。保留非 root 用户、`--init`（Compose `init: true`）、`cap-drop ALL`、`no-new-privileges` 和 loopback 端口绑定。浏览器漏洞可能暴露容器内数据，包括账号凭据；这些限制不等价于 Chromium 沙箱，也不代表完整隔离。禁止挂载 Docker socket、使用 privileged、增加 `SYS_ADMIN` 或用 unconfined seccomp 绕过限制。
+- 首次启动打印一次自动生成的密钥，并保存到 `/app/data/api_key`。重启后保留的旧容器日志仍含密钥，须限制访问且不要上传未脱敏日志。设置 `MUSE_CONSOLE_ADMIN_KEY` 可分离管理与调用密钥。
 - 保持端口只绑本机，前面加 TLS 反向代理（第 4 节）。不要暴露 CDP 端口 19210。
-- `docker-compose.yml` 同目录的 `.env` 会被读取；compose 文件 `environment:` 中的设置优先。
+- `docker-compose.yml` 同目录的 `.env` 会被读取，`environment:` 中的设置优先。`.env.example` 面向源码/Mock：复制后会选用 Mock。其 `CHROMIUM_NO_SANDBOX=false` 行已注释，保留源码默认 `false`、镜像默认 `true` 的区别；不要未经检查直接照搬全部配置。
 
 ## 3. 单 worker 与专属真实浏览器
 
@@ -57,7 +57,7 @@ Compose 等价：`docker compose up -d` 拉取镜像；`docker compose up -d --b
 
 1. 停止 mock 实例，选择独立私有数据目录和**全新空的专属 profile**。设置 `MUSE_CONSOLE_DRIVER=browser`，必要时用 `MUSE_CONSOLE_CHROMIUM_PATH` 指定已安装的 Chromium/Chrome。默认 profile 为 `data_dir/browser-profile`；仅可将 `MUSE_CONSOLE_BROWSER_PROFILE_DIR` 改为另一个获授权的项目专属目录。
 2. 禁止使用、复制、伪造所有权标记或读取用户日常主浏览器 profile 文件。首次启动以 `.muse-console-owned-profile` 认领空目录，也识别有效旧标记 `.muse2api-owned-profile`。非空且无标记目录会被拒绝。应使用新目录或明确授权的迁移，不得伪造标记。受保护根目录与 symlink/junction/reparse 检查只防误用，不是 OS 沙箱。
-3. 使用专属非特权 OS 身份，只允许该身份访问 profile/数据。保持 Chromium sandbox 启用（`MUSE_CONSOLE_CHROMIUM_NO_SANDBOX=false`），修复 sandbox/user namespace 支持，不要通过 root 或禁用 sandbox 绕过。实现会在 root 运行时添加 `--no-sandbox`，因此 false 设置不能让 root 变安全。
+3. 使用专属非特权 OS 身份，只允许该身份访问 profile/数据。源码部署保持 Chromium sandbox 启用（容器例外见第 2 节）（`MUSE_CONSOLE_CHROMIUM_NO_SANDBOX=false`），修复 sandbox/user namespace 支持，不要通过 root 或禁用 sandbox 绕过。实现会在 root 运行时添加 `--no-sandbox`，因此 false 设置不能让 root 变安全。
 4. 在管理控制台使用隔离的手动浏览器会话，自行完成认证/MFA，再完成验证与导入。不承诺密码或验证码自动化。批量 cookie 导入预览只验证结构，不证明上游会话有效。所有导入文件都按秘密处理。
 5. 使用授权账号和预算，分别验证登录及所需的聊天/图片/视频能力。历史样本或离线测试不等于本次修订的真实验收。上游账号级记忆可能跨对话生效，不要让互不信任的租户共享一个上游账号。
 
@@ -91,9 +91,28 @@ uv run --no-sync uvicorn muse_console.app:create_app --factory --host 127.0.0.1 
 
 导入默认关闭。使用明确授权的**独立测试浏览器**，不能自动安装到或检查用户主浏览器。扩展要求兼容 MV3 的 Chrome/Edge（manifest 最低 Chrome 132）。
 
+<a id="local-extension-import-with-docker"></a>
+
+### 本机扩展导号（Docker）
+
+基础一行启动使用真实浏览器 driver，但凭据导入仍默认关闭；关闭时 `/credential-ingestions/*` 返回 404。以下是**替代基础启动命令**的显式启用示例，仅用于同机 loopback HTTP：
+
+```bash
+docker run -d --init --name muse-console -p 127.0.0.1:18610:18610 --shm-size 1g --memory 4g --pids-limit 512 --cap-drop ALL --security-opt no-new-privileges -e MUSE_CONSOLE_CREDENTIAL_INGESTION_ENABLED=true -e MUSE_CONSOLE_CREDENTIAL_SERVER_ORIGIN=http://127.0.0.1:18610 -e MUSE_CONSOLE_CREDENTIAL_ALLOW_LOOPBACK_HTTP=true -v muse-data:/app/data ghcr.io/yunmengxue42/muse-console:0.4.4
+docker logs muse-console
+```
+
+若已有名为 `muse-console` 的容器，先停掉并移除旧容器（不要删除卷），再用同一数据卷重新创建；不要让两个实例共用数据。原先用 Compose 时须保留实际带项目前缀的卷名，不能盲用 `muse-data`。此命令不自动迁移数据、不自动配对，也不自动开启同步。
+
+控制台和扩展都使用精确的 `http://127.0.0.1:18610` origin（无路径、无尾斜杠；`localhost` 不是同一 origin）。扩展端还须显式允许 loopback HTTP 开发模式、授予此目标权限、核对服务器身份并单独同意同步；服务端开关不代表自动信任。复制配对 JSON 后仍须完成这些检查。禁止将此 HTTP 例外用于 LAN 或公网。
+
+远程部署按第 4 节配置可信 TLS，并设置 `MUSE_CONSOLE_CREDENTIAL_SERVER_ORIGIN=https://example.com` 与 `MUSE_CONSOLE_CREDENTIAL_INGESTION_ENABLED=true`；保持 `MUSE_CONSOLE_CREDENTIAL_ALLOW_LOOPBACK_HTTP=false`，扩展只授权相同的精确 HTTPS origin。
+
+### 配对步骤
+
 1. 在独立 browser-driver 部署中设置 `MUSE_CONSOLE_CREDENTIAL_INGESTION_ENABLED=true` 和精确的 `MUSE_CONSOLE_CREDENTIAL_SERVER_ORIGIN=https://example.com`，使用可信 TLS。仅本地开发可由两端明确允许精确 loopback HTTP，如 `http://127.0.0.1:18610`，服务端设置 `MUSE_CONSOLE_CREDENTIAL_ALLOW_LOOPBACK_HTTP=true`。禁止远程/LAN 明文 HTTP。
 2. 在 `extension` 中运行 `npm ci`、`npm test`、`npm run build`。只有用户同意安装/权限后，才手动加载 `extension/dist`。Manifest 的可选 HTTPS 权限范围不构成访问任意服务器的授权；只在扩展设置中授予选定目标权限。
-3. 管理员在控制台生成一次性 pairing challenge。扩展设置输入完全相同的 origin、授予目标权限、读取服务器身份，并在交换 challenge 前与控制台核对 **`server_id` 和 `fingerprint` 两项**。Fingerprint 是应用身份校验和，**不是 TLS 证书 pin**。禁止向扩展输入管理/主/客户端 key。
+3. 管理员在控制台生成一次性 pairing challenge。扩展设置输入完全相同的 origin、授予目标权限、读取服务器身份，并在交换 challenge 前与控制台核对 **`server_id` 和 `fingerprint` 两项**。Fingerprint 是应用身份校验和，**不是 TLS 证书 pin**。禁止向扩展输入管理/主/客户端 key。已实现的手动复制 JSON 快速配对包包含 origin、服务器 ID、fingerprint、challenge 和到期时间，不会自动授予权限或开启同步；按临时秘密处理，不记录到日志或公开分享。
 4. 单独开启同步，并明确确认 Muse 会话凭据将发送到该服务器；正常登录 Muse。扩展只经 cookies API 只读采集 `hatch_sess`、`hatch_gw`、`hatch_vml`、`hatch_native_auth_device`，保留原 scope/store/partition。不复制 profile、不修改 cookie、不收集身份提供商密码。后端在自己拥有的临时浏览器 context 中探测固定 session 端点后才提交，不发送生成请求；导入成功不等于生成成功。
 5. 设备默认可新增一个账号。已知上游 subject 可能匹配已有账号，但仅 cookie 轮换不能证明身份。身份缺失/冲突或服务端凭据版本更新时，可能需要管理员对**一个精确 capture、目标账号及当前凭据版本**进行确认。核对当前账号、确认该 capture，再重提原始候选。这不授权未来全部账号切换；版本变化需重新确认，候选丢失需重新采集和确认。
 6. 暂停/忘记只停止本地同步，不删除服务端账号。需在服务端撤销设备授权以禁止未来上传；设备 token 有效期有限且可轮换，不能读取 cookie 值、列出账号或调用管理 API。验证失败保留已有凭据。原始 capture 仅临时留在可信扩展 session storage，受限设备 token 持久化在可信 local storage；独立浏览器本身也须保护。
@@ -112,9 +131,9 @@ uv run --no-sync uvicorn muse_console.app:create_app --factory --host 127.0.0.1 
 | `MEDIA_MAX_BYTES` / `BROWSER_MEDIA_MAX_BYTES` | 各 33554432 字节 |
 | `MEDIA_STORAGE_MAX_BYTES` | 1073741824 字节 |
 
-登录和凭据验证 context 有独立上限；生成标签页上限不是 Chromium 总内存上限。额外设置 OS/容器 CPU、内存、进程、磁盘及出站限制；Compose 共享内存设置不是 RAM 上限。可选抠图增加模型下载、存储及 CPU/RAM 需求，需单独验证。仅公网下载验证是纵深防御，不替代出站控制。限制是进程内的，不是分布式计费限流或容量承诺。手动重试媒体生成前检查结果：不保证 exactly-once 生成、上游取消或退款。
+登录和凭据验证 context 有独立上限；生成标签页上限不是 Chromium 总内存上限。额外设置 OS/容器 CPU、内存、进程、磁盘及出站限制；Compose 共享内存设置不是 RAM 上限。可选抠图增加模型下载、存储及 CPU/RAM 需求，需单独验证。仅公网下载验证是纵深防御，不替代出站控制。限制是进程内的，不是分布式计费限流或容量承诺。手动重试媒体生成前检查结果：不保证 exactly-once 生成、上游取消或退款。示例以 4 GiB 内存和 512 PIDs 作为起始预算，须按实测负载和宿主容量调整，不代表完整隔离。
 
-`MUSE_CONSOLE_KEEPALIVE_ENABLED=false` 为默认值，获授权的真实验收前应保持关闭。带 scope 的凭据使用 owned-context 浏览器续期，旧凭据保留 HTTP 续期路径；两者都不保证跨设备/IP 可移植或永久登录。导入延迟目标、多账号负载及 **72 小时续期均未通过本次文档工作核验**。`MUSE_CONSOLE_LOGIN_AUTO_COMPLETE_ENABLED=false` 是另一个开关，仅用于结束隔离手动登录，不是无人值守密码/MFA 自动化。`tools/soak_check.py` 的只读健康监测不构成续期验收。
+`MUSE_CONSOLE_KEEPALIVE_ENABLED=false` 保持默认关闭。长期效果未验证。带 scope 的凭据使用 owned-context 浏览器续期，旧凭据保留 HTTP 续期路径；两者都不保证跨设备/IP 可移植或永久登录。`MUSE_CONSOLE_LOGIN_AUTO_COMPLETE_ENABLED=false` 是另一个开关，仅用于结束隔离手动登录，不是无人值守密码/MFA 自动化。`tools/soak_check.py` 的只读健康监测不构成续期验收。
 
 ## 8. 停写一致备份与完整恢复
 
@@ -131,7 +150,7 @@ uv run --no-sync python tools/backup_restore.py backup --data data --output ../m
 uv run --no-sync python tools/backup_restore.py restore --backup ../muse-backup-001 --output ../muse-restored-001 --stopped
 ```
 
-将 `data` 替换为实际已停写的宿主数据路径（所附 Compose 使用 `./data`）。源和目标不能相同或相互嵌套，即使目标是已存在的空目录也拒绝。失败保留部分输出供私下检查。工具创建严格权限（POSIX 0700/0600 或 Windows 当前用户 ACL），复制并验证清单/SHA-256。哈希仅检测损坏，**不防止清单和载荷一起遭恶意替换**；工具不加密备份，应另行加密并限制访问。
+将 `data` 替换为实际已停写的宿主数据路径（仅显式设置 `MUSE_CONSOLE_DATA=./data` 时为 `./data`；默认使用 named volume，须在全部停写后处理其挂载内容）。源和目标不能相同或相互嵌套，即使目标是已存在的空目录也拒绝。失败保留部分输出供私下检查。工具创建严格权限（POSIX 0700/0600 或 Windows 当前用户 ACL），复制并验证清单/SHA-256。哈希仅检测损坏，**不防止清单和载荷一起遭恶意替换**；工具不加密备份，应另行加密并限制访问。
 
 将整个已验证快照恢复到新目录；禁止合并到运行数据，或只恢复账号库而遗漏 key、所有权与设备状态。保持停写，恢复匹配的外部配置/profile，设置正确服务/容器所有权及 ACL（备份操作者可能不同于 UID 1000），再切换数据挂载/路径。保留旧目录用于私密回滚，不能让两个实例共享 profile/数据。在受限环境启动一个 worker，核对健康/就绪、管理/客户端 key 隔离、账号解密、设备撤销状态及媒体所有权/签名，再恢复流量。真实检查只使用授权测试账号，离线恢复不证明当前上游有效性。撰写本文没有执行恢复演练或完整真实验收。
 

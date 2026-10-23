@@ -59,7 +59,7 @@ uv run --no-sync python tools/backup_restore.py --help
 uv run --no-sync python tools/soak_check.py --help
 ```
 
-Backup/restore requires all writers stopped and explicit disjoint paths. Soak monitoring is read-only health/readiness and optional redacted admin counts, not generation or renewal acceptance. Never point live tests at production data or a daily browser profile.
+Backup/restore requires all writers stopped and explicit disjoint paths. Soak monitoring is read-only health/readiness and optional redacted admin counts, not generation or renewal acceptance. Automatic renewal is off by default; its long-term effectiveness is unverified. Never point live tests at production data or a daily browser profile.
 
 ## Picking up a task
 
@@ -98,7 +98,7 @@ After the frontend build, a local wheel can be built with:
 uv run --no-sync python -m pip wheel . --no-deps -w dist
 ```
 
-This command requires pip in that interpreter; if unavailable, use a separate Python packaging environment with pip. Inspect the wheel for `muse_console/web/dashboard.html`, referenced assets, the CLI entry point and the MIT license notice. These are verification requirements, not a claim that a release passed them. No PyPI release is published; container images come from the GHCR workflow.
+This command requires pip in that interpreter; if unavailable, use a separate Python packaging environment with pip. Inspect the wheel for `muse_console/web/dashboard.html`, referenced assets, the CLI entry point and the MIT license notice. These are verification requirements, not a claim that a release passed them. No PyPI release is published; see [Deployment](docs/DEPLOYMENT.md) for container setup and availability.
 
 Muse Console derives from [www222fff/muse2api](https://github.com/www222fff/muse2api). Preserve [LICENSE](LICENSE), including `Copyright (c) 2026 www222fff` and the MIT permission notice, in copies/substantial portions, packages and container images; retain the README upstream attribution. Renaming does not transfer copyright, imply upstream endorsement, or make upstream stars/releases/maintainers those of Muse Console. Keep all secrets, data, profiles, virtualenvs and `node_modules` out of delivery archives.
 

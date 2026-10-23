@@ -33,9 +33,10 @@ ENV MUSE_CONSOLE_HOST=0.0.0.0 \
     MUSE_CONSOLE_CHROMIUM_PATH=/usr/bin/chromium \
     MUSE_CONSOLE_CHROMIUM_NO_SANDBOX=true \
     PYTHONUNBUFFERED=1
-# Docker's default seccomp profile blocks the namespaces Chromium's own sandbox needs,
-# so inside the image the container is the isolation boundary: non-root UID 1000, and
-# compose drops all capabilities with no-new-privileges. Outside Docker the sandbox stays on.
+# Container default: Chromium's sandbox is disabled for compatibility.
+# Container hardening is not equivalent: browser exploits may expose container data.
+# Run non-root with --init, cap-drop ALL, no-new-privileges and loopback publishing;
+# never expose CDP, mount the Docker socket or use privileged mode.
 
 RUN mkdir -p /app/data && chown -R muse:muse /app
 USER muse

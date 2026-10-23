@@ -1,12 +1,14 @@
-# Quick start: docker compose up -d && docker compose logs muse-console
+# v0.4.4 image publication and anonymous pulls are not yet verified.
+# After publication: docker compose up -d && docker compose logs muse-console
 # The first start prints the console URL and a generated API key.
 services:
   muse-console:
-    image: ghcr.io/yunmengxue42/muse-console:${MUSE_CONSOLE_TAG:-latest}
+    image: ghcr.io/yunmengxue42/muse-console:${MUSE_CONSOLE_TAG:-0.4.4}
     # Build from this checkout instead: docker compose up -d --build
     build: .
     pull_policy: missing
     restart: unless-stopped
+    init: true
     env_file:
       - path: .env
         required: false
@@ -23,6 +25,10 @@ services:
       # (owned by UID 1000), e.g. when upgrading a deployment that used ./data.
       - ${MUSE_CONSOLE_DATA:-muse-data}:/app/data
     shm_size: "1gb"
+    # Starting budgets, not complete isolation; tune for measured browser workloads.
+    mem_limit: 4g
+    pids_limit: 512
+    # Keep the image's non-root user; never expose CDP, mount the Docker socket or use privileged mode.
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true

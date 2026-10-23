@@ -1,7 +1,6 @@
 name: Container image
 
-# Publishes ghcr.io/<owner>/muse-console for linux/amd64 and linux/arm64.
-# Tags v1.2.3 -> 1.2.3, 1.2, latest. Pull requests only build and smoke-test.
+# Release tags (including v0.4.4) require matching project metadata and main CI.
 on:
   push:
     tags: ["v*.*.*"]
@@ -10,35 +9,139 @@ on:
       - Dockerfile
       - .dockerignore
       - .github/workflows/image.yml
+      - .github/workflows/ci.yml
       - pyproject.toml
       - uv.lock
       - src/**
       - frontend/**
+      - '*compose*.yml'
+      - '*compose*.yaml'
+      - tools/**
   workflow_dispatch:
     inputs:
       push:
-        description: "Push the image (tag edge)"
+        description: "Push the image (tag edge; requires main CI for this SHA)"
         type: boolean
         default: false
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: image-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  image:
+  smoke:
+    name: Native browser smoke (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and load native image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          push: false
+          tags: muse-console:smoke
+          cache-from: type=gha,scope=image-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=image-${{ matrix.arch }}
+      - name: Offline browser, isolation and persistent-key smoke
+        run: python tools/container_smoke.py --image muse-console:smoke --arch '${{ matrix.arch }}'
+
+  release-gate:
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push == true)
+    needs: smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      sha: ${{ steps.gate.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require exact stable tag and matching project version
+        if: github.event_name == 'push'
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          import tomllib
+          from pathlib import Path
+
+          tag = os.environ['RELEASE_TAG']
+          version = tomllib.loads(Path('pyproject.toml').read_text())['project']['version']
+          if not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+', tag) or tag != 'v' + version:
+              raise SystemExit('Release tag must exactly match the stable pyproject version')
+          PY
+      - name: Verify current ref SHA and successful main push CI via GitHub API
+        id: gate
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const sha = (await exec.getExecOutput('git', ['rev-parse', 'HEAD'])).stdout.trim();
+            // The commits endpoint peels annotated tags as well as lightweight tags.
+            const ref = context.eventName === 'push'
+              ? `tags/${context.ref.slice('refs/tags/'.length)}`
+              : context.ref;
+            const current = await github.rest.repos.getCommit({owner, repo, ref});
+            if (current.data.sha !== sha || context.sha !== sha) {
+              throw new Error('Ref moved or checkout does not match the triggering SHA');
+            }
+            const ancestry = await github.rest.repos.compareCommits({
+              owner, repo, base: sha, head: 'main'
+            });
+            if (!['ahead', 'identical'].includes(ancestry.data.status)) {
+              throw new Error('Publishing SHA must belong to main history');
+            }
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              owner, repo, workflow_id: 'ci.yml', branch: 'main', event: 'push',
+              head_sha: sha, per_page: 100
+            });
+            const matching = runs.filter(run => run.head_sha === sha &&
+              run.head_branch === 'main' && run.event === 'push' &&
+              run.head_repository?.full_name === `${owner}/${repo}`);
+            matching.sort((a, b) => b.id - a.id);
+            const latest = matching[0];
+            if (!latest || latest.status !== 'completed' || latest.conclusion !== 'success') {
+              throw new Error('Latest main push CI for this exact SHA must be completed successfully');
+            }
+            core.setOutput('sha', sha);
+
+  publish:
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push == true)
+    needs: [smoke, release-gate]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
       contents: read
       packages: write
-    env:
-      PUSH: ${{ github.event_name == 'push' || inputs.push }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-gate.outputs.sha }}
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - name: Image name
@@ -49,49 +152,127 @@ jobs:
         with:
           images: ${{ steps.name.outputs.image }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{version}},enable=${{ github.event_name == 'push' }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'push' }}
             type=raw,value=latest,enable=${{ github.event_name == 'push' }}
             type=raw,value=edge,enable=${{ github.event_name == 'workflow_dispatch' }}
-      - name: Build native image for smoke test
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          load: true
-          tags: muse-console:smoke
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Smoke test (default browser driver, no network)
-        run: |
-          set -euo pipefail
-          trap 'docker logs muse-console-smoke 2>&1 | tail -40; docker rm -f muse-console-smoke >/dev/null 2>&1 || true' EXIT
-          docker run -d --name muse-console-smoke --network none --shm-size 1g \
-            --cap-drop ALL --security-opt no-new-privileges \
-            -e MUSE_CONSOLE_KEEPALIVE_ENABLED=false muse-console:smoke
-          for attempt in $(seq 1 60); do
-            if docker exec muse-console-smoke python -c 'import json,urllib.request; d=json.load(urllib.request.urlopen("http://127.0.0.1:18610/readyz", timeout=2)); assert d["driver"]["ok"] is True, d'; then
-              ok=1; break
-            fi
-            sleep 1
-          done
-          test "${ok:-}" = 1
-          docker logs muse-console-smoke 2>&1 | grep -q "First start: generated an API key"
-          docker logs muse-console-smoke 2>&1 | grep -q "Console: http://127.0.0.1:18610/dashboard"
       - name: Log in to GHCR
-        if: env.PUSH == 'true'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      # Pull requests build both architectures too, so a tag never meets a new arm64 failure.
-      - name: Build multi-arch image (push on tags)
+      - name: Push multi-architecture image after both native smokes and CI gate
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          push: ${{ env.PUSH == 'true' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha,scope=image-amd64
+            type=gha,scope=image-arm64
+      - name: Verify manifest is anonymously readable (no Docker credentials)
+        env:
+          IMAGE: ${{ steps.name.outputs.image }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.parse
+          import urllib.request
+
+          # Do not read ~/.docker/config.json or send GITHUB_TOKEN/basic auth.
+          image = os.environ['IMAGE'].removeprefix('ghcr.io/')
+          tag = os.environ['RELEASE_TAG'][1:] if os.environ['EVENT_NAME'] == 'push' else 'edge'
+          opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+          query = urllib.parse.urlencode({'service': 'ghcr.io', 'scope': f'repository:{image}:pull'})
+          try:
+              with opener.open('https://ghcr.io/token?' + query, timeout=30) as response:
+                  token = json.load(response)['token']
+              request = urllib.request.Request(
+                  f'https://ghcr.io/v2/{image}/manifests/{tag}',
+                  headers={
+                      'Authorization': 'Bearer ' + token,
+                      'Accept': 'application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json',
+                  },
+              )
+              with opener.open(request, timeout=30) as response:
+                  manifest = json.load(response)
+              platforms = {(m['platform']['os'], m['platform']['architecture'])
+                           for m in manifest['manifests']}
+              assert {('linux', 'amd64'), ('linux', 'arm64')} <= platforms
+          except Exception:
+              raise SystemExit(
+                  'Anonymous multi-arch manifest acceptance FAILED. Image may already be pushed but private; '
+                  'publication acceptance remains incomplete. Check GHCR package visibility in the documented UI '
+                  'and repeat anonymous verification; this workflow never changes visibility.'
+              ) from None
+          print('PASS: anonymous GHCR manifest exposes linux/amd64 and linux/arm64')
+          PY
+
+  anonymous-pull-smoke:
+    name: Anonymous published-image smoke (${{ matrix.arch }})
+    needs: [publish, release-gate]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-gate.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # No login action, packages permission, registry secret or build/push here.
+      - name: Full anonymous native pull, then offline container acceptance
+        env:
+          IMAGE_OWNER: ${{ github.repository_owner }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          IMAGE_ARCH: ${{ matrix.arch }}
+        run: |
+          python - <<'PY'
+          import os
+          import subprocess
+          import sys
+          import tempfile
+
+          owner = os.environ['IMAGE_OWNER'].lower()
+          tag = os.environ['RELEASE_TAG'][1:] if os.environ['EVENT_NAME'] == 'push' else 'edge'
+          image = f'ghcr.io/{owner}/muse-console:{tag}'
+          arch = os.environ['IMAGE_ARCH']
+          # Fresh job/daemon and explicit pull download the published layers,
+          # rather than reusing the build job's locally loaded smoke image.
+          with tempfile.TemporaryDirectory(prefix='muse-anonymous-docker-') as config:
+              env = dict(os.environ, DOCKER_CONFIG=config)
+              env.pop('DOCKER_AUTH_CONFIG', None)
+              env.pop('REGISTRY_AUTH_FILE', None)
+              try:
+                  subprocess.run(
+                      ['docker', 'pull', '--platform', f'linux/{arch}', image],
+                      env=env, check=True,
+                  )
+              except (OSError, subprocess.CalledProcessError):
+                  raise SystemExit(
+                      'Anonymous full image pull FAILED; publication acceptance remains incomplete. '
+                      'No visibility changes or retry push were performed.'
+                  ) from None
+              subprocess.run(
+                  [sys.executable, 'tools/container_smoke.py', '--image', image, '--arch', arch],
+                  env=env, check=True,
+              )
+          PY

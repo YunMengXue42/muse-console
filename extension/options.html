@@ -63,6 +63,30 @@
                   </p>
                 </div>
               </header>
+              <label class="field" for="pairingPackage">
+                <span data-i18n="quickPairingLabel"
+                  >快速配对包（短期敏感，勿外传）</span
+                >
+                <textarea
+                  id="pairingPackage"
+                  rows="5"
+                  maxlength="8192"
+                  autocomplete="off"
+                  spellcheck="false"
+                ></textarea>
+              </label>
+              <p class="fine" data-i18n="quickPairingHelp">
+                从可信控制台手动复制。预填内容不是信任来源；仍须核对可信控制台身份并单独同意
+                Cookie 同步。开发 HTTP 须先勾选开发模式。
+              </p>
+              <div class="actions">
+                <button id="loadPackage" data-i18n="loadQuickPairing">
+                  解析并预填
+                </button>
+                <button id="clearPackage" data-i18n="clearQuickPairing">
+                  清除配对包与挑战
+                </button>
+              </div>
               <label class="field" for="origin"
                 ><span data-i18n="serverOrigin">服务器 origin </span
                 ><input

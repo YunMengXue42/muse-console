@@ -6,7 +6,7 @@
 
 <p><strong>Connect Muse to your AI tools. Manage accounts, keys and generation tasks in one console.</strong></p>
 
-<p>English · <a href="README.zh-CN.md">简体中文</a> · <strong>0.4.3</strong> · Python <strong>3.10+</strong> · <strong>MIT</strong></p>
+<p>English · <a href="README.zh-CN.md">简体中文</a> · <strong>0.4.4</strong> · Python <strong>3.10+</strong> · <strong>MIT</strong></p>
 
 </div>
 
@@ -47,16 +47,18 @@ Call the API from your tools and maintain the service through a web console. Cli
 
 ## Quick start
 
-With Docker, one command:
+The v0.4.4 GHCR image is not yet published; package visibility and anonymous pulls are not yet verified. Use the source instructions until release.
+
+One-command start after image publication:
 
 ```bash
-docker run -d --name muse-console -p 127.0.0.1:18610:18610 --shm-size 1g   -v muse-data:/app/data ghcr.io/yunmengxue42/muse-console:latest
+docker run -d --init --name muse-console -p 127.0.0.1:18610:18610 --shm-size 1g --memory 4g --pids-limit 512 --cap-drop ALL --security-opt no-new-privileges -v muse-data:/app/data ghcr.io/yunmengxue42/muse-console:0.4.4
 docker logs muse-console
 ```
 
-The log shows the console URL and a generated key. Open `http://127.0.0.1:18610/dashboard`, sign in with the key, then add accounts by web login, cookie import or the browser extension. Images are published for amd64 and arm64. With Compose: `docker compose up -d`.
+The log shows the console URL and a generated key. Open `http://127.0.0.1:18610/dashboard`, sign in with the key, then add accounts by web login, cookie import or the browser extension. The container release targets amd64 and arm64. After publication, Compose supports `docker compose up -d` (default tag `0.4.4`).
 
-The image runs the real browser driver. To try it without an account, add `-e MUSE_CONSOLE_DRIVER=mock`.
+The image defaults to `browser` and `MUSE_CONSOLE_CHROMIUM_NO_SANDBOX=true`. The command above runs non-root with dropped capabilities, `no-new-privileges`, `--init` and loopback-only publishing. Never expose CDP, mount the Docker socket or use privileged mode. Browser vulnerabilities may expose container data; these restrictions are not equivalent to Chromium’s sandbox. Memory/PID budgets are starting points, not complete isolation. To try it offline after building locally, add `-e MUSE_CONSOLE_DRIVER=mock`. Startup logs contain the first generated key: keep them private, including after restart.
 
 <details>
 <summary>From source</summary>
@@ -72,7 +74,7 @@ cp .env.example .env
 uv run --no-sync muse-console
 ```
 
-Source runs default to **mock mode**. For real Muse access, install Chromium/Chrome and set `MUSE_CONSOLE_DRIVER=browser`. In PowerShell, use `Copy-Item .env.example .env` and run the frontend commands separately.
+Source runs default to **mock mode** and `MUSE_CONSOLE_CHROMIUM_NO_SANDBOX=false`. For real Muse access, install Chromium/Chrome and set `MUSE_CONSOLE_DRIVER=browser`. In PowerShell, use `Copy-Item .env.example .env` and run the frontend commands separately.
 
 </details>
 
@@ -94,16 +96,18 @@ Prefer `muse-chat`, `muse-image` and `muse-video`. See the [API reference](docs/
 
 A companion MV3 extension makes onboarding accounts easier: log in to Muse as usual and the session syncs to your paired console, including later rotations. It reads only four Muse session cookies, sends them only to the single server you grant, and its device token can be revoked at any time.
 
-See the [extension guide](extension/README.md) to install and pair.
+JSON quick pairing supports manual copy/paste of the origin, server ID, fingerprint, one-use challenge and expiry. Pasting will not enable sync automatically; identity checks, target permission and separate sync consent remain required.
+
+Credential ingestion is **off by default**; the basic container command does not enable extension import, and ingestion endpoints return 404 while disabled. Use the [local extension-enabled Docker example](docs/DEPLOYMENT.md#local-extension-import-with-docker) to opt in with an exact origin, then follow the [extension guide](extension/README.md) to install and pair.
 
 ## Boundaries
 
 - **A compatibility subset, not a full OpenAI implementation.** Model aliases do not provide those vendors' actual models. Tool calling, structured output and masked inpainting are unsupported.
-- **One process per deployment.** Run one worker per data directory. Automatic renewal is off by default; long-term renewal and multi-account load still need acceptance. The direct HTTP driver is unfinished.
+- **One process per deployment.** Run one worker per data directory. Automatic renewal is off by default; its long-term effectiveness is unverified. Multi-account load remains unverified. The direct HTTP driver is unfinished.
 - **Protect real credentials.** Use a dedicated browser profile. Set a separate admin key before sharing access and create client keys for callers. Do not share upstream accounts containing private memories among mutually untrusted users.
 - **Back up completely.** Stop all writers and back up the whole data directory, including both the account database and `credentials.key`. Use trusted TLS for remote access and keep CDP private.
 
-Build from source; no published PyPI package or container image is provided. Real generation depends on upstream pages, account state and quota.
+No PyPI package is published. Real generation depends on upstream pages, account state and quota.
 
 ## Documentation
 

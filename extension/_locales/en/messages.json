@@ -1,4 +1,40 @@
 {
+  "quickPairingLabel": {
+    "message": "Quick pairing package (short-lived and sensitive; keep private)"
+  },
+  "quickPairingHelp": {
+    "message": "Copy manually from your trusted console. Prefilled values are not a source of trust: still verify the identity against your trusted console and separately consent to Cookie sync. For development HTTP, select development mode first."
+  },
+  "loadQuickPairing": { "message": "Parse and prefill" },
+  "clearQuickPairing": { "message": "Clear package and challenge" },
+  "invalidQuickPairing": {
+    "message": "Invalid or expired pairing package. Check the format, exact origin and development mode. Nothing was authorized."
+  },
+  "quickPairingExpired": {
+    "message": "Pairing package expired and cleared. Generate a new package."
+  },
+  "quickPairingLoaded": {
+    "message": "Prefilled only. Click to grant access and fetch identity, then compare it with your trusted console. Sync is not authorized."
+  },
+  "quickPairingCleared": {
+    "message": "Package and challenge cleared. Manual pairing remains available."
+  },
+  "quickPairingIdentityMismatch": {
+    "message": "Server identity does not match the package. Pairing refused; package and challenge cleared."
+  },
+  "operationCompleted": { "message": "Operation completed." },
+
+  "quickPairingPackage": { "message": "Quick pairing package" },
+  "loadPairingPackage": { "message": "Parse and prefill" },
+  "invalidPairingPackage": {
+    "message": "Invalid or expired package. Copy a new one from your trusted console."
+  },
+  "pairingPackageExpired": {
+    "message": "Pairing package expired and cleared. Obtain a new one."
+  },
+  "pairingPackageLoaded": {
+    "message": "Prefilled, not authorized. Grant access to check identity, then explicitly confirm pairing. Sync requires separate consent."
+  },
   "extName": {
     "message": "Muse Console",
     "description": "extName UI message."
