@@ -65,7 +65,8 @@ jobs:
         run: |
           set -euo pipefail
           trap 'docker logs muse-console-smoke 2>&1 | tail -40; docker rm -f muse-console-smoke >/dev/null 2>&1 || true' EXIT
-          docker run -d --name muse-console-smoke --network none --shm-size 1g \n            --cap-drop ALL --security-opt no-new-privileges \
+          docker run -d --name muse-console-smoke --network none --shm-size 1g \
+            --cap-drop ALL --security-opt no-new-privileges \
             -e MUSE_CONSOLE_KEEPALIVE_ENABLED=false muse-console:smoke
           for attempt in $(seq 1 60); do
             if docker exec muse-console-smoke python -c 'import json,urllib.request; d=json.load(urllib.request.urlopen("http://127.0.0.1:18610/readyz", timeout=2)); assert d["driver"]["ok"] is True, d'; then
