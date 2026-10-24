@@ -117,7 +117,10 @@ async function signIn() {
 describe("控制台完整交互", () => {
   it("登录页只保留单个密钥提示与底部短说明", () => {
     render(<App />);
-    expect(screen.getByRole("heading", { name: "Muse Console" })).toBeTruthy();
+    const heading = screen.getByRole("heading", { name: "Muse Console" });
+    const language = screen.getByRole("group", { name: "界面语言" });
+    expect(language.parentElement?.className).toBe("login-card-tools");
+    expect(language.parentElement?.nextElementSibling).toBe(heading);
     expect(
       screen.getByLabelText("管理员 Key").getAttribute("placeholder"),
     ).toBe("管理员 Key");

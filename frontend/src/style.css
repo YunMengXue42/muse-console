@@ -859,6 +859,7 @@ th:first-child {
 .login-page {
   min-height: 100dvh;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
   background: var(--bg);
   padding: 40px 20px;
@@ -871,10 +872,15 @@ th:first-child {
 .login-card {
   width: 440px;
   max-width: 100%;
-  padding: 45px 36px;
+  padding: 24px 36px 40px;
   border: 1px solid var(--line);
   border-radius: 22px;
   background: var(--panel);
+}
+.login-card-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 24px;
 }
 .brand-logo {
   display: block;
@@ -1161,7 +1167,10 @@ th:first-child {
     flex-direction: column;
   }
   .login-card {
-    padding: 32px 25px;
+    padding: 20px 25px 32px;
+  }
+  .login-card-tools .language-switch button {
+    min-height: 44px;
   }
   .modal .toolbar button {
     min-height: 44px;

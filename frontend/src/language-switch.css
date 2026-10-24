@@ -20,6 +20,3 @@
   background: var(--line);
   color: var(--ink);
 }
-.login-card .language-switch {
-  margin-bottom: 16px;
-}
