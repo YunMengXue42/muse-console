@@ -441,8 +441,10 @@ export default function App() {
             void authenticate();
           }}
         >
+          <div className="login-card-tools">
+            <LanguageSwitch />
+          </div>
           <h1>Muse Console</h1>
-          <LanguageSwitch />
           <label>
             <input
               aria-label={t("管理员 Key")}

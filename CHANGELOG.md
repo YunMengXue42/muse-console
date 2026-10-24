@@ -2,6 +2,11 @@
 
 All notable changes to Muse Console are listed here. Versions follow [Semantic Versioning](https://semver.org/) while the project is pre-1.0: minor versions may change behavior.
 
+## [Unreleased]
+
+### Fixed
+- Move the login language switch to a separate top-right toolbar while keeping the title centered. Prevent the login card from overflowing narrow screens and provide 44 px language-button targets on mobile.
+
 ## [0.4.4] - 2026-10-24
 
 ### Added
